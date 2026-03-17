@@ -1,7 +1,6 @@
 # roadmap.md
 
 > **READ THIS FILE AT THE START OF EVERY SESSION.**
-> You have goldfish brain. You do not remember previous sessions.
 > This file is the single source of truth for what is done, what is in progress, and what is next.
 > After reading this file, read `CLAUDE.md` and `whatwearebuilding.md` for full context.
 
