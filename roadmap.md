@@ -77,11 +77,11 @@ npm run build        # must pass — all pages render without error
 
 ### Tasks
 
-- [ ] **1.1** Write `prisma/schema.prisma` — 7 models matching `whatwearebuilding.md`:
+- [x] **1.1** Write `prisma/schema.prisma` — 7 models matching `whatwearebuilding.md`:
   - Round (with `shipping_fee`), Supplier, Product (with `supplier_id`), User, Order (with `shipping_fee`, `shipped_at`, 5 statuses), OrderItem, NotificationLog (with `type`, nullable `order_id`)
   - All relations, constraints, indexes, defaults
-- [ ] **1.2** Run `npx prisma generate` — confirm no errors
-- [ ] **1.3** Write `prisma/migration.sql` — full Supabase migration:
+- [x] **1.2** Run `npx prisma generate` — confirm no errors
+- [x] **1.3** Write `prisma/migration.sql` — full Supabase migration:
   - 7 `CREATE TABLE` statements
   - Indexes (NOT on columns with `@unique`)
   - `generate_order_number()` trigger with `pg_advisory_xact_lock`
@@ -89,13 +89,13 @@ npm run build        # must pass — all pages render without error
   - All RLS policies (reference CLAUDE.md RLS table — `suppliers` is admin-only)
   - `product_progress` view (includes `supplier_id`)
   - `orders_by_product` view
-- [ ] **1.4** Write `types/index.ts` — TypeScript interfaces:
+- [x] **1.4** Write `types/index.ts` — TypeScript interfaces:
   - `Round`, `Supplier`, `Product`, `User`, `Order`, `OrderItem`, `NotificationLog`
   - `CartItem`, `OrderSubmitRequest`, `PaymentReportRequest`
   - `OrderStatus` union: `'pending_payment' | 'pending_confirm' | 'confirmed' | 'shipped' | 'cancelled'`
   - `NotificationType` union: `'payment_confirmed' | 'shipment' | 'product_arrival'`
   - `ProductProgress`, `OrderByProduct`
-- [ ] **1.5** Write `constants/index.ts`:
+- [x] **1.5** Write `constants/index.ts`:
   - `ORDER_STATUS` enum object (5 statuses now)
   - `STATUS_LABELS` (Chinese: 待付款/待確認/已確認/已出貨/已取消)
   - `STATUS_COLORS` (Tailwind classes for each)

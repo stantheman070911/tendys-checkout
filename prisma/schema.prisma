@@ -7,3 +7,147 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
+// ─── Round (開團) ───────────────────────────────────────────
+
+model Round {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  is_open      Boolean   @default(true)
+  deadline     DateTime? @db.Timestamptz(6)
+  shipping_fee Int?
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+
+  products Product[]
+  orders   Order[]
+
+  @@index([is_open])
+  @@map("rounds")
+}
+
+// ─── Supplier (供應商) ──────────────────────────────────────
+
+model Supplier {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  contact_name String?
+  phone        String?
+  email        String?
+  note         String?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  products Product[]
+
+  @@map("suppliers")
+}
+
+// ─── Product (商品) ─────────────────────────────────────────
+
+model Product {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  round_id    String?  @db.Uuid
+  supplier_id String?  @db.Uuid
+  name        String
+  price       Int
+  unit        String   @default("份")
+  is_active   Boolean  @default(true)
+  stock       Int?
+  goal_qty    Int?
+  image_url   String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  round       Round?      @relation(fields: [round_id], references: [id], onDelete: SetNull)
+  supplier    Supplier?   @relation(fields: [supplier_id], references: [id], onDelete: SetNull)
+  order_items OrderItem[]
+
+  @@index([round_id])
+  @@index([supplier_id])
+  @@index([is_active])
+  @@map("products")
+}
+
+// ─── User (用戶) ────────────────────────────────────────────
+
+model User {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nickname       String   @unique
+  recipient_name String?
+  phone          String?
+  address        String?
+  email          String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  orders Order[]
+
+  @@map("users")
+}
+
+// ─── Order (訂單) ───────────────────────────────────────────
+
+model Order {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_number        String    @unique @default("")
+  user_id             String?   @db.Uuid
+  round_id            String?   @db.Uuid
+  total_amount        Int       @default(0)
+  shipping_fee        Int?
+  status              String    @default("pending_payment")
+  payment_amount      Int?
+  payment_last5       String?
+  payment_reported_at DateTime? @db.Timestamptz(6)
+  confirmed_at        DateTime? @db.Timestamptz(6)
+  shipped_at          DateTime? @db.Timestamptz(6)
+  note                String?
+  pickup_location     String?
+  submission_key      String?   @unique @db.Uuid
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+
+  user              User?             @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  round             Round?            @relation(fields: [round_id], references: [id], onDelete: SetNull)
+  order_items       OrderItem[]
+  notification_logs NotificationLog[]
+
+  @@index([status])
+  @@index([user_id])
+  @@index([round_id])
+  @@index([created_at(sort: Desc)])
+  @@map("orders")
+}
+
+// ─── OrderItem (訂單明細) ───────────────────────────────────
+
+model OrderItem {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id     String  @db.Uuid
+  product_id   String? @db.Uuid
+  product_name String
+  unit_price   Int
+  quantity     Int
+  subtotal     Int
+
+  order   Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+
+  @@index([order_id])
+  @@map("order_items")
+}
+
+// ─── NotificationLog (通知記錄) ─────────────────────────────
+
+model NotificationLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id      String?  @db.Uuid
+  channel       String
+  type          String
+  status        String
+  error_message String?
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  order Order? @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id])
+  @@index([type])
+  @@map("notification_logs")
+}
