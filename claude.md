@@ -24,13 +24,15 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 
 1. Admin creates a round (開團), sets deadline + shipping fee, adds products with prices/stock/goal quantities.
 2. Admin shares Vercel URL in LINE group.
-3. User opens link → browses products (progress bars show goal status) → adds to cart (stock-limited) → enters nickname (auto-fills returning user data) → fills recipient info + pickup option → sees shipping fee if 宅配 → submits order (idempotent via `submission_key`).
+3. User opens link → browses products (progress bars show goal status) → adds to cart (stock-limited, CartBar hints shipping fee) → enters nickname (auto-fills returning user data) → fills recipient info + pickup option → sees shipping fee if 宅配 → submits order (idempotent via `submission_key`).
 4. System shows bank account details + share CTA if any product is under goal.
-5. User transfers money, reports payment (amount + last 5 digits of account).
+5. User transfers money, reports payment (amount + last 5 digits — with confirmation step before submit).
 6. Admin reviews in dashboard → confirms single or batch → system sends LINE Notify + Resend email (logged to `notification_logs`). Status: `confirmed`.
 7. Admin coordinates with suppliers → products arrive at 理貨中心 → admin sends arrival notification to relevant customers.
-8. Admin goes to 待出貨 page → marks orders as shipped (single or batch) → system sends shipment notification via LINE Notify + Email. Status: `shipped`.
-9. User checks status via `/lookup` (by nickname or order number).
+8. Admin goes to 待出貨 page (grouped by pickup method) → marks orders as shipped (single or batch) → system sends shipment notification via LINE Notify + Email. Status: `shipped`.
+9. User checks status via `/lookup` (by nickname or order number) → can click into order detail.
+10. **POS mode**: Admin can create orders on behalf of customers, do instant cash confirmation, and handle face-to-face pickup.
+11. **Admin cancel**: Admin can cancel orders from any status (with reason + cancellation notification).
 
 ---
 
@@ -52,10 +54,11 @@ app/                          → Next.js pages and API routes only
   api/
     submit-order/route.ts     # Create order (submission_key dedup, stock check, shipping fee calc)
     report-payment/route.ts   # User reports payment (pending_payment → pending_confirm)
-    cancel-order/route.ts     # User cancels (only if pending_payment)
+    cancel-order/route.ts     # User cancels (pending_payment only) OR Admin cancels (any status, with reason)
     confirm-order/route.ts    # Admin confirms single order + notifications
     batch-confirm/route.ts    # Admin batch confirm
     confirm-shipment/route.ts # Admin marks order(s) as shipped + notifications
+    quick-confirm/route.ts    # Admin POS: skip pending_confirm, go straight to confirmed (cash payment)
     notify-arrival/route.ts   # Admin sends product-arrival notification to relevant customers
     export-csv/route.ts       # CSV export of orders
     rounds/route.ts           # Round CRUD (includes shipping_fee)
@@ -106,9 +109,9 @@ Round          → id, name, is_open, deadline, shipping_fee, created_at
 Supplier       → id, name, contact_name, phone, email, note, created_at, updated_at
 Product        → id, round_id(FK), supplier_id(FK), name, price, unit, is_active, stock, goal_qty, image_url, created_at
 User           → id, nickname(UNIQUE), recipient_name, phone, address, email, created_at, updated_at
-Order          → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, submission_key(UNIQUE), created_at
+Order          → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), created_at
 OrderItem      → id, order_id(FK), product_id(FK), product_name, unit_price, quantity, subtotal
-NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('payment_confirmed'|'shipment'|'product_arrival'), status('success'|'failed'), error_message, created_at
+NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('payment_confirmed'|'shipment'|'product_arrival'|'order_cancelled'), status('success'|'failed'), error_message, created_at
 ```
 
 ### Key Additions from v1
@@ -117,21 +120,25 @@ NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('paymen
 - **`suppliers` table**: Linked to products via `products.supplier_id`. Used for 供應商管理 page and product-arrival notifications.
 - **`orders.shipping_fee`**: Snapshot of the round's shipping fee at order time (so changing the round fee later doesn't affect existing orders). Null if pickup.
 - **`orders.shipped_at`**: Timestamp written when admin confirms shipment.
-- **`notification_logs.type`**: Distinguishes payment confirmation vs shipment vs product arrival notifications.
+- **`orders.cancel_reason`**: Text, nullable. Written when admin cancels an order (optional reason).
+- **`notification_logs.type`**: Distinguishes payment confirmation vs shipment vs product arrival vs order cancellation notifications.
 - **`notification_logs.order_id`**: Now nullable — product arrival notifications aren't tied to a single order.
 
 ### Order Status Flow
 
 ```
 pending_payment → pending_confirm → confirmed → shipped
-       ↓                                          ↓
-   cancelled                               LINE + Email
-   (user or admin)                         (出貨通知)
-       ↑
-   (admin can cancel from any status)
+       │                                          ↓
+       ↓                                    LINE + Email (出貨通知)
+   cancelled (user: only from pending_payment)
+   cancelled (admin: from any status, with cancel_reason + cancellation notification)
+
+Admin POS shortcut: pending_payment → confirmed (skip pending_confirm for cash payments)
 ```
 
 Five statuses: `pending_payment`, `pending_confirm`, `confirmed`, `shipped`, `cancelled`
+
+Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for shipped.
 
 ### Key DB Behaviors
 
@@ -178,6 +185,8 @@ Five statuses: `pending_payment`, `pending_confirm`, `confirmed`, `shipped`, `ca
 - `confirm-order` and `batch-confirm`: update status → send notifications → log results. Notification failure does NOT rollback confirmation.
 - `confirm-shipment`: update status to `shipped` + write `shipped_at` → send shipment notifications → log results.
 - `notify-arrival`: takes `productId` + `roundId` → find all customers with that product in non-cancelled orders → send "已到達理貨中心" notification to each → log results.
+- `cancel-order`: Two modes — user (only `pending_payment`, no auth) and admin (any status, requires auth, optional `cancel_reason`). Restores stock except for `shipped`. Sends cancellation notification (admin cancel only).
+- `quick-confirm`: Admin POS shortcut — takes `orderId`, skips `pending_confirm`, sets status to `confirmed` + writes `confirmed_at` + auto-fills payment fields. For cash/in-person payments.
 
 ### Git
 
