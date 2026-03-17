@@ -2,7 +2,7 @@
 
 Read this entire file before writing or modifying any code. After reading this file, read `whatwearebuilding.md` for product spec, then read `roadmap.md` to find your current task.then read `prdandmock.tsx` to get the database schema and mock data. Do not start coding until you've read all three files.
 
-use context7 skill to get the up to date information about the tech stack.
+**Actual versions (as installed):** Next.js 16.1.7, React 19.2.4, TypeScript 5.9, Tailwind CSS 3.4, Prisma 6.19, ESLint 9 (flat config).
 
 ---
 
@@ -12,7 +12,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 
 | Key | Value |
 |-----|-------|
-| Framework | Next.js (App Router), TypeScript strict |
+| Framework | Next.js 16.1 (App Router, Turbopack), TypeScript strict |
 | DB | PostgreSQL via Supabase, Prisma ORM |
 | Styling | Tailwind CSS + shadcn/ui |
 | Email | Resend |
@@ -188,7 +188,7 @@ Five statuses: `pending_payment`, `pending_confirm`, `confirmed`, `shipped`, `ca
 
 ### Code Style
 
-- Prettier for formatting. ESLint with `next/core-web-vitals`.
+- Prettier for formatting. ESLint 9 flat config (`eslint.config.mjs`) with `eslint-config-next`.
 - Tests: Vitest, colocated as `*.test.ts` or in `__tests__/`.
 - Only change what was requested. No speculative helpers, no drive-by docstrings.
 

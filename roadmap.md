@@ -30,10 +30,10 @@
 
 ### Tasks
 
-- [ ] **0.1** Initialize Next.js 14 project with TypeScript strict, App Router, Tailwind CSS
-- [ ] **0.2** Install dependencies: `prisma`, `@prisma/client`, `@supabase/supabase-js`, `resend`, shadcn/ui base
-- [ ] **0.3** Run `npx shadcn-ui init` — choose default config
-- [ ] **0.4** Create directory structure (empty files with minimal exports where Next.js requires them):
+- [x] **0.1** Initialize Next.js 16.1 project with TypeScript strict, App Router, Tailwind CSS 3, React 19
+- [x] **0.2** Install dependencies: `prisma`, `@prisma/client`, `@supabase/supabase-js`, `resend`, shadcn/ui base
+- [x] **0.3** Run `npx shadcn@latest init` + add components
+- [x] **0.4** Create directory structure (all placeholder pages + lib skeleton):
   ```
   lib/db/          → prisma.ts (globalThis singleton, no models yet)
   lib/notifications/
@@ -42,7 +42,7 @@
   types/index.ts
   constants/index.ts
   app/page.tsx                      → "Coming soon" placeholder
-  app/order/[id]/page.tsx           → placeholder
+  app/order/[id]/page.tsx           → placeholder (async params for Next.js 16)
   app/lookup/page.tsx               → placeholder
   app/admin/page.tsx                → placeholder
   app/admin/dashboard/page.tsx      → placeholder
@@ -52,9 +52,9 @@
   app/admin/rounds/page.tsx         → placeholder
   app/admin/suppliers/page.tsx      → placeholder
   ```
-- [ ] **0.5** Create `.env.local.example` with all env vars from CLAUDE.md (no real values)
-- [ ] **0.6** Configure `next.config.ts` — minimal
-- [ ] **0.7** Add shadcn/ui components: `button`, `input`, `select`, `badge`, `card`, `table`, `dialog`, `tabs`, `checkbox`, `toast`
+- [x] **0.5** Create `.env.local.example` with all env vars from CLAUDE.md (no real values)
+- [x] **0.6** Configure `next.config.ts` — minimal (native TS config in Next.js 16)
+- [x] **0.7** Add shadcn/ui components: `button`, `input`, `select`, `badge`, `card`, `table`, `dialog`, `tabs`, `checkbox`, `toast`, `label`, `toaster`
 
 ### Checkpoint 0
 
@@ -65,6 +65,8 @@ npm run build        # must pass — all pages render without error
 ```
 
 **Done when:** Project builds clean. Every page renders a placeholder. No business logic.
+
+**Status: COMPLETE** — All tasks done. `tsc`, `lint`, `build` all pass. Committed and pushed to `main`.
 
 ---
 
