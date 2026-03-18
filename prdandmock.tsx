@@ -10,8 +10,8 @@
 // --- Suppliers ---
 
 const mockSuppliers = [
-  { id: "s1", name: "阿土伯有機農場", contact: "陳阿土", phone: "0911-111-111", email: "farmer@org.tw", note: "週二、五送貨" },
-  { id: "s2", name: "海鮮王批發", contact: "林海", phone: "0922-222-222", email: "sea@fish.tw", note: "需提前3天下單" },
+  { id: "s1", name: "阿土伯有機農場", contact_name: "陳阿土", phone: "0911-111-111", email: "farmer@org.tw", note: "週二、五送貨" },
+  { id: "s2", name: "海鮮王批發", contact_name: "林海", phone: "0922-222-222", email: "sea@fish.tw", note: "需提前3天下單" },
 ];
 
 // --- Products (linked to suppliers) ---
@@ -34,7 +34,7 @@ const mockRound = {
   shipping_fee: 60,
 };
 
-// --- Orders (covers all 4 status variations + shipping/pickup/notification combos) ---
+// --- Orders (covers 5 status variations + shipping/pickup/notification combos) ---
 
 const mockOrders = [
   {
@@ -122,6 +122,26 @@ const mockOrders = [
       { type: "shipment", line: "success", email: "success" },
     ],
   },
+  {
+    id: "ORD-20260315-005",
+    nickname: "阿花",
+    name: "張阿花",
+    phone: "0945-678-901",
+    address: "高雄市左營區博愛路30號",
+    pickup: null,
+    email: "flower@gmail.com",
+    items: [{ name: "有機地瓜", qty: 2, price: 60 }],
+    subtotal: 120,
+    shipping_fee: 60,
+    total: 180,
+    status: "cancelled",
+    payAmount: null,
+    payLast5: null,
+    paidAt: null,
+    shippedAt: null,
+    cancel_reason: "客戶要求取消",
+    notif: [{ type: "order_cancelled", line: "success", email: "success" }],
+  },
 ];
 
 // --- UI Reference Maps (used in constants/index.ts) ---
@@ -146,6 +166,7 @@ const notifTypeLabel = {
   payment_confirmed: "付款確認",
   shipment: "出貨通知",
   product_arrival: "到貨通知",
+  order_cancelled: "取消通知",
 };
 
 // ============================================
@@ -948,7 +969,7 @@ function AdminFlow({ onBack }) {
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="font-bold">{s.name}</div>
-                          <div className="text-xs text-gray-500">{s.contact} ・ {s.phone}</div>
+                          <div className="text-xs text-gray-500">{s.contact_name} ・ {s.phone}</div>
                           {s.email && <div className="text-xs text-gray-400">{s.email}</div>}
                           {s.note && <div className="text-xs text-orange-600 mt-1">📝 {s.note}</div>}
                         </div>

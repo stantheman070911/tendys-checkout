@@ -161,7 +161,8 @@ npm run build                 # must pass
   - `batchConfirm(orderIds)`
   - `confirmShipment(orderId)` — status → shipped, writes shipped_at
   - `batchConfirmShipment(orderIds)`
-  - `cancelOrder(orderId)` — status → cancelled + restore stock (transaction)
+  - `cancelOrder(orderId, isAdmin?, cancelReason?)` — user: only pending_payment; admin: any status with reason. Restore stock (except shipped). Transaction.
+  - `quickConfirm(orderId, paymentAmount)` — POS shortcut: pending_payment → confirmed, auto-fill payment fields + confirmed_at
   - `findByNicknameOrOrderNumber(query)` — for lookup
   - `listByRound(roundId, statusFilter?)`
   - `listConfirmedByRound(roundId)` — for 待出貨 page
@@ -177,12 +178,14 @@ npm run build                 # must pass
   - `sendOrderConfirmationEmail(to, order, items)` — type: payment_confirmed
   - `sendShipmentEmail(to, order, items)` — type: shipment
   - `sendProductArrivalEmail(to, productName)` — type: product_arrival
+  - `sendOrderCancelledEmail(to, order, items, cancelReason?)` — type: order_cancelled
   - All never-throw, return `{ success, error? }`
   - Plain HTML templates (Chinese)
 - [ ] **2.10** `lib/notifications/send.ts`:
   - `sendPaymentConfirmedNotifications(order, items)` — both channels + log
   - `sendShipmentNotifications(order, items)` — both channels + log
   - `sendProductArrivalNotifications(productName, customers)` — loop: send to each customer via both channels + log each
+  - `sendOrderCancelledNotifications(order, items, cancelReason?)` — both channels + log (admin cancel only)
 - [ ] **2.11** `lib/auth/supabase-admin.ts`:
   - Supabase client with service role key
   - Supabase client with anon key
@@ -232,8 +235,9 @@ npm run build        # must pass
   - Check status = `pending_payment`
   - Call `reportPayment()`
 - [ ] **3.3** `app/api/cancel-order/route.ts` — POST
-  - Check status = `pending_payment`
-  - Call `cancelOrder()` (restores stock)
+  - Two modes: user cancel (no auth, pending_payment only) and admin cancel (auth required, any status, optional cancel_reason)
+  - User: check status = `pending_payment` → cancel + restore stock
+  - Admin: any status → cancel + restore stock (except shipped) + send cancellation notification
 - [ ] **3.4** `app/api/confirm-order/route.ts` — POST (admin)
   - Verify admin → confirm → send payment_confirmed notifications → return results
 - [ ] **3.5** `app/api/batch-confirm/route.ts` — POST (admin)
@@ -249,17 +253,22 @@ npm run build        # must pass
   - Call `getOrdersByProduct()` to find all relevant customers
   - Call `sendProductArrivalNotifications()` with product name + customer list
   - Return: count notified, successes, failures
-- [ ] **3.8** `app/api/export-csv/route.ts` — GET (admin)
+- [ ] **3.8** `app/api/quick-confirm/route.ts` — POST (admin)
+  - POS shortcut: takes `orderId` + `paymentAmount`
+  - Verify admin → set status to `confirmed`, auto-fill payment fields, write `confirmed_at`
+  - Send payment_confirmed notifications
+  - Use case: admin collects cash in person, skips pending_confirm step
+- [ ] **3.9** `app/api/export-csv/route.ts` — GET (admin)
   - CSV with shipping fee column added
-- [ ] **3.9** `app/api/rounds/route.ts` — CRUD (admin)
+- [ ] **3.10** `app/api/rounds/route.ts` — CRUD (admin)
   - POST (create) includes `shipping_fee`
   - PUT (update) can change `shipping_fee`
-- [ ] **3.10** `app/api/products/route.ts` — CRUD (admin)
+- [ ] **3.11** `app/api/products/route.ts` — CRUD (admin)
   - Includes `supplier_id` in create/update
-- [ ] **3.11** `app/api/suppliers/route.ts` — CRUD (admin)
+- [ ] **3.12** `app/api/suppliers/route.ts` — CRUD (admin)
   - GET: list all with product count
   - POST: create, PUT: update, DELETE: delete (only if no linked products)
-- [ ] **3.12** `app/api/orders-by-product/route.ts` — GET (admin)
+- [ ] **3.13** `app/api/orders-by-product/route.ts` — GET (admin)
   - Query params: `productId`, `roundId`
   - Returns customer list: nickname, name, phone, quantity, order number
 
@@ -280,8 +289,10 @@ npm run build        # must pass
 - [ ] `notify-arrival` finds customers by product, not by order
 - [ ] `confirm-order`/`confirm-shipment` don't rollback on notification failure
 - [ ] Supplier DELETE is blocked if products reference it
+- [ ] `cancel-order` handles both user mode (pending_payment only) and admin mode (any status + reason + notification)
+- [ ] `quick-confirm` skips pending_confirm for POS cash payments
 
-**Done when:** All 12 routes compile and build passes. Backend feature-complete.
+**Done when:** All 13 routes compile and build passes. Backend feature-complete.
 
 ---
 
@@ -296,7 +307,7 @@ npm run build        # must pass
   - `SharePanel.tsx` — copy link + LINE share
   - `DeadlineBanner.tsx` — countdown + 已截單
   - `OrderStatusBadge.tsx` — 5 statuses now (add 已出貨)
-  - `CartBar.tsx` — sticky bottom (count + total + checkout)
+  - `CartBar.tsx` — sticky bottom (count + total + checkout) + **shipping fee hint** ("商品 $420 + 宅配運費 $60")
   - `ProductCard.tsx` — +/- with stock limit + progress bar
   - `ShippingFeeNote.tsx` — "宅配到以上地址，運費 $XXX"
 - [ ] **4.2** `app/page.tsx` — Storefront:
@@ -313,16 +324,17 @@ npm run build        # must pass
   - Round closed → 已截單 + disable cart
 - [ ] **4.3** `app/order/[id]/page.tsx` — Order Confirmation + Payment Report:
   - Fetch order by ID
-  - `pending_payment`: bank details (amount includes shipping) + report form + cancel + share CTA
+  - `pending_payment`: bank details (amount includes shipping) + report form + cancel + share CTA + **「繼續選購」link back to storefront**
   - `pending_confirm`: waiting status + summary + share CTA
   - `confirmed`: confirmed state + "等待出貨"
   - `shipped`: shipped state with shipped_at timestamp
-  - `cancelled`: cancelled state
-  - Payment report form: amount + last5
+  - `cancelled`: cancelled state + cancel_reason (if any)
+  - Payment report form: amount + last5 + **confirmation step before submit** (show amount vs order total comparison)
   - Cancel: confirmation dialog → API → refresh
 - [ ] **4.4** `app/lookup/page.tsx` — Order Lookup:
   - Search by nickname or order number
   - Results with 5-status badge, items, total (shipping shown separately)
+  - **Each result clickable → links to `/order/[id]` detail page**
   - `pending_payment` actions: report link + cancel
 
 ### Checkpoint 4
@@ -343,7 +355,11 @@ npm run build        # must pass
 - [ ] submission_key generated once per session
 - [ ] Share panel only when product under goal
 - [ ] Lookup works with both nickname and order number
-- [ ] Order detail page handles all 5 statuses
+- [ ] Lookup results link to `/order/[id]` detail page
+- [ ] Order detail page handles all 5 statuses (cancelled shows reason if present)
+- [ ] Payment report has confirmation step before submit
+- [ ] CartBar shows shipping fee hint
+- [ ] Order confirmation page has "繼續選購" link
 - [ ] All pages mobile-responsive (LINE browser)
 
 **Done when:** User full flow works end-to-end with real API.
@@ -358,16 +374,20 @@ npm run build        # must pass
 
 - [ ] **5.1** `app/admin/page.tsx` — Login:
   - Email/password → Supabase Auth → redirect to dashboard
-- [ ] **5.2** Admin auth guard:
+- [ ] **5.2** Admin auth guard + navigation:
   - Check session on all `/admin/*` (except login) → redirect if unauthenticated
+  - **Fixed navigation bar** (sidebar or top nav) with all admin sections + current round name + logout button
 - [ ] **5.3** `app/admin/dashboard/page.tsx`:
   - Top cards: total orders, revenue, pending confirm, pending payment, **pending shipment (confirmed count)**
-  - 商品需求彙總: product name, total qty, unit, revenue, **supplier name**, **「通知到貨」button**, **click to expand customer list**
-  - 通知發送狀態: by notification type (payment_confirmed / shipment / product_arrival)
+  - **Cards are clickable** — 待確認 → orders page filtered; 待出貨 → shipments page
+  - 商品需求彙總: product name, total qty, unit, revenue, **supplier name**, **「通知到貨」button**, **click to expand customer list**, **「列印理貨清單」button**
+  - 通知發送狀態: by notification type (payment_confirmed / shipment / product_arrival / order_cancelled)
 - [ ] **5.4** `app/admin/orders/page.tsx`:
-  - Filter tabs: 全部 / 待付款 / 待確認 / 已確認 / **已出貨** / 已取消
+  - **Search bar** (nickname / phone / order number) + Filter tabs: 全部 / 待付款 / 待確認 / 已確認 / **已出貨** / 已取消
+  - **「+ 代客下單」button** → opens inline order form (POS mode)
   - Order cards + batch confirm for pending_confirm
-  - Single order detail: info + payment match + confirm / cancel
+  - Single order detail: info + payment match + confirm / **admin cancel (with reason)** / **quick confirm (POS cash)**
+  - **Print packing slip** per order
   - CSV export (includes shipping fee column)
 - [ ] **5.5** `app/admin/products/page.tsx`:
   - Product list with progress bars + **supplier name**
@@ -409,12 +429,14 @@ npm run build        # must pass
 
 - [ ] **6.1** `app/admin/shipments/page.tsx` — 待出貨管理:
   - List all `confirmed` orders (not yet shipped)
+  - **Group by pickup method**: 宅配 section, 面交點A section, 面交點B section (collapsible)
   - Each shows: order number, recipient, phone, address/pickup, items, total
-  - Search/filter by nickname or order number
-  - Single "確認寄出" button per order
+  - Search/filter by nickname, phone, or order number
+  - Single "確認寄出" button per order (面交 orders show "確認取貨" instead)
   - Checkbox multi-select + "批次確認寄出" button
   - On confirm: calls `confirm-shipment` API → status → shipped → notifications sent
   - Success feedback: show notification results (LINE ✓/✗, Email ✓/✗)
+  - **「列印全部」button** → print all pending shipment packing slips (@media print)
 - [ ] **6.2** `app/admin/suppliers/page.tsx` — 供應商管理:
   - Supplier list: name, contact, phone, email, product count
   - Create / edit / delete (delete blocked if has products)
@@ -437,6 +459,7 @@ npm run build        # must pass
 
 **Verify:**
 - [ ] 待出貨 page only shows `confirmed` orders (not pending_payment, not already shipped)
+- [ ] 待出貨 page groups orders by pickup method (宅配 / 面交點A / 面交點B)
 - [ ] Single + batch shipment confirm works
 - [ ] Shipment confirmation sends both LINE + Email notifications
 - [ ] shipped_at timestamp is written
@@ -473,7 +496,11 @@ npm run build        # must pass
   - Double-click submit → same order (submission_key)
   - Payment report wrong format → validation error
   - Cancel `pending_confirm` → should fail
-  - Cancel `confirmed` (by admin) → should succeed + restore stock
+  - Cancel `confirmed` (by admin) → should succeed + restore stock + send cancellation notification
+  - Cancel `shipped` (by admin) → should succeed + NO stock restore + send cancellation notification
+  - Quick confirm (POS) on pending_payment → confirmed directly (skip pending_confirm)
+  - Quick confirm on non-pending_payment → should fail
+  - Admin create order on behalf of customer → order created as pending_payment
   - Batch confirm mix of valid/already-confirmed → partial success
   - Batch ship mix of confirmed/already-shipped → partial success
   - 通知到貨 when no one ordered that product → graceful "0 位客戶" message
