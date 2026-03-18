@@ -10,7 +10,8 @@ export type OrderStatus =
 export type NotificationType =
   | "payment_confirmed"
   | "shipment"
-  | "product_arrival";
+  | "product_arrival"
+  | "order_cancelled";
 
 export type NotificationChannel = "line" | "email";
 
@@ -76,6 +77,7 @@ export interface Order {
   shipped_at: string | null;
   note: string | null;
   pickup_location: string | null;
+  cancel_reason: string | null;
   submission_key: string | null;
   created_at: string;
 }

@@ -3,6 +3,7 @@ import {
   sendOrderConfirmationEmail,
   sendShipmentEmail,
   sendProductArrivalEmail,
+  sendOrderCancelledEmail,
 } from "@/lib/notifications/email";
 import { logNotification } from "@/lib/db/notification-logs";
 import { formatCurrency, formatOrderItems } from "@/lib/utils";
@@ -88,6 +89,47 @@ export async function sendShipmentNotifications(
       order.id,
       "email",
       "shipment",
+      emailResult.success ? "success" : "failed",
+      emailResult.error
+    );
+  }
+
+  return { line: lineResult, email: emailResult };
+}
+
+// ─── Order Cancelled ─────────────────────────────────────────
+
+export async function sendOrderCancelledNotifications(
+  order: OrderForNotify,
+  items: ItemForNotify[],
+  cancelReason?: string | null
+): Promise<{ line: NotifyResult; email: NotifyResult | null }> {
+  // LINE
+  const reasonText = cancelReason ? `\n原因: ${cancelReason}` : "";
+  const lineMsg = `\n訂單 ${order.order_number} 已取消${reasonText}\n${formatOrderItems(items)}`;
+  const lineResult = await sendLineNotify(lineMsg);
+  await logNotification(
+    order.id,
+    "line",
+    "order_cancelled",
+    lineResult.success ? "success" : "failed",
+    lineResult.error
+  );
+
+  // Email
+  let emailResult: NotifyResult | null = null;
+  const email = order.user?.email;
+  if (email) {
+    emailResult = await sendOrderCancelledEmail(
+      email,
+      order,
+      items,
+      cancelReason
+    );
+    await logNotification(
+      order.id,
+      "email",
+      "order_cancelled",
       emailResult.success ? "success" : "failed",
       emailResult.error
     );

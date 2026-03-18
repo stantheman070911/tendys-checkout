@@ -69,6 +69,7 @@ create table public.orders (
   shipped_at timestamptz,
   note text,
   pickup_location text,
+  cancel_reason text,
   submission_key uuid unique,
   created_at timestamptz default now()
 );
@@ -89,7 +90,7 @@ create table public.notification_logs (
   id uuid default gen_random_uuid() primary key,
   order_id uuid references public.orders(id) on delete cascade,
   channel text not null check (channel in ('line','email')),
-  type text not null check (type in ('payment_confirmed','shipment','product_arrival')),
+  type text not null check (type in ('payment_confirmed','shipment','product_arrival','order_cancelled')),
   status text not null check (status in ('success','failed')),
   error_message text,
   created_at timestamptz default now()
