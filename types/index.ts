@@ -132,6 +132,14 @@ export interface PaymentReportRequest {
   payment_last5: string;
 }
 
+// ─── Composite Types ────────────────────────────────────────
+
+export interface ProductWithProgress extends Product {
+  supplier_name: string | null;
+  current_qty: number;
+  progress_pct: number | null;
+}
+
 // ─── View Types ─────────────────────────────────────────────
 
 export interface ProductProgress {

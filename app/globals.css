@@ -33,5 +33,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Mobile-first: ensure inputs meet 44px touch target */
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px; /* prevents iOS zoom on focus */
   }
 }
