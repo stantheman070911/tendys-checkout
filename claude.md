@@ -28,7 +28,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 | DB | PostgreSQL via Supabase, Prisma ORM |
 | Styling | Tailwind CSS + shadcn/ui |
 | Email | Resend |
-| Notifications | LINE Messaging API (broadcast) |
+| Notifications | LINE Messaging API (1-on-1 push/multicast via webhook linking) |
 | Auth | Supabase Auth (admin only, email/password) |
 | Deploy | Vercel |
 
@@ -43,8 +43,9 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 7. Admin coordinates with suppliers → products arrive at 理貨中心 → admin sends arrival notification to relevant customers.
 8. Admin goes to 待出貨 page (grouped by pickup method) → marks orders as shipped (single or batch) → system sends shipment notification via LINE + Email. Status: `shipped`.
 9. User checks status via `/lookup` (by nickname or order number) → can click into order detail.
-10. **POS mode**: Admin can create orders on behalf of customers, do instant cash confirmation, and handle face-to-face pickup.
-11. **Admin cancel**: Admin can cancel orders from any status (with reason + cancellation notification).
+10. **LINE linking**: User pastes order number (e.g. `ORD-20260318-001`) into LINE Official Account → webhook validates → links `line_user_id` to order → subsequent notifications sent as 1-on-1 push (not broadcast).
+11. **POS mode**: Admin can create orders on behalf of customers, do instant cash confirmation, and handle face-to-face pickup.
+12. **Admin cancel**: Admin can cancel orders from any status (with reason + cancellation notification).
 
 ---
 
@@ -77,6 +78,7 @@ app/                          → Next.js pages and API routes only
     products/route.ts         # Product CRUD (includes supplier_id)
     suppliers/route.ts        # Supplier CRUD
     orders-by-product/route.ts # Group orders by product → customer list
+    line/webhook/route.ts     # LINE webhook: signature verify → message handler → order linking
 lib/                          → Pure TypeScript business logic (NO React/Next imports)
   db/
     prisma.ts                 # globalThis singleton PrismaClient
@@ -86,10 +88,14 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
     rounds.ts                 # CRUD, open/close, shipping fee
     suppliers.ts              # CRUD, list with product counts
     notification-logs.ts      # Insert log entry, query by order
+  line/
+    push.ts                   # LINE push/multicast/reply API (raw fetch, never-throw)
+    webhook.ts                # HMAC-SHA256 signature verification for LINE webhooks
+    validate-order-code.ts    # Validates order number format, links line_user_id to order
+    message-handler.ts        # Handles incoming LINE text messages (order linking + status check)
   notifications/
-    line-notify.ts            # LINE Messaging API broadcast, never-throw
     email.ts                  # Resend client + templates (order confirm, shipment, arrival)
-    send.ts                   # Orchestrator: send both channels, log results
+    send.ts                   # Orchestrator: send LINE push + email, log results
   auth/
     supabase-admin.ts         # Supabase Auth helpers (admin login/session check)
   utils.ts                    # Order number helpers, date formatting, share URL builder
@@ -109,6 +115,8 @@ constants/
   index.ts                    # Status enums, pickup options, bank info keys
 prisma/
   schema.prisma               # 7 models: Round, Product, User, Order, OrderItem, NotificationLog, Supplier
+  migration.sql               # Initial migration (all tables, triggers, RLS, views)
+  migration_002_line_push.sql # Add line_user_id column to orders
   seed.ts                     # Dev seed data
 ```
 
@@ -121,7 +129,7 @@ Round          → id, name, is_open, deadline, shipping_fee, created_at
 Supplier       → id, name, contact_name, phone, email, note, created_at, updated_at
 Product        → id, round_id(FK), supplier_id(FK), name, price, unit, is_active, stock, goal_qty, image_url, created_at
 User           → id, nickname(UNIQUE), recipient_name, phone, address, email, created_at, updated_at
-Order          → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), created_at
+Order          → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), line_user_id, created_at
 OrderItem      → id, order_id(FK), product_id(FK), product_name, unit_price, quantity, subtotal
 NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('payment_confirmed'|'shipment'|'product_arrival'|'order_cancelled'), status('success'|'failed'), error_message, created_at
 ```
@@ -134,6 +142,7 @@ NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('paymen
 - **`orders.shipped_at`**: Timestamp written when admin confirms shipment.
 - **`orders.cancel_reason`**: Text, nullable. Written when admin cancels an order (optional reason).
 - **`notification_logs.type`**: Four values: `payment_confirmed`, `shipment`, `product_arrival`, `order_cancelled`.
+- **`orders.line_user_id`**: Text, nullable. Set when user pastes order number into LINE OA via webhook. Used for 1-on-1 push notifications. Per-order (not per-user) — each order must be linked individually.
 - **`notification_logs.order_id`**: Now nullable — product arrival notifications aren't tied to a single order.
 
 ### Order Status Flow
@@ -164,6 +173,7 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 | 確認取貨 | Mark 面交 order as picked up (same status: `shipped`) |
 | 代客下單 | Admin creates order on behalf of customer (POS) |
 | 快速收款 | POS cash payment → quick-confirm (pending_payment → confirmed) |
+| 綁定訂單 | User pastes order number in LINE OA → webhook links `line_user_id` to that order |
 
 ### Key DB Behaviors
 
@@ -172,6 +182,7 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 - **`product_progress` view**: Aggregates `order_items` by product (excluding cancelled orders).
 - **Auto `updated_at`**: Trigger on `users` and `suppliers` tables.
 - **Shipping fee calculation**: `submit-order` route checks `pickup_location`: if null/empty (宅配), adds `round.shipping_fee` to total and snapshots it in `orders.shipping_fee`.
+- **LINE order linking**: User pastes `ORD-YYYYMMDD-NNN` in LINE OA → webhook writes `line_user_id` on that order. Per-order (not per-user). Idempotent — re-pasting same order by same user is a no-op. One order = one LINE account.
 
 ### RLS Policies (critical — get these right)
 
@@ -212,6 +223,7 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 - `notify-arrival`: takes `productId` + `roundId` → find all customers with that product in non-cancelled orders → send "已到達理貨中心" notification to each → log results.
 - `cancel-order`: Two modes — user (only `pending_payment`, no auth) and admin (any status, requires auth, optional `cancel_reason`). Restores stock except for `shipped`. Sends cancellation notification (admin cancel only).
 - `quick-confirm`: Admin POS shortcut — takes `orderId`, skips `pending_confirm`, sets status to `confirmed` + writes `confirmed_at` + auto-fills payment fields. For cash/in-person payments.
+- `line/webhook`: LINE webhook receiver. Verifies `x-line-signature` (HMAC-SHA256), dispatches text messages to `handleMessage()`. Always returns 200. Handles: order number → validate + link `line_user_id`; existing user → show status; unknown text → show instructions.
 
 ### Git
 
@@ -239,7 +251,7 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 | 5 | **shadcn/ui components are editable copies** | Don't regenerate without warning — local changes get overwritten. |
 | 6 | **Stock decrement must be atomic** | `UPDATE products SET stock = stock - $qty WHERE stock >= $qty` in transaction. Never read-then-write. |
 | 7 | **Order number trigger needs advisory lock** | `pg_advisory_xact_lock` prevents duplicate sequence numbers. |
-| 8 | **LINE Messaging API broadcast** | `POST https://api.line.me/v2/bot/message/broadcast` with Bearer `LINE_CHANNEL_ACCESS_TOKEN` and JSON body. |
+| 8 | **LINE Messaging API push (not broadcast)** | Uses push (`/push`), multicast (`/multicast`), and reply (`/reply`) — NOT broadcast. Requires `line_user_id` linked via webhook. Raw `fetch`, no SDK. |
 | 9 | **RLS + Prisma** | Anon operations use Supabase anon key client. Admin operations use service role key. Don't mix. |
 | 10 | **`submission_key` must be UUID** | Use `crypto.randomUUID()`. Strings/timestamps will collide. |
 | 11 | **Shipping fee snapshot** | Store `shipping_fee` on the order at creation time. If admin changes round fee later, existing orders are unaffected. |

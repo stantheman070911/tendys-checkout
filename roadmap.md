@@ -172,8 +172,9 @@ npm run build                 # must pass
   - `logNotification(orderId, channel, type, status, errorMessage?)` — orderId nullable for arrival notifications
   - `getLogsByOrder(orderId)`
   - `getLogsByRound(roundId)` — for dashboard notification summary
-- [x] **2.8** `lib/notifications/line-notify.ts`:
-  - `sendLineNotify(message)` — never throws, returns `{ success, error? }`
+- [x] **2.8** ~~`lib/notifications/line-notify.ts`~~ → **Replaced by `lib/line/push.ts`** in Phase 3.5:
+  - Old: `sendLineNotify(message)` — broadcast to all followers (deprecated, file deleted)
+  - New: `sendLinePush`, `sendLineMulticast`, `sendLineReply`, `sendLineMessage` — 1-on-1 push via raw fetch, never-throw
 - [x] **2.9** `lib/notifications/email.ts`:
   - `sendOrderConfirmationEmail(to, order, items)` — type: payment_confirmed
   - `sendShipmentEmail(to, order, items)` — type: shipment
@@ -294,6 +295,60 @@ npm run build        # must pass
 **Done when:** All 13 routes compile and build passes. Backend feature-complete.
 
 **Status: COMPLETE** — All 13 routes done. `tsc`, `lint`, `build` all pass. LINE Notify migrated to LINE Messaging API. Committed and pushed to `main`.
+
+---
+
+## Phase 3.5: LINE Push Notification Migration
+
+> **Goal:** Replace broadcast notifications with 1-on-1 push. Users link orders to their LINE account by pasting the order number into the LINE Official Account.
+
+### Tasks
+
+- [x] **3.5.1** Add `line_user_id` (TEXT, nullable) to Order model in `prisma/schema.prisma`
+- [x] **3.5.2** Write `prisma/migration_002_line_push.sql` — `ALTER TABLE orders ADD COLUMN line_user_id TEXT`
+- [x] **3.5.3** Create `lib/line/push.ts` — LINE API module (raw fetch, never-throw):
+  - `sendLinePush(lineUserId, message)` — single user push
+  - `sendLineMulticast(lineUserIds, message)` — batch up to 500, auto-chunks
+  - `sendLineReply(replyToken, message)` — reply to webhook event (free)
+  - `sendLineMessage(lineUserId, text, replyToken?)` — tries reply first, falls back to push
+- [x] **3.5.4** Create `lib/line/webhook.ts` — HMAC-SHA256 signature verification
+- [x] **3.5.5** Create `lib/line/validate-order-code.ts` — validates order number format (`ORD-YYYYMMDD-NNN`), links `line_user_id` to order (idempotent, per-order)
+- [x] **3.5.6** Create `lib/line/message-handler.ts` — handles incoming LINE messages:
+  - Order number pattern → validate + link → reply confirmation
+  - Existing linked user → show order status
+  - Unknown text → show instructions
+- [x] **3.5.7** Create `app/api/line/webhook/route.ts` — LINE webhook endpoint:
+  - Verify `x-line-signature` header
+  - Dispatch text message events to `handleMessage()`
+  - Always return 200 OK (LINE requirement)
+- [x] **3.5.8** Update `lib/notifications/send.ts` — replace broadcast with targeted push:
+  - Payment/shipment/cancellation: `sendLinePush(order.line_user_id, msg)`, skip if no `line_user_id`
+  - Product arrival: collect all customer `line_user_id`s, use `sendLineMulticast(ids, msg)`
+  - Add `line_user_id` to `OrderForNotify` and `CustomerForArrival` interfaces
+- [x] **3.5.9** Update `types/index.ts` — add `line_user_id: string | null` to Order interface
+- [x] **3.5.10** Update `app/api/notify-arrival/route.ts` — pass `line_user_id` in customer data
+- [x] **3.5.11** Delete `lib/notifications/line-notify.ts` (dead code, replaced by `lib/line/push.ts`)
+- [x] **3.5.12** Add `order-link-template/` to `tsconfig.json` exclude array
+
+### Checkpoint 3.5
+
+```bash
+npx tsc --noEmit     # must pass
+npm run lint         # must pass
+npm run build        # must pass
+```
+
+**Verify:**
+- [x] `lib/line/push.ts` uses raw fetch (no `@line/bot-sdk`)
+- [x] All push functions are never-throw
+- [x] Webhook verifies HMAC-SHA256 signature
+- [x] Order linking is idempotent (re-pasting same order = no-op)
+- [x] One order = one LINE account (ALREADY_LINKED error for different user)
+- [x] `send.ts` imports from `@/lib/line/push`, not `line-notify`
+- [x] Product arrival uses multicast (not individual pushes)
+- [x] Missing `line_user_id` → skip LINE push gracefully (email still sent)
+
+**Status: COMPLETE** — All tasks done. `tsc`, `lint`, `build` all pass. Committed to `main` (`d9583fd`).
 
 ---
 
