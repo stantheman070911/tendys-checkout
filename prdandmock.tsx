@@ -556,8 +556,7 @@ function UserFlow({ onBack }) {
               <label className="block text-sm font-medium text-gray-600 mb-1">取貨方式</label>
               <select value={info.pickup} onChange={e => setInfo(p => ({ ...p, pickup: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
                 <option value="">宅配到以上地址</option>
-                <option value="面交點A：中正路全家">面交點A：中正路全家</option>
-                <option value="面交點B：民生路小七">面交點B：民生路小七</option>
+                
               </select>
               {!info.pickup && mockRound.shipping_fee > 0 && (
                 <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-2 text-sm text-blue-800">

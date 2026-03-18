@@ -4,6 +4,18 @@ Read this entire file before writing or modifying any code. After reading this f
 
 **Actual versions (as installed):** Next.js 16.1.7, React 19.2.4, TypeScript 5.9, Tailwind CSS 3.4, Prisma 6.19, ESLint 9 (flat config).
 
+Core Principles (Non-Negotiable)
+
+Efficiency: Minimize steps, time, and cognitive load
+
+Effectiveness: Flows must reliably achieve intended outcomes
+
+Quality: No ambiguous states; edge cases explicitly handled
+
+Simplicity: Eliminate unnecessary complexity
+
+Constraint: Simple ≠ Easy (do not remove necessary system logic)
+
 ---
 
 ## Project
