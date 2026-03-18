@@ -56,7 +56,9 @@ app/                          → Next.js pages and API routes only
   page.tsx                    # User storefront (products + cart + checkout)
   order/[id]/page.tsx         # Order confirmation + payment report + cancel + share
   lookup/page.tsx             # Order lookup + history
-  admin/
+  gtfo/page.tsx               # Troll page for /admin snoopers ("get the fuck out")
+  admin/                      # ⚠️ NOT accessible via /admin (redirects to /gtfo)
+                              # Real URL: /bitchassnigga (via next.config.ts rewrites)
     page.tsx                  # Admin login
     dashboard/page.tsx        # Stats + item aggregation + notification log
     orders/page.tsx           # Order list, filter, single/batch confirm, CSV export

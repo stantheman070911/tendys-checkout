@@ -418,6 +418,8 @@ npm run build        # must pass
 
 **Status: COMPLETE** — All tasks done. `tsc`, `lint`, `build` all pass. Mobile-first: viewport meta with viewportFit=cover, 44px min touch targets on all inputs/buttons, safe-area padding on CartBar, 16px base font to prevent iOS zoom, single-column mobile layout with responsive grid.
 
+**Additional:** Admin route obfuscation applied — `/admin` redirects to `/gtfo` (troll page). Real admin accessed via `/bitchassnigga` (rewrites in `next.config.ts`). Mock UI/UX from `prdandmock.tsx` applied to all Phase 4 pages.
+
 ---
 
 ## Phase 5: Admin Pages — Core
