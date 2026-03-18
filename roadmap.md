@@ -93,7 +93,7 @@ npm run build        # must pass — all pages render without error
   - `Round`, `Supplier`, `Product`, `User`, `Order`, `OrderItem`, `NotificationLog`
   - `CartItem`, `OrderSubmitRequest`, `PaymentReportRequest`
   - `OrderStatus` union: `'pending_payment' | 'pending_confirm' | 'confirmed' | 'shipped' | 'cancelled'`
-  - `NotificationType` union: `'payment_confirmed' | 'shipment' | 'product_arrival'`
+  - `NotificationType` union: `'payment_confirmed' | 'shipment' | 'product_arrival' | 'order_cancelled'`
   - `ProductProgress`, `OrderByProduct`
 - [x] **1.5** Write `constants/index.ts`:
   - `ORDER_STATUS` enum object (5 statuses now)
@@ -119,7 +119,7 @@ npm run build                 # must pass
 - [ ] `product_progress` view excludes cancelled orders, includes `supplier_id`
 - [ ] `orders_by_product` view joins users, excludes cancelled
 - [ ] `orders.status` CHECK includes all 5 values
-- [ ] `notification_logs.type` CHECK includes all 3 values
+- [ ] `notification_logs.type` CHECK includes all 4 values (`payment_confirmed`, `shipment`, `product_arrival`, `order_cancelled`)
 - [ ] `notification_logs.order_id` is nullable
 - [ ] `rounds.shipping_fee` column exists
 - [ ] `orders.shipping_fee` and `orders.shipped_at` columns exist
@@ -213,7 +213,7 @@ npm run build        # must pass
 - [ ] `createWithItems` handles shipping fee: adds to total if 宅配, snapshots on order
 - [ ] `confirmShipment` writes `shipped_at`
 - [ ] `sendProductArrivalNotifications` loops over customers, doesn't stop on single failure
-- [ ] 3 email templates exist (payment_confirmed, shipment, product_arrival)
+- [ ] 4 email templates exist (payment_confirmed, shipment, product_arrival, order_cancelled)
 
 **Done when:** All lib files compile. No React imports. Business logic complete.
 
@@ -432,7 +432,7 @@ npm run build        # must pass
   - **Group by pickup method**: 宅配 section, 面交點A section, 面交點B section (collapsible)
   - Each shows: order number, recipient, phone, address/pickup, items, total
   - Search/filter by nickname, phone, or order number
-  - Single "確認寄出" button per order (面交 orders show "確認取貨" instead)
+  - Single confirm button per order: 宅配 → "確認寄出", 面交 → "確認取貨" (both set status to `shipped`)
   - Checkbox multi-select + "批次確認寄出" button
   - On confirm: calls `confirm-shipment` API → status → shipped → notifications sent
   - Success feedback: show notification results (LINE ✓/✗, Email ✓/✗)
@@ -542,7 +542,7 @@ npx vitest run       # must pass (if tests exist)
 - [ ] Full user flow end-to-end (including shipping fee)
 - [ ] Full admin flow end-to-end (confirm → arrival notify → ship)
 - [ ] Supplier management works
-- [ ] All 3 notification types send correctly
+- [ ] All 4 notification types send correctly (payment_confirmed, shipment, product_arrival, order_cancelled)
 - [ ] No console errors
 - [ ] Mobile-friendly
 - [ ] CSV correct

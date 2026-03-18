@@ -15,6 +15,21 @@
 
 ---
 
+## 術語標準化
+
+| 術語 | 定義 | 備註 |
+|------|------|------|
+| 宅配 | 寄送到客戶地址 | 加收 shipping_fee |
+| 面交 | 客戶到指定地點取貨 | 免運，使用 pickup_location |
+| 取貨方式 | 宅配 or 面交（統稱） | |
+| 確認寄出 | Admin 標記宅配訂單已寄出 | status → shipped |
+| 確認取貨 | Admin 標記面交訂單已交付 | status → shipped（同等效力） |
+| 代客下單 | Admin 替客戶建立訂單（POS） | 建立後可搭配快速收款 |
+| 快速收款 | POS 現場收現金，跳過 pending_confirm | quick-confirm API |
+| 到貨通知 | 商品到達理貨中心，通知相關客戶 | 按商品而非按訂單 |
+
+---
+
 ## 系統架構 Overview
 
 ```

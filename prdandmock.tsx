@@ -6,6 +6,112 @@
 // and testing. The full DB schema, system flow, page structure, and
 // env vars are documented in claude.md, whatwearebuilding.md, and roadmap.md.
 // Do NOT duplicate that information here.
+//
+// ============================================
+// UX AUDIT — REQUIRED UPDATES (2026-03-18)
+// ============================================
+//
+// The following gaps were identified between whatwearebuilding.md spec
+// and this prototype. Each must be addressed when building real pages.
+//
+// --- USER FLOW ---
+//
+// 1. CartBar missing shipping fee hint
+//    Location: UserFlow step 0, sticky bottom bar
+//    Fix: Add small text "宅配另加運費 $60" next to the total
+//    Spec ref: whatwearebuilding.md UX 要點 #1
+//
+// 2. Payment report missing confirmation step
+//    Location: UserFlow step 3 (回報匯款)
+//    Fix: After user fills amount + last5, show confirmation summary
+//    comparing order total vs reported amount BEFORE submit.
+//    Add a "確認送出" step instead of going straight to submit.
+//    Spec ref: whatwearebuilding.md Flow 2 step 2, UX 要點 #3
+//
+// 3. Missing "繼續選購" button on order confirmation
+//    Location: UserFlow step 2 (訂單成立)
+//    Fix: Add "繼續選購" link back to storefront (same round)
+//    Spec ref: whatwearebuilding.md UX 要點 #5
+//
+// 4. Lookup results not clickable
+//    Location: LookupFlow results list
+//    Fix: Each order card should be clickable → navigate to /order/[id]
+//    Spec ref: whatwearebuilding.md Flow 3 step 3, UX 要點 #4
+//
+// --- ADMIN FLOW ---
+//
+// 5. Dashboard stat cards not clickable
+//    Location: AdminFlow dashboard, grid cards
+//    Fix: "待確認 N筆" → click navigates to orders tab with pending_confirm filter
+//    "待出貨 N筆" → click navigates to shipments tab
+//    Spec ref: whatwearebuilding.md UX Admin #1
+//
+// 6. Missing search bar in admin orders
+//    Location: AdminFlow orders tab
+//    Fix: Add search input above filter tabs (暱稱 / 電話 / 訂單編號)
+//    Support real-time filtering as user types
+//    Spec ref: whatwearebuilding.md UX Admin #2
+//
+// 7. Missing POS "代客下單" button
+//    Location: AdminFlow orders tab
+//    Fix: Add "+ 代客下單" button that opens inline order form
+//    (product selection + customer info + pickup method)
+//    After submit: order created as pending_payment
+//    Then offer "已現場收款" for instant quick-confirm
+//    Spec ref: whatwearebuilding.md Flow 7
+//
+// 8. Missing quick-confirm (POS cash payment)
+//    Location: AdminFlow order detail
+//    Fix: For pending_payment orders, add "已現場收款" button
+//    that calls quick-confirm API (pending_payment → confirmed, skip pending_confirm)
+//    Spec ref: whatwearebuilding.md Flow 7 step 4, claude.md quick-confirm API
+//
+// 9. Missing admin cancel with reason
+//    Location: AdminFlow order detail (cancel button)
+//    Fix: When admin clicks cancel, show dialog with optional reason textarea
+//    Cancel should work from ANY status (not just pending_payment)
+//    Sends cancellation notification (LINE + Email)
+//    Spec ref: whatwearebuilding.md Flow 8
+//
+// 10. Shipments not grouped by pickup method
+//     Location: AdminFlow shipments tab
+//     Fix: Group confirmed orders into collapsible sections:
+//     "宅配" section, "面交點A" section, "面交點B" section
+//     Spec ref: whatwearebuilding.md Flow 5, UX Admin #3
+//
+// 11. Shipment button text should differentiate pickup method
+//     Location: AdminFlow shipments tab, per-order confirm button
+//     Fix: 宅配 orders → "確認寄出", 面交 orders → "確認取貨"
+//     Both set status to shipped, but label differentiates for clarity
+//     Spec ref: whatwearebuilding.md terminology, roadmap.md Phase 6
+//
+// 12. Missing print buttons
+//     Location: AdminFlow order detail, shipments tab, dashboard
+//     Fix: Add "列印出貨單" per order, "列印全部" on shipments page,
+//     "列印理貨清單" on dashboard product aggregation
+//     Use @media print CSS for print-optimized layout
+//     Spec ref: whatwearebuilding.md Flow 10
+//
+// 13. Missing round history
+//     Location: AdminFlow rounds tab
+//     Fix: Show last 5 historical rounds below current round
+//     Spec ref: whatwearebuilding.md Flow 11 step 4
+//
+// 14. Remove embedded SQL at bottom of file
+//     The Supabase migration SQL duplicates schema from whatwearebuilding.md
+//     and claude.md. Remove to eliminate drift risk.
+//     Schema source of truth: whatwearebuilding.md + prisma/schema.prisma
+//
+// --- CROSS-CUTTING ---
+//
+// 15. NotificationType must include 'order_cancelled'
+//     The notifTypeLabel map is correct (has all 4 types).
+//     Ensure types/index.ts also includes order_cancelled.
+//
+// 16. Touch targets: Ensure all interactive elements ≥ 44px on mobile
+//     Several buttons (filter tabs, checkbox areas) are smaller than 44px
+//
+// ============================================
 
 // --- Suppliers ---
 
@@ -1125,246 +1231,13 @@ function AdminFlow({ onBack }) {
 }
 
 // ============================================
-// Supabase Migration SQL v2
-// (Run in Supabase SQL Editor)
+// Supabase Migration SQL — REMOVED
 // ============================================
+// Schema is defined in:
+//   - whatwearebuilding.md (canonical DB schema tables)
+//   - prisma/schema.prisma (Prisma models)
+//   - prisma/migration.sql (full migration with RLS, triggers, views)
 //
-// -- 0. Rounds 開團表
-// create table public.rounds (
-//   id uuid default gen_random_uuid() primary key,
-//   name text not null,
-//   is_open boolean not null default true,
-//   deadline timestamptz,
-//   shipping_fee integer,            -- NEW: 宅配運費 (null = 免運)
-//   created_at timestamptz default now()
-// );
-//
-// -- 1. Suppliers 供應商表
-// create table public.suppliers (
-//   id uuid default gen_random_uuid() primary key,
-//   name text not null,
-//   contact_name text,
-//   phone text,
-//   email text,
-//   note text,
-//   created_at timestamptz default now(),
-//   updated_at timestamptz default now()
-// );
-//
-// -- 2. Products 商品表
-// create table public.products (
-//   id uuid default gen_random_uuid() primary key,
-//   round_id uuid references public.rounds(id) on delete set null,
-//   supplier_id uuid references public.suppliers(id) on delete set null,
-//   name text not null,
-//   price integer not null check (price > 0),
-//   unit text not null default '份',
-//   is_active boolean not null default true,
-//   stock integer,
-//   goal_qty integer,
-//   image_url text,
-//   created_at timestamptz default now()
-// );
-//
-// -- 3. Users 用戶表
-// create table public.users (
-//   id uuid default gen_random_uuid() primary key,
-//   nickname text unique not null,
-//   recipient_name text,
-//   phone text,
-//   address text,
-//   email text,
-//   created_at timestamptz default now(),
-//   updated_at timestamptz default now()
-// );
-//
-// -- 4. Orders 訂單表
-// create table public.orders (
-//   id uuid default gen_random_uuid() primary key,
-//   order_number text unique not null,
-//   user_id uuid references public.users(id) on delete set null,
-//   round_id uuid references public.rounds(id) on delete set null,
-//   total_amount integer not null default 0,
-//   shipping_fee integer,            -- NEW: 快照運費 (null = 面交免運)
-//   status text not null default 'pending_payment'
-//     check (status in ('pending_payment','pending_confirm','confirmed','shipped','cancelled')),
-//   payment_amount integer,
-//   payment_last5 text check (payment_last5 is null or length(payment_last5) = 5),
-//   payment_reported_at timestamptz,
-//   confirmed_at timestamptz,
-//   shipped_at timestamptz,          -- NEW: 確認寄出時間
-//   note text,
-//   pickup_location text,
-//   submission_key uuid unique,
-//   created_at timestamptz default now()
-// );
-//
-// -- 5. Order Items 訂單明細表
-// create table public.order_items (
-//   id uuid default gen_random_uuid() primary key,
-//   order_id uuid references public.orders(id) on delete cascade not null,
-//   product_id uuid references public.products(id) on delete set null,
-//   product_name text not null,
-//   unit_price integer not null,
-//   quantity integer not null check (quantity > 0),
-//   subtotal integer not null
-// );
-//
-// -- 6. Notification Logs 通知記錄表
-// create table public.notification_logs (
-//   id uuid default gen_random_uuid() primary key,
-//   order_id uuid references public.orders(id) on delete cascade,  -- nullable for arrival
-//   channel text not null check (channel in ('line','email')),
-//   type text not null check (type in ('payment_confirmed','shipment','product_arrival')),
-//   status text not null check (status in ('success','failed')),
-//   error_message text,
-//   created_at timestamptz default now()
-// );
-//
-// -- Indexes
-// create index idx_rounds_is_open on public.rounds(is_open);
-// create index idx_products_round_id on public.products(round_id);
-// create index idx_products_supplier_id on public.products(supplier_id);
-// create index idx_products_is_active on public.products(is_active);
-// create index idx_orders_status on public.orders(status);
-// create index idx_orders_user_id on public.orders(user_id);
-// create index idx_orders_round_id on public.orders(round_id);
-// create index idx_orders_created_at on public.orders(created_at desc);
-// create index idx_order_items_order_id on public.order_items(order_id);
-// create index idx_notification_logs_order_id on public.notification_logs(order_id);
-// create index idx_notification_logs_type on public.notification_logs(type);
-//
-// -- Auto-generate order number with advisory lock
-// create or replace function public.generate_order_number()
-// returns trigger as $$
-// declare
-//   today_str text;
-//   seq integer;
-// begin
-//   today_str := to_char(now() at time zone 'Asia/Taipei', 'YYYYMMDD');
-//   perform pg_advisory_xact_lock(hashtext('order_number_' || today_str));
-//   select count(*) + 1 into seq
-//   from public.orders
-//   where order_number like 'ORD-' || today_str || '-%';
-//   new.order_number := 'ORD-' || today_str || '-' || lpad(seq::text, 3, '0');
-//   return new;
-// end;
-// $$ language plpgsql;
-//
-// create trigger trg_generate_order_number
-//   before insert on public.orders
-//   for each row
-//   when (new.order_number is null or new.order_number = '')
-//   execute function public.generate_order_number();
-//
-// -- Auto-update updated_at (users + suppliers)
-// create or replace function public.handle_updated_at()
-// returns trigger as $$
-// begin
-//   new.updated_at = now();
-//   return new;
-// end;
-// $$ language plpgsql;
-//
-// create trigger trg_users_updated_at
-//   before update on public.users
-//   for each row
-//   execute function public.handle_updated_at();
-//
-// create trigger trg_suppliers_updated_at
-//   before update on public.suppliers
-//   for each row
-//   execute function public.handle_updated_at();
-//
-// -- RLS Policies
-//
-// -- Rounds: read everyone, write admin
-// alter table public.rounds enable row level security;
-// create policy "Rounds select" on public.rounds for select using (true);
-// create policy "Rounds admin" on public.rounds for all
-//   using (auth.role() = 'authenticated')
-//   with check (auth.role() = 'authenticated');
-//
-// -- Suppliers: admin only
-// alter table public.suppliers enable row level security;
-// create policy "Suppliers admin select" on public.suppliers for select
-//   using (auth.role() = 'authenticated');
-// create policy "Suppliers admin write" on public.suppliers for all
-//   using (auth.role() = 'authenticated')
-//   with check (auth.role() = 'authenticated');
-//
-// -- Products: read everyone, write admin
-// alter table public.products enable row level security;
-// create policy "Products select" on public.products for select using (true);
-// create policy "Products admin" on public.products for all
-//   using (auth.role() = 'authenticated')
-//   with check (auth.role() = 'authenticated');
-//
-// -- Users: anyone read/create/update
-// alter table public.users enable row level security;
-// create policy "Users select" on public.users for select using (true);
-// create policy "Users insert" on public.users for insert with check (true);
-// create policy "Users update" on public.users for update using (true) with check (true);
-//
-// -- Orders: read/create anyone, anon update only payment report, admin update all
-// alter table public.orders enable row level security;
-// create policy "Orders select" on public.orders for select using (true);
-// create policy "Orders insert" on public.orders for insert with check (true);
-// create policy "Orders anon payment report" on public.orders for update
-//   using (status = 'pending_payment')
-//   with check (
-//     status = 'pending_confirm'
-//     and payment_amount is not null
-//     and payment_last5 is not null
-//   );
-// create policy "Orders admin update" on public.orders for update
-//   using (auth.role() = 'authenticated')
-//   with check (auth.role() = 'authenticated');
-//
-// -- Order items: read/create anyone
-// alter table public.order_items enable row level security;
-// create policy "Order items select" on public.order_items for select using (true);
-// create policy "Order items insert" on public.order_items for insert with check (true);
-//
-// -- Notification logs: admin only
-// alter table public.notification_logs enable row level security;
-// create policy "Notif logs admin select" on public.notification_logs for select
-//   using (auth.role() = 'authenticated');
-// create policy "Notif logs admin insert" on public.notification_logs for insert
-//   with check (auth.role() = 'authenticated');
-//
-// -- Helper view: product progress (crowdfunding bar)
-// create or replace view public.product_progress as
-// select
-//   p.id as product_id,
-//   p.name,
-//   p.goal_qty,
-//   p.supplier_id,
-//   coalesce(sum(oi.quantity), 0) as current_qty,
-//   case
-//     when p.goal_qty is null then null
-//     when p.goal_qty = 0 then 100
-//     else round(coalesce(sum(oi.quantity), 0)::numeric / p.goal_qty * 100, 1)
-//   end as progress_pct
-// from public.products p
-// left join public.order_items oi on oi.product_id = p.id
-// left join public.orders o on o.id = oi.order_id and o.status != 'cancelled'
-// where p.is_active = true
-// group by p.id, p.name, p.goal_qty, p.supplier_id;
-//
-// -- Helper view: orders by product (for customer-per-item list)
-// create or replace view public.orders_by_product as
-// select
-//   oi.product_id,
-//   oi.product_name,
-//   u.nickname,
-//   u.recipient_name,
-//   u.phone,
-//   oi.quantity,
-//   oi.subtotal,
-//   o.order_number,
-//   o.status,
-//   o.pickup_location
-// from public.order_items oi
-// join public.orders o on o.id = oi.order_id and o.status != 'cancelled'
-// join public.users u on u.id = o.user_id
+// Key fix needed in migration: notification_logs.type CHECK must include
+// all 4 values: 'payment_confirmed', 'shipment', 'product_arrival', 'order_cancelled'
+// (previously only had 3, missing order_cancelled)
