@@ -121,24 +121,37 @@ NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('paymen
 - **`orders.shipping_fee`**: Snapshot of the round's shipping fee at order time (so changing the round fee later doesn't affect existing orders). Null if pickup.
 - **`orders.shipped_at`**: Timestamp written when admin confirms shipment.
 - **`orders.cancel_reason`**: Text, nullable. Written when admin cancels an order (optional reason).
-- **`notification_logs.type`**: Distinguishes payment confirmation vs shipment vs product arrival vs order cancellation notifications.
+- **`notification_logs.type`**: Four values: `payment_confirmed`, `shipment`, `product_arrival`, `order_cancelled`.
 - **`notification_logs.order_id`**: Now nullable — product arrival notifications aren't tied to a single order.
 
 ### Order Status Flow
 
 ```
-pending_payment → pending_confirm → confirmed → shipped
-       │                                          ↓
-       ↓                                    LINE + Email (出貨通知)
-   cancelled (user: only from pending_payment)
-   cancelled (admin: from any status, with cancel_reason + cancellation notification)
+pending_payment ──user reports payment──→ pending_confirm ──admin confirms──→ confirmed ──admin ships──→ shipped
+       │                                                                                                  ↓
+       ↓                                                                                          LINE + Email
+   cancelled (user: only from pending_payment)                                                    (出貨通知)
+   cancelled (admin: from ANY status, with cancel_reason + cancellation notification)
 
-Admin POS shortcut: pending_payment → confirmed (skip pending_confirm for cash payments)
+Admin POS shortcut: pending_payment → confirmed (skip pending_confirm for cash payments via quick-confirm)
 ```
 
 Five statuses: `pending_payment`, `pending_confirm`, `confirmed`, `shipped`, `cancelled`
 
+Four notification types: `payment_confirmed`, `shipment`, `product_arrival`, `order_cancelled`
+
 Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for shipped.
+
+### Terminology (canonical — use consistently)
+
+| Term | Meaning |
+|------|---------|
+| 宅配 | Home delivery, adds shipping_fee |
+| 面交 | In-person pickup at designated location, no shipping fee |
+| 確認寄出 | Mark 宅配 order as shipped |
+| 確認取貨 | Mark 面交 order as picked up (same status: `shipped`) |
+| 代客下單 | Admin creates order on behalf of customer (POS) |
+| 快速收款 | POS cash payment → quick-confirm (pending_payment → confirmed) |
 
 ### Key DB Behaviors
 
