@@ -19,13 +19,14 @@ export const STATUS_COLORS: Record<string, string> = {
   pending_confirm: "bg-blue-100 text-blue-800",
   confirmed: "bg-green-100 text-green-800",
   shipped: "bg-purple-100 text-purple-800",
-  cancelled: "bg-gray-100 text-gray-500",
+  cancelled: "bg-red-100 text-red-800",
 };
 
 export const NOTIFICATION_TYPES = {
   PAYMENT_CONFIRMED: "payment_confirmed",
   SHIPMENT: "shipment",
   PRODUCT_ARRIVAL: "product_arrival",
+  ORDER_CANCELLED: "order_cancelled",
 } as const;
 
 export const PICKUP_OPTIONS = [

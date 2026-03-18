@@ -119,7 +119,7 @@ npm run build                 # must pass
 - [x] `product_progress` view excludes cancelled orders, includes `supplier_id` (fixed: added FILTER clause)
 - [x] `orders_by_product` view joins users, excludes cancelled
 - [x] `orders.status` CHECK includes all 5 values
-- [x] `notification_logs.type` CHECK includes all 3 values
+- [x] `notification_logs.type` CHECK includes all 4 values
 - [x] `notification_logs.order_id` is nullable
 - [x] `rounds.shipping_fee` column exists
 - [x] `orders.shipping_fee` and `orders.shipped_at` columns exist
@@ -206,23 +206,13 @@ npm run build        # must pass
 ```
 
 **Verify:**
-<<<<<<< HEAD
-- [ ] `lib/` has ZERO imports from `react`, `next`, `next/server`
-- [ ] Only `lib/db/prisma.ts` contains `new PrismaClient()`
-- [ ] All notification functions are never-throw
-- [ ] `createWithItems` handles shipping fee: adds to total if 宅配, snapshots on order
-- [ ] `confirmShipment` writes `shipped_at`
-- [ ] `sendProductArrivalNotifications` loops over customers, doesn't stop on single failure
-- [ ] 4 email templates exist (payment_confirmed, shipment, product_arrival, order_cancelled)
-=======
 - [x] `lib/` has ZERO imports from `react`, `next`, `next/server`
 - [x] Only `lib/db/prisma.ts` contains `new PrismaClient()`
 - [x] All notification functions are never-throw
 - [x] `createWithItems` handles shipping fee: adds to total if 宅配, snapshots on order
 - [x] `confirmShipment` writes `shipped_at`
 - [x] `sendProductArrivalNotifications` loops over customers, doesn't stop on single failure
-- [x] 3 email templates exist (payment_confirmed, shipment, product_arrival)
->>>>>>> 6cc7d65 (Add library layer: DB helpers, notifications, auth, utils (Phase 2))
+- [x] 4 email templates exist (payment_confirmed, shipment, product_arrival, order_cancelled)
 
 **Status: COMPLETE** — All tasks done. `tsc`, `lint`, `build` all pass. All verification checks passed.
 

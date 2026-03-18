@@ -334,7 +334,8 @@ SELECT
   oi.subtotal,
   o.order_number,
   o.status,
-  o.pickup_location
+  o.pickup_location,
+  o.round_id
 FROM order_items oi
 JOIN orders o ON o.id = oi.order_id AND o.status != 'cancelled'
 JOIN users u ON u.id = o.user_id

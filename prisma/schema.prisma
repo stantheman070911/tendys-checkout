@@ -101,6 +101,7 @@ model Order {
   shipped_at          DateTime? @db.Timestamptz(6)
   note                String?
   pickup_location     String?
+  cancel_reason       String?
   submission_key      String?   @unique @db.Uuid
   created_at          DateTime  @default(now()) @db.Timestamptz(6)
 

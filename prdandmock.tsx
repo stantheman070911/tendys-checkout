@@ -104,9 +104,9 @@
 //
 // --- CROSS-CUTTING ---
 //
-// 15. NotificationType must include 'order_cancelled'
-//     The notifTypeLabel map is correct (has all 4 types).
-//     Ensure types/index.ts also includes order_cancelled.
+// 15. [RESOLVED] NotificationType now includes 'order_cancelled'
+//     Fixed in types/index.ts, constants/index.ts, migration.sql,
+//     lib/notifications/email.ts, and lib/notifications/send.ts.
 //
 // 16. Touch targets: Ensure all interactive elements ≥ 44px on mobile
 //     Several buttons (filter tabs, checkbox areas) are smaller than 44px

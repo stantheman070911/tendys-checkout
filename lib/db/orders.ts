@@ -236,31 +236,71 @@ export async function batchConfirmShipment(orderIds: string[]) {
   });
 }
 
-export async function cancelOrder(orderId: string) {
+export async function cancelOrder(
+  orderId: string,
+  isAdmin?: boolean,
+  cancelReason?: string
+) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      include: { order_items: true },
+      include: { order_items: true, user: true },
     });
     if (!order) return null;
     if (order.status === "cancelled") return order;
 
+    // User can only cancel pending_payment; admin can cancel any status
+    if (!isAdmin && order.status !== "pending_payment") {
+      return { error: "User can only cancel pending_payment orders" };
+    }
+
     await tx.order.update({
       where: { id: orderId },
-      data: { status: "cancelled" },
+      data: {
+        status: "cancelled",
+        cancel_reason: cancelReason || null,
+      },
     });
 
-    // Restore stock for each item
-    for (const item of order.order_items) {
-      if (item.product_id) {
-        await tx.$executeRaw`
-          UPDATE products
-          SET stock = CASE WHEN stock IS NOT NULL THEN stock + ${item.quantity} ELSE stock END
-          WHERE id = ${item.product_id}::uuid
-        `;
+    // Restore stock for each item (skip for shipped orders — product already sent)
+    if (order.status !== "shipped") {
+      for (const item of order.order_items) {
+        if (item.product_id) {
+          await tx.$executeRaw`
+            UPDATE products
+            SET stock = CASE WHEN stock IS NOT NULL THEN stock + ${item.quantity} ELSE stock END
+            WHERE id = ${item.product_id}::uuid
+          `;
+        }
       }
     }
 
-    return { ...order, status: "cancelled" };
+    return { ...order, status: "cancelled" as const, cancel_reason: cancelReason || null };
   });
+}
+
+// ─── Quick Confirm (POS Cash Payment) ────────────────────────
+
+export async function quickConfirm(orderId: string, paymentAmount: number) {
+  try {
+    return await prisma.order.update({
+      where: { id: orderId, status: "pending_payment" },
+      data: {
+        status: "confirmed",
+        payment_amount: paymentAmount,
+        payment_last5: "CASH",
+        payment_reported_at: new Date(),
+        confirmed_at: new Date(),
+      },
+      include: { order_items: true, user: true },
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      return null;
+    }
+    throw err;
+  }
 }
