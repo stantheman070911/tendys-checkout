@@ -80,6 +80,8 @@ app/                          → Next.js pages and API routes only
     products/route.ts         # Product CRUD (includes supplier_id)
     suppliers/route.ts        # Supplier CRUD
     orders-by-product/route.ts # Group orders by product → customer list
+    users/lookup/route.ts     # Nickname auto-fill (GET ?nickname=)
+    lookup/route.ts           # Order search by nickname or order number
     line/webhook/route.ts     # LINE webhook: signature verify → message handler → order linking
 lib/                          → Pure TypeScript business logic (NO React/Next imports)
   db/
@@ -103,13 +105,15 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
   utils.ts                    # cn(), formatCurrency, formatOrderItems, share URL builders, submission key, calcOrderTotal
 components/
   ui/                         # shadcn/ui generated components
+  StorefrontClient.tsx        # Main storefront client component (cart, checkout, form)
   ProductCard.tsx
   ProgressBar.tsx
   SharePanel.tsx
   DeadlineBanner.tsx
   OrderStatusBadge.tsx
   CartBar.tsx
-  OrderLookup.tsx
+  PaymentReportForm.tsx       # Two-step payment report (amount + last5 → confirm → submit)
+  CancelOrderButton.tsx       # Cancel order with Dialog confirmation
   ShippingFeeNote.tsx         # "宅配到以上地址運費 $XXX" display
 types/
   index.ts                    # Shared TS interfaces
