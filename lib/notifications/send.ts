@@ -1,4 +1,4 @@
-import { sendLineNotify, type NotifyResult } from "@/lib/notifications/line-notify";
+import { sendLinePush, sendLineMulticast, type NotifyResult } from "@/lib/line/push";
 import {
   sendOrderConfirmationEmail,
   sendShipmentEmail,
@@ -8,6 +8,9 @@ import {
 import { logNotification } from "@/lib/db/notification-logs";
 import { formatCurrency, formatOrderItems } from "@/lib/utils";
 
+// Re-export NotifyResult for consumers
+export type { NotifyResult } from "@/lib/line/push";
+
 // ─── Types ───────────────────────────────────────────────────
 
 interface OrderForNotify {
@@ -15,6 +18,7 @@ interface OrderForNotify {
   order_number: string;
   total_amount: number;
   shipping_fee?: number | null;
+  line_user_id?: string | null;
   user?: { email?: string | null } | null;
 }
 
@@ -26,6 +30,7 @@ interface ItemForNotify {
 
 interface CustomerForArrival {
   email?: string | null;
+  line_user_id?: string | null;
   orderId?: string | null;
 }
 
@@ -35,9 +40,14 @@ export async function sendPaymentConfirmedNotifications(
   order: OrderForNotify,
   items: ItemForNotify[]
 ): Promise<{ line: NotifyResult; email: NotifyResult | null }> {
-  // LINE
+  // LINE — push to the specific user (skip if no line_user_id)
   const lineMsg = `\n訂單 ${order.order_number} 付款已確認\n${formatOrderItems(items)}\n金額: ${formatCurrency(order.total_amount)}`;
-  const lineResult = await sendLineNotify(lineMsg);
+  let lineResult: NotifyResult;
+  if (order.line_user_id) {
+    lineResult = await sendLinePush(order.line_user_id, lineMsg);
+  } else {
+    lineResult = { success: false, error: "No LINE user linked to this order" };
+  }
   await logNotification(
     order.id,
     "line",
@@ -69,9 +79,14 @@ export async function sendShipmentNotifications(
   order: OrderForNotify,
   items: ItemForNotify[]
 ): Promise<{ line: NotifyResult; email: NotifyResult | null }> {
-  // LINE
+  // LINE — push to the specific user
   const lineMsg = `\n訂單 ${order.order_number} 已出貨\n${formatOrderItems(items)}`;
-  const lineResult = await sendLineNotify(lineMsg);
+  let lineResult: NotifyResult;
+  if (order.line_user_id) {
+    lineResult = await sendLinePush(order.line_user_id, lineMsg);
+  } else {
+    lineResult = { success: false, error: "No LINE user linked to this order" };
+  }
   await logNotification(
     order.id,
     "line",
@@ -104,10 +119,15 @@ export async function sendOrderCancelledNotifications(
   items: ItemForNotify[],
   cancelReason?: string | null
 ): Promise<{ line: NotifyResult; email: NotifyResult | null }> {
-  // LINE
+  // LINE — push to the specific user
   const reasonText = cancelReason ? `\n原因: ${cancelReason}` : "";
   const lineMsg = `\n訂單 ${order.order_number} 已取消${reasonText}\n${formatOrderItems(items)}`;
-  const lineResult = await sendLineNotify(lineMsg);
+  let lineResult: NotifyResult;
+  if (order.line_user_id) {
+    lineResult = await sendLinePush(order.line_user_id, lineMsg);
+  } else {
+    lineResult = { success: false, error: "No LINE user linked to this order" };
+  }
   await logNotification(
     order.id,
     "line",
@@ -147,9 +167,18 @@ export async function sendProductArrivalNotifications(
   line: NotifyResult;
   emailResults: Array<{ email: string; result: NotifyResult }>;
 }> {
-  // One LINE message to the group
+  // LINE — multicast to all customers with linked LINE accounts
   const lineMsg = `\n【${productName}】已到達理貨中心，我們會盡快安排出貨！`;
-  const lineResult = await sendLineNotify(lineMsg);
+  const lineUserIds = customers
+    .map((c) => c.line_user_id)
+    .filter((id): id is string => !!id);
+
+  let lineResult: NotifyResult;
+  if (lineUserIds.length > 0) {
+    lineResult = await sendLineMulticast(lineUserIds, lineMsg);
+  } else {
+    lineResult = { success: false, error: "No customers have linked LINE accounts" };
+  }
   await logNotification(
     null,
     "line",

@@ -103,6 +103,7 @@ model Order {
   pickup_location     String?
   cancel_reason       String?
   submission_key      String?   @unique @db.Uuid
+  line_user_id        String?
   created_at          DateTime  @default(now()) @db.Timestamptz(6)
 
   user              User?             @relation(fields: [user_id], references: [id], onDelete: SetNull)

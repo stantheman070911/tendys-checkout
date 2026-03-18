@@ -79,6 +79,7 @@ export interface Order {
   pickup_location: string | null;
   cancel_reason: string | null;
   submission_key: string | null;
+  line_user_id: string | null;
   created_at: string;
 }
 

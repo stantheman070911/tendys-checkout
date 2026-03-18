@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "prdandmock.tsx"
+    "prdandmock.tsx",
+    "order-link-template"
   ]
 }

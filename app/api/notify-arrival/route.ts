@@ -52,8 +52,11 @@ export async function POST(request: NextRequest) {
 
     // Deduplicate customers by user_id
     const seen = new Set<string>();
-    const customers: Array<{ email?: string | null; orderId?: string | null }> =
-      [];
+    const customers: Array<{
+      email?: string | null;
+      line_user_id?: string | null;
+      orderId?: string | null;
+    }> = [];
 
     for (const item of items) {
       const userId = item.order.user_id;
@@ -61,6 +64,7 @@ export async function POST(request: NextRequest) {
       seen.add(userId);
       customers.push({
         email: item.order.user?.email ?? null,
+        line_user_id: item.order.line_user_id ?? null,
         orderId: item.order.id,
       });
     }
