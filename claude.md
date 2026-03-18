@@ -28,7 +28,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 | DB | PostgreSQL via Supabase, Prisma ORM |
 | Styling | Tailwind CSS + shadcn/ui |
 | Email | Resend |
-| Notifications | LINE Notify Webhook |
+| Notifications | LINE Messaging API (broadcast) |
 | Auth | Supabase Auth (admin only, email/password) |
 | Deploy | Vercel |
 
@@ -39,9 +39,9 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 3. User opens link → browses products (progress bars show goal status) → adds to cart (stock-limited, CartBar hints shipping fee) → enters nickname (auto-fills returning user data) → fills recipient info + pickup option → sees shipping fee if 宅配 → submits order (idempotent via `submission_key`).
 4. System shows bank account details + share CTA if any product is under goal.
 5. User transfers money, reports payment (amount + last 5 digits — with confirmation step before submit).
-6. Admin reviews in dashboard → confirms single or batch → system sends LINE Notify + Resend email (logged to `notification_logs`). Status: `confirmed`.
+6. Admin reviews in dashboard → confirms single or batch → system sends LINE + Resend email (logged to `notification_logs`). Status: `confirmed`.
 7. Admin coordinates with suppliers → products arrive at 理貨中心 → admin sends arrival notification to relevant customers.
-8. Admin goes to 待出貨 page (grouped by pickup method) → marks orders as shipped (single or batch) → system sends shipment notification via LINE Notify + Email. Status: `shipped`.
+8. Admin goes to 待出貨 page (grouped by pickup method) → marks orders as shipped (single or batch) → system sends shipment notification via LINE + Email. Status: `shipped`.
 9. User checks status via `/lookup` (by nickname or order number) → can click into order detail.
 10. **POS mode**: Admin can create orders on behalf of customers, do instant cash confirmation, and handle face-to-face pickup.
 11. **Admin cancel**: Admin can cancel orders from any status (with reason + cancellation notification).
@@ -87,7 +87,7 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
     suppliers.ts              # CRUD, list with product counts
     notification-logs.ts      # Insert log entry, query by order
   notifications/
-    line-notify.ts            # POST to LINE Notify webhook, never-throw
+    line-notify.ts            # LINE Messaging API broadcast, never-throw
     email.ts                  # Resend client + templates (order confirm, shipment, arrival)
     send.ts                   # Orchestrator: send both channels, log results
   auth/

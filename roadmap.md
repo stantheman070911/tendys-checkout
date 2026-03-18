@@ -293,6 +293,8 @@ npm run build        # must pass
 
 **Done when:** All 13 routes compile and build passes. Backend feature-complete.
 
+**Status: COMPLETE** — All 13 routes done. `tsc`, `lint`, `build` all pass. LINE Notify migrated to LINE Messaging API. Committed and pushed to `main`.
+
 ---
 
 ## Phase 4: User-Facing Pages
