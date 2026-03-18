@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -69,87 +66,96 @@ export function PaymentReportForm({
 
   if (confirming) {
     const parsedAmount = parseInt(amount, 10);
-    const mismatch = parsedAmount !== orderTotal;
+    const match = parsedAmount === orderTotal;
 
     return (
-      <div className="rounded-lg border p-4 space-y-4">
-        <h3 className="font-semibold">確認匯款資訊</h3>
-        <div className="space-y-2 text-sm">
+      <div
+        className={`rounded-xl p-4 border-2 ${
+          match
+            ? "border-green-400 bg-green-50"
+            : "border-orange-300 bg-orange-50"
+        }`}
+      >
+        <div className="font-bold text-center mb-3">
+          {match ? "金額吻合" : "金額不符，請確認"}
+        </div>
+        <div className="space-y-2 text-sm bg-white rounded-xl p-3">
           <div className="flex justify-between">
-            <span>訂單金額</span>
-            <span>{formatCurrency(orderTotal)}</span>
+            <span className="text-gray-500">訂單應付</span>
+            <span className="font-bold">{formatCurrency(orderTotal)}</span>
           </div>
           <div className="flex justify-between">
-            <span>回報金額</span>
+            <span className="text-gray-500">填寫匯款</span>
             <span
-              className={mismatch ? "text-orange-600 font-medium" : ""}
+              className={`font-bold ${match ? "text-green-700" : "text-orange-600"}`}
             >
               {formatCurrency(parsedAmount)}
             </span>
           </div>
-          {mismatch && (
-            <p className="text-orange-600 text-xs">
-              回報金額與訂單金額不同，請確認是否正確
-            </p>
-          )}
-          <div className="flex justify-between">
-            <span>帳號末五碼</span>
-            <span>{last5.trim()}</span>
+          <div className="flex justify-between border-t pt-2">
+            <span className="text-gray-500">帳號後五碼</span>
+            <span className="font-bold font-mono tracking-widest">
+              {last5.trim()}
+            </span>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1 h-11"
+        <div className="flex gap-3 mt-4">
+          <button
             onClick={() => setConfirming(false)}
             disabled={submitting}
+            className="flex-1 border-2 rounded-xl py-3 font-medium text-gray-600"
           >
-            返回修改
-          </Button>
-          <Button
-            className="flex-1 h-11"
+            ← 修改
+          </button>
+          <button
             onClick={handleSubmit}
             disabled={submitting}
+            className="flex-1 bg-green-600 text-white rounded-xl py-3 font-bold disabled:opacity-50"
           >
             {submitting ? "送出中..." : "確認送出"}
-          </Button>
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <form
-      onSubmit={handleReview}
-      className="rounded-lg border p-4 space-y-4"
-    >
-      <h3 className="font-semibold">回報匯款</h3>
-      <div className="space-y-2">
-        <Label htmlFor="paymentAmount">匯款金額</Label>
-        <Input
-          id="paymentAmount"
+    <form onSubmit={handleReview} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-600 mb-1.5">
+          匯款金額
+        </label>
+        <input
           type="number"
           min="1"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={`應付 ${formatCurrency(orderTotal)}`}
+          placeholder={String(orderTotal)}
+          className="w-full border rounded-xl px-4 py-3.5 text-2xl font-bold"
           required
+          autoFocus
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="last5">帳號末五碼</Label>
-        <Input
-          id="last5"
+      <div>
+        <label className="block text-sm font-medium text-gray-600 mb-1.5">
+          帳號後五碼
+        </label>
+        <input
           maxLength={5}
           value={last5}
           onChange={(e) => setLast5(e.target.value)}
-          placeholder="12345"
+          placeholder="56789"
+          className="w-full border rounded-xl px-4 py-3.5 text-2xl font-bold tracking-widest"
           required
         />
       </div>
-      <Button type="submit" className="w-full h-11">
-        回報匯款
-      </Button>
+      <button
+        type="submit"
+        disabled={!amount || last5.length < 5}
+        className="w-full bg-green-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-40 hover:bg-green-700 transition"
+      >
+        核對後確認送出 →
+      </button>
     </form>
   );
 }

@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderWithItems } from "@/lib/db/orders";
 import { listActiveByRound } from "@/lib/db/products";
@@ -32,163 +33,229 @@ export default async function OrderPage({
 
   const status = order.status as OrderStatus;
   const items = order.order_items;
+  const itemsTotal = items.reduce((sum, i) => sum + i.subtotal, 0);
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold">{order.order_number}</h1>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-green-700 text-white p-3 sticky top-0 z-10">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <span className="font-bold">訂單詳情</span>
           <OrderStatusBadge status={status} />
         </div>
-        {order.user && (
-          <p className="text-sm text-muted-foreground">
-            {order.user.nickname}
-          </p>
-        )}
-      </div>
-
-      {/* Status-specific content */}
-      {status === "pending_payment" && (
-        <PendingPaymentSection
-          orderId={order.id}
-          orderTotal={order.total_amount}
-        />
-      )}
-
-      {status === "pending_confirm" && (
-        <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 text-center">
-          <p className="font-medium text-blue-700">
-            已回報匯款，等待主辦確認中...
-          </p>
-          {order.payment_amount !== null && (
-            <p className="text-sm text-blue-600 mt-1">
-              回報金額 {formatCurrency(order.payment_amount)}，末五碼{" "}
-              {order.payment_last5}
+      </header>
+      <main className="max-w-lg mx-auto p-4 space-y-4">
+        {/* Status-specific hero */}
+        {status === "pending_payment" && (
+          <div className="text-center py-4">
+            <div className="text-5xl mb-2">📋</div>
+            <h2 className="font-bold text-xl">訂單已成立</h2>
+            <p className="text-gray-400 text-sm mt-1 font-mono">
+              {order.order_number}
             </p>
-          )}
-        </div>
-      )}
-
-      {status === "confirmed" && (
-        <div className="rounded-lg bg-green-50 border border-green-200 p-4 text-center">
-          <p className="font-medium text-green-700">
-            訂單已確認，等待出貨中...
-          </p>
-        </div>
-      )}
-
-      {status === "shipped" && (
-        <div className="rounded-lg bg-purple-50 border border-purple-200 p-4 text-center">
-          <p className="font-medium text-purple-700">已出貨！</p>
-          {order.shipped_at && (
-            <p className="text-sm text-purple-600 mt-1">
-              出貨時間：{new Date(order.shipped_at).toLocaleString("zh-TW")}
-            </p>
-          )}
-        </div>
-      )}
-
-      {status === "cancelled" && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-center space-y-1">
-          <p className="font-medium text-red-700">訂單已取消</p>
-          {order.cancel_reason && (
-            <p className="text-sm text-red-600">
-              原因：{order.cancel_reason}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Order summary */}
-      <div className="rounded-lg border p-4 space-y-2">
-        <h3 className="font-semibold">訂單內容</h3>
-        {items.map((item) => (
-          <div key={item.id} className="flex justify-between text-sm">
-            <span>
-              {item.product_name} x{item.quantity}
-            </span>
-            <span>{formatCurrency(item.subtotal)}</span>
-          </div>
-        ))}
-        {order.shipping_fee !== null && order.shipping_fee > 0 && (
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>宅配運費</span>
-            <span>{formatCurrency(order.shipping_fee)}</span>
           </div>
         )}
-        <div className="flex justify-between font-semibold border-t pt-2">
-          <span>合計</span>
-          <span>{formatCurrency(order.total_amount)}</span>
-        </div>
-        {order.pickup_location ? (
-          <p className="text-sm text-muted-foreground">
-            取貨方式：{order.pickup_location}
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            取貨方式：宅配
-            {order.user?.address ? `（${order.user.address}）` : ""}
-          </p>
+
+        {status === "pending_confirm" && (
+          <div className="text-center py-4">
+            <div className="text-5xl mb-2">⏳</div>
+            <h2 className="font-bold text-xl">匯款回報完成</h2>
+            <p className="text-gray-400 text-sm mt-1">
+              等待賣家確認，確認後收到 LINE + Email 通知
+            </p>
+            <div className="mt-3 bg-white rounded-xl border p-4 text-sm text-left space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-400">訂單</span>
+                <span className="font-mono">{order.order_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">狀態</span>
+                <span className="text-blue-600 font-medium">待確認</span>
+              </div>
+              {order.payment_amount !== null && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">匯款</span>
+                  <span>{formatCurrency(order.payment_amount)}</span>
+                </div>
+              )}
+              {order.payment_last5 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">後五碼</span>
+                  <span className="font-mono tracking-widest">
+                    {order.payment_last5}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         )}
-        {order.note && (
-          <p className="text-sm text-muted-foreground">備註：{order.note}</p>
+
+        {status === "confirmed" && (
+          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-center">
+            <p className="font-medium text-green-700">
+              訂單已確認，等待出貨中...
+            </p>
+          </div>
         )}
-      </div>
 
-      {/* Share + continue shopping (non-cancelled) */}
-      {status !== "cancelled" && order.round_id && (
-        <div className="space-y-3">
-          <SharePanel roundId={order.round_id} show={anyUnderGoal} />
-          <a
-            href={buildShareUrl(order.round_id)}
-            className="block text-center text-sm text-primary hover:underline"
-          >
-            繼續選購
-          </a>
-        </div>
-      )}
-    </main>
-  );
-}
+        {status === "shipped" && (
+          <div className="rounded-xl bg-purple-50 border border-purple-200 p-4 text-center">
+            <p className="font-medium text-purple-700">已出貨！</p>
+            {order.shipped_at && (
+              <p className="text-sm text-purple-600 mt-1">
+                📦 出貨：{new Date(order.shipped_at).toLocaleString("zh-TW")}
+              </p>
+            )}
+          </div>
+        )}
 
-function PendingPaymentSection({
-  orderId,
-  orderTotal,
-}: {
-  orderId: string;
-  orderTotal: number;
-}) {
-  return (
-    <div className="space-y-4">
-      {/* Bank info */}
-      <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4 space-y-2">
-        <h3 className="font-semibold text-yellow-800">請匯款至以下帳戶</h3>
-        <div className="text-sm space-y-1">
-          <p>
-            銀行：<span className="font-medium">{BANK_INFO.name}</span>
-          </p>
-          <p>
-            帳號：
-            <span className="font-medium font-mono">{BANK_INFO.account}</span>
-          </p>
-          <p>
-            戶名：<span className="font-medium">{BANK_INFO.holder}</span>
-          </p>
-          <p>
-            應付金額：
-            <span className="font-bold text-base">
-              {formatCurrency(orderTotal)}
-            </span>
-          </p>
-        </div>
-      </div>
+        {status === "cancelled" && (
+          <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-center space-y-1">
+            <p className="font-medium text-red-700">訂單已取消</p>
+            {order.cancel_reason && (
+              <p className="text-sm text-red-600">
+                取消：{order.cancel_reason}
+              </p>
+            )}
+          </div>
+        )}
 
-      <PaymentReportForm orderId={orderId} orderTotal={orderTotal} />
+        {/* Bank info for pending_payment */}
+        {status === "pending_payment" && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="font-bold text-blue-800 text-center mb-3 text-sm">
+              匯款帳戶資訊
+            </div>
+            <div className="bg-white rounded-xl p-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">銀行</span>
+                <span className="font-medium">{BANK_INFO.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">戶名</span>
+                <span className="font-medium">{BANK_INFO.holder}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">帳號</span>
+                <span className="font-bold font-mono text-lg tracking-widest">
+                  {BANK_INFO.account}
+                </span>
+              </div>
+              <div className="border-t pt-2">
+                <div className="flex justify-between text-gray-400">
+                  <span>商品小計</span>
+                  <span>{formatCurrency(itemsTotal)}</span>
+                </div>
+                {order.shipping_fee !== null && order.shipping_fee > 0 && (
+                  <div className="flex justify-between text-blue-500">
+                    <span>宅配運費</span>
+                    <span>{formatCurrency(order.shipping_fee)}</span>
+                  </div>
+                )}
+                {order.pickup_location && (
+                  <div className="flex justify-between text-green-600">
+                    <span>面交免運</span>
+                    <span>$0</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-green-700 text-2xl mt-1">
+                  <span>應付</span>
+                  <span>{formatCurrency(order.total_amount)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-      <div className="flex justify-center">
-        <CancelOrderButton orderId={orderId} />
-      </div>
+        {/* Payment report form */}
+        {status === "pending_payment" && (
+          <PaymentReportForm
+            orderId={order.id}
+            orderTotal={order.total_amount}
+          />
+        )}
+
+        {/* Order summary card (non-pending_payment) */}
+        {status !== "pending_payment" && (
+          <div className="bg-white rounded-xl border p-4 space-y-3">
+            <div>
+              <div className="font-bold">{order.order_number}</div>
+              <div className="text-gray-500 text-sm">
+                {order.user?.nickname}
+                {order.user?.recipient_name
+                  ? ` (${order.user.recipient_name})`
+                  : ""}
+                {order.user?.phone ? ` · ${order.user.phone}` : ""}
+              </div>
+            </div>
+            <div className="border-t pt-3 space-y-1 text-sm">
+              {items.map((item) => (
+                <div key={item.id} className="flex justify-between">
+                  <span>
+                    {item.product_name} x{item.quantity}
+                  </span>
+                  <span>{formatCurrency(item.subtotal)}</span>
+                </div>
+              ))}
+              {order.shipping_fee !== null && order.shipping_fee > 0 && (
+                <div className="flex justify-between text-blue-600">
+                  <span>運費</span>
+                  <span>{formatCurrency(order.shipping_fee)}</span>
+                </div>
+              )}
+              <div className="border-t pt-1.5 font-bold flex justify-between">
+                <span>合計</span>
+                <span>{formatCurrency(order.total_amount)}</span>
+              </div>
+            </div>
+            {order.pickup_location && (
+              <div className="text-sm text-purple-600 bg-purple-50 rounded-lg p-2">
+                📍 {order.pickup_location}
+              </div>
+            )}
+            {order.note && (
+              <p className="text-sm text-gray-500">備註：{order.note}</p>
+            )}
+          </div>
+        )}
+
+        {/* Actions for pending_payment */}
+        {status === "pending_payment" && (
+          <div className="flex gap-3">
+            {order.round_id && (
+              <a
+                href={buildShareUrl(order.round_id)}
+                className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 text-center"
+              >
+                繼續選購
+              </a>
+            )}
+            <div className="flex-1">
+              <CancelOrderButton orderId={order.id} />
+            </div>
+          </div>
+        )}
+
+        {/* Share + continue shopping (non-cancelled, non-pending_payment) */}
+        {status !== "cancelled" && status !== "pending_payment" && order.round_id && (
+          <div className="space-y-3">
+            <SharePanel roundId={order.round_id} show={anyUnderGoal} />
+            <div className="flex gap-3">
+              <a
+                href={buildShareUrl(order.round_id)}
+                className="flex-1 bg-green-600 text-white rounded-xl py-3 font-bold text-center"
+              >
+                繼續選購
+              </a>
+              <Link
+                href="/"
+                className="flex-1 border-2 rounded-xl py-3 text-sm text-gray-600 text-center"
+              >
+                返回首頁
+              </Link>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

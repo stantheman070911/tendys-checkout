@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { formatCurrency, calcOrderTotal } from "@/lib/utils";
 import type { CartItem } from "@/types";
 
@@ -15,25 +14,27 @@ export function CartBar({ items, shippingFee, onCheckout }: CartBarProps) {
 
   const count = items.reduce((sum, i) => sum + i.quantity, 0);
   const itemsTotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-  const total = calcOrderTotal(items, shippingFee);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-green-700 text-white shadow-2xl pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto max-w-lg flex items-center justify-between px-4 py-3">
         <div className="min-w-0">
-          <p className="font-medium">
-            共 {count} 件，合計 {formatCurrency(total)}
-          </p>
+          <span className="text-green-300 text-sm">{count} 件</span>
+          <span className="font-bold text-2xl ml-2">
+            {formatCurrency(itemsTotal)}
+          </span>
           {shippingFee ? (
-            <p className="text-xs text-muted-foreground truncate">
-              商品 {formatCurrency(itemsTotal)} + 宅配運費{" "}
-              {formatCurrency(shippingFee)}
-            </p>
+            <span className="text-green-400 text-xs ml-2">
+              宅配另加 {formatCurrency(shippingFee)}
+            </span>
           ) : null}
         </div>
-        <Button onClick={onCheckout} className="ml-3 shrink-0 h-11">
-          前往結帳
-        </Button>
+        <button
+          onClick={onCheckout}
+          className="bg-white text-green-700 font-bold px-6 py-2.5 rounded-xl text-sm shrink-0 ml-3 active:bg-green-50"
+        >
+          結帳 →
+        </button>
       </div>
     </div>
   );

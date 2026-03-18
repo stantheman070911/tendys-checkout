@@ -2,9 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -44,6 +42,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submissionKey, setSubmissionKey] = useState<string | null>(null);
+  const [nickFound, setNickFound] = useState(false);
 
   // Form state
   const [nickname, setNickname] = useState("");
@@ -59,6 +58,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const shippingFee =
     isDelivery && round.shipping_fee ? round.shipping_fee : null;
   const cartItems = Array.from(cart.values());
+  const itemsTotal = cartItems.reduce((sum, i) => sum + i.subtotal, 0);
   const orderTotal = calcOrderTotal(cartItems, shippingFee);
   const anyUnderGoal = products.some(
     (p) => p.goal_qty !== null && p.current_qty < p.goal_qty
@@ -123,7 +123,10 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         if (data.user.phone) setPhone(data.user.phone);
         if (data.user.address) setAddress(data.user.address);
         if (data.user.email) setEmail(data.user.email);
+        setNickFound(true);
         toast({ title: "已自動帶入上次資料" });
+      } else {
+        setNickFound(false);
       }
     } catch {
       // Silent fail — auto-fill is convenience only
@@ -198,170 +201,198 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 pt-6 pb-32 space-y-6">
-      <h1 className="text-xl font-bold text-center">{round.name}</h1>
+    <div className="min-h-screen bg-gray-50 pb-28">
+      <header className="bg-green-700 text-white p-3 sticky top-0 z-10">
+        <span className="font-bold text-sm">{round.name}</span>
+      </header>
+      <main className="max-w-lg mx-auto p-3 space-y-3">
+        <DeadlineBanner
+          deadline={round.deadline}
+          isOpen={round.is_open}
+          roundName={round.name}
+        />
+        {round.shipping_fee && (
+          <p className="text-xs text-center text-gray-400">
+            宅配 +{formatCurrency(round.shipping_fee)} · 指定面交點免運費
+          </p>
+        )}
+        <SharePanel roundId={round.id} show={anyUnderGoal} />
 
-      <DeadlineBanner deadline={round.deadline} isOpen={round.is_open} />
-      <SharePanel roundId={round.id} show={anyUnderGoal} />
+        {/* Product List */}
+        <div className="space-y-3">
+          {products.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              cartQty={cart.get(product.id)?.quantity ?? 0}
+              onAdd={() => addToCart(product)}
+              onRemove={() => removeFromCart(product.id)}
+              disabled={roundClosed}
+            />
+          ))}
+        </div>
 
-      {/* Product Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {products.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            cartQty={cart.get(product.id)?.quantity ?? 0}
-            onAdd={() => addToCart(product)}
-            onRemove={() => removeFromCart(product.id)}
-            disabled={roundClosed}
-          />
-        ))}
-      </div>
+        {products.length === 0 && (
+          <p className="text-center text-muted-foreground py-8">
+            目前沒有商品
+          </p>
+        )}
 
-      {products.length === 0 && (
-        <p className="text-center text-muted-foreground py-8">
-          目前沒有商品
-        </p>
-      )}
-
-      {/* Checkout Form */}
-      {checkoutOpen && (
-        <div ref={checkoutRef} className="space-y-6 border-t pt-6">
-          <h2 className="text-lg font-semibold">結帳資訊</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="nickname">暱稱 *</Label>
-              <Input
-                id="nickname"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                onBlur={handleNicknameBlur}
-                placeholder="輸入暱稱（回購自動帶入資料）"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="recipientName">收件人姓名 *</Label>
-              <Input
-                id="recipientName"
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="真實姓名"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">電話 *</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="0912-345-678"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pickup">取貨方式</Label>
-              <Select value={pickupLocation} onValueChange={setPickupLocation}>
-                <SelectTrigger id="pickup" className="h-11">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PICKUP_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt.value || DELIVERY_VALUE}
-                      value={opt.value || DELIVERY_VALUE}
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {isDelivery && (
-              <div className="space-y-2">
-                <Label htmlFor="address">地址</Label>
-                <Input
-                  id="address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="宅配地址"
-                />
-                {shippingFee && <ShippingFeeNote fee={shippingFee} />}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email（選填，收通知用）</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="note">備註（選填）</Label>
-              <Input
-                id="note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="特殊需求"
-              />
-            </div>
-
-            {/* Order Summary */}
-            <div className="rounded-lg border p-4 space-y-2">
-              <h3 className="font-semibold">訂單摘要</h3>
+        {/* Checkout Form */}
+        {checkoutOpen && (
+          <div ref={checkoutRef} className="space-y-4">
+            {/* Order Details Card */}
+            <div className="bg-white rounded-xl border p-4">
+              <div className="font-medium text-gray-600 mb-2 text-sm">訂單明細</div>
               {cartItems.map((item) => (
-                <div
-                  key={item.product_id}
-                  className="flex justify-between text-sm"
-                >
-                  <span>
-                    {item.product_name} x{item.quantity}
-                  </span>
+                <div key={item.product_id} className="flex justify-between text-sm py-0.5">
+                  <span>{item.product_name} x{item.quantity}</span>
                   <span>{formatCurrency(item.subtotal)}</span>
                 </div>
               ))}
-              {shippingFee && (
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>宅配運費</span>
-                  <span>{formatCurrency(shippingFee)}</span>
+              <div className="border-t mt-2 pt-2 space-y-1">
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>商品小計</span>
+                  <span>{formatCurrency(itemsTotal)}</span>
                 </div>
-              )}
-              <div className="flex justify-between font-semibold border-t pt-2">
-                <span>合計</span>
-                <span>{formatCurrency(orderTotal)}</span>
+                {shippingFee ? (
+                  <div className="flex justify-between text-sm text-blue-600">
+                    <span>宅配運費</span>
+                    <span>{formatCurrency(shippingFee)}</span>
+                  </div>
+                ) : !isDelivery ? (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>面交免運</span>
+                    <span>$0</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between font-bold text-lg pt-1">
+                  <span>合計</span>
+                  <span>{formatCurrency(orderTotal)}</span>
+                </div>
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full h-12 text-base"
-              disabled={submitting || cartItems.length === 0 || roundClosed}
-            >
-              {submitting ? "送出中..." : "確認下單"}
-            </Button>
-          </form>
-        </div>
-      )}
+            {/* Customer Info Card */}
+            <div className="bg-white rounded-xl border p-4 space-y-3">
+              <div className="font-medium text-gray-600 text-sm">收貨資訊</div>
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    LINE 暱稱 *
+                  </label>
+                  <div className="relative">
+                    <Input
+                      value={nickname}
+                      onChange={(e) => { setNickname(e.target.value); setNickFound(false); }}
+                      onBlur={handleNicknameBlur}
+                      placeholder="你在群組的暱稱"
+                      className={`pr-24 transition ${nickFound ? "border-green-400 bg-green-50" : ""}`}
+                      required
+                    />
+                    {nickFound && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded-full">
+                        已自動帶入
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-      {/* CartBar */}
-      {!roundClosed && (
-        <CartBar
-          items={cartItems}
-          shippingFee={shippingFee}
-          onCheckout={handleCheckout}
-        />
-      )}
-    </main>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">收貨人 *</label>
+                  <Input
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    placeholder="真實姓名"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">電話 *</label>
+                  <Input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="0912-345-678"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">取貨方式</label>
+                  <Select value={pickupLocation} onValueChange={setPickupLocation}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PICKUP_OPTIONS.map((opt) => (
+                        <SelectItem
+                          key={opt.value || DELIVERY_VALUE}
+                          value={opt.value || DELIVERY_VALUE}
+                        >
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {isDelivery && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">收貨地址</label>
+                    <Input
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="縣市、區、路、號"
+                    />
+                    {shippingFee && <ShippingFeeNote fee={shippingFee} />}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Email（選填）</label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">備註（選填）</label>
+                  <Input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="特殊需求"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting || cartItems.length === 0 || roundClosed || (isDelivery && !address.trim())}
+                  className="w-full bg-green-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-50 hover:bg-green-700 transition"
+                >
+                  {submitting ? "送出中..." : `送出訂單 · ${formatCurrency(orderTotal)}`}
+                </button>
+                {isDelivery && !address.trim() && (
+                  <p className="text-xs text-center text-gray-400">宅配請填寫收貨地址</p>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* CartBar */}
+        {!roundClosed && (
+          <CartBar
+            items={cartItems}
+            shippingFee={shippingFee}
+            onCheckout={handleCheckout}
+          />
+        )}
+      </main>
+    </div>
   );
 }

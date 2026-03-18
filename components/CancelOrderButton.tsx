@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -52,9 +51,9 @@ export function CancelOrderButton({ orderId }: CancelOrderButtonProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive" className="h-11">
+        <button className="w-full border-2 border-red-200 text-red-600 rounded-xl py-2.5 text-sm font-medium min-h-[44px]">
           取消訂單
-        </Button>
+        </button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -64,20 +63,20 @@ export function CancelOrderButton({ orderId }: CancelOrderButtonProps) {
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button
-            variant="outline"
+          <button
             onClick={() => setOpen(false)}
             disabled={cancelling}
+            className="flex-1 border-2 rounded-xl py-2.5 font-medium text-gray-600"
           >
             返回
-          </Button>
-          <Button
-            variant="destructive"
+          </button>
+          <button
             onClick={handleCancel}
             disabled={cancelling}
+            className="flex-1 bg-red-600 text-white rounded-xl py-2.5 font-bold disabled:opacity-50"
           >
             {cancelling ? "取消中..." : "確定取消"}
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

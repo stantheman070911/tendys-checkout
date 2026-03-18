@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ProgressBar";
 import { formatCurrency } from "@/lib/utils";
 import type { ProductWithProgress } from "@/types";
@@ -24,51 +23,52 @@ export function ProductCard({
   const atStockLimit =
     product.stock !== null && cartQty >= product.stock;
   const outOfStock = product.stock !== null && product.stock <= 0;
+  const remainingStock =
+    product.stock !== null ? product.stock - cartQty : null;
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="font-semibold text-base truncate">{product.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {formatCurrency(product.price)} / {product.unit}
-            </p>
+    <div
+      className={`bg-white rounded-xl border p-3 transition ${outOfStock ? "opacity-50" : ""}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium">
+            {product.name}
+            {outOfStock && (
+              <span className="ml-1.5 text-xs text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+                已售完
+              </span>
+            )}
           </div>
-          {product.stock !== null && (
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              庫存 {product.stock}
+          <div className="text-green-600 font-bold text-lg">
+            {formatCurrency(product.price)}
+            <span className="text-sm font-normal text-gray-400">
+              /{product.unit}
             </span>
+          </div>
+          {remainingStock !== null && !outOfStock && (
+            <div className="text-xs text-gray-400">
+              庫存 {remainingStock} {product.unit}
+            </div>
           )}
         </div>
-
-        <ProgressBar
-          currentQty={product.current_qty}
-          goalQty={product.goal_qty}
-        />
-
-        {outOfStock ? (
-          <div className="text-center text-sm text-muted-foreground py-2">
-            已售完
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-3">
+        {!outOfStock && (
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
-              className="h-11 w-11"
+              className="h-11 w-11 rounded-full text-xl font-bold"
               onClick={onRemove}
               disabled={cartQty === 0 || disabled}
             >
               −
             </Button>
-            <span className="w-8 text-center font-medium tabular-nums">
+            <span className="w-7 text-center font-bold text-lg tabular-nums">
               {cartQty}
             </span>
             <Button
-              variant="outline"
               size="icon"
-              className="h-11 w-11"
+              className="h-11 w-11 rounded-full bg-green-600 text-white text-xl font-bold hover:bg-green-700"
               onClick={onAdd}
               disabled={atStockLimit || disabled}
             >
@@ -76,7 +76,15 @@ export function ProductCard({
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+      <ProgressBar
+        currentQty={product.current_qty + cartQty}
+        goalQty={product.goal_qty}
+        unit={product.unit}
+      />
+      {atStockLimit && !outOfStock && (
+        <p className="text-xs text-orange-500 mt-1">已達庫存上限</p>
+      )}
+    </div>
   );
 }

@@ -5,21 +5,10 @@ import { useState, useEffect } from "react";
 interface DeadlineBannerProps {
   deadline: string | null;
   isOpen: boolean;
+  roundName?: string;
 }
 
-function formatCountdown(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (days > 0) return `${days}天 ${hours}時 ${minutes}分 ${seconds}秒`;
-  if (hours > 0) return `${hours}時 ${minutes}分 ${seconds}秒`;
-  return `${minutes}分 ${seconds}秒`;
-}
-
-export function DeadlineBanner({ deadline, isOpen }: DeadlineBannerProps) {
+export function DeadlineBanner({ deadline, isOpen, roundName }: DeadlineBannerProps) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -30,36 +19,42 @@ export function DeadlineBanner({ deadline, isOpen }: DeadlineBannerProps) {
 
   if (!isOpen) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-center text-red-700 font-medium">
-        已截單
+      <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-sm text-red-700 text-center font-medium">
+        本團已截單
       </div>
     );
   }
 
   if (!deadline) return null;
 
-  const deadlineMs = new Date(deadline).getTime();
-  const remaining = deadlineMs - now;
+  const deadlineDate = new Date(deadline);
+  const remaining = deadlineDate.getTime() - now;
 
   if (remaining <= 0) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-center text-red-700 font-medium">
-        已截單
+      <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-sm text-red-700 text-center font-medium">
+        本團已截單
       </div>
     );
   }
 
-  const urgent = remaining < 3600000; // < 1 hour
+  const hrs = Math.max(0, Math.floor(remaining / 3600000));
+  const mins = Math.max(0, Math.floor((remaining % 3600000) / 60000));
+  const dateStr = deadlineDate.toLocaleDateString("zh-TW");
+  const timeStr = deadlineDate.toLocaleTimeString("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
-    <div
-      className={`rounded-lg border px-4 py-3 text-center font-medium ${
-        urgent
-          ? "bg-orange-50 border-orange-200 text-orange-700"
-          : "bg-blue-50 border-blue-200 text-blue-700"
-      }`}
-    >
-      距離截單還有 {formatCountdown(remaining)}
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-sm text-amber-800 text-center">
+      {roundName && <span className="font-medium">{roundName}</span>}
+      {roundName && "\u3000"}截止 {dateStr} {timeStr}
+      {hrs < 48 && (
+        <span className="ml-2 text-red-600 font-bold">
+          剩 {hrs}h {mins}m
+        </span>
+      )}
     </div>
   );
 }
