@@ -227,11 +227,11 @@ select
   p.name,
   p.goal_qty,
   p.supplier_id,
-  coalesce(sum(oi.quantity), 0) as current_qty,
+  coalesce(sum(oi.quantity) filter (where o.id is not null), 0) as current_qty,
   case
     when p.goal_qty is null then null
     when p.goal_qty = 0 then 100
-    else round(coalesce(sum(oi.quantity), 0)::numeric / p.goal_qty * 100, 1)
+    else round((coalesce(sum(oi.quantity) filter (where o.id is not null), 0))::numeric / p.goal_qty * 100, 1)
   end as progress_pct
 from public.products p
 left join public.order_items oi on oi.product_id = p.id
