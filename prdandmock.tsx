@@ -279,956 +279,943 @@ const notifTypeLabel = {
 // Prototype UI Components (reference for building real pages)
 // ============================================
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
-// ============================================
-// Shared Components
-// ============================================
+const SUPP = [
+  { id:"s1", name:"阿土伯有機農場", contact:"陳阿土", phone:"0911-111-111", email:"farmer@org.tw", note:"週二、五送貨" },
+  { id:"s2", name:"海鮮王批發",     contact:"林海",   phone:"0922-222-222", email:"sea@fish.tw",  note:"需提前3天下單" },
+];
+const PRODS = [
+  { id:1, name:"有機地瓜", price:60,  unit:"斤", stock:50, goal:30,   qty:22, sid:"s1" },
+  { id:2, name:"空心菜",   price:35,  unit:"把", stock:40, goal:20,   qty:20, sid:"s1" },
+  { id:3, name:"放山雞蛋", price:120, unit:"盒", stock:20, goal:15,   qty:8,  sid:"s1" },
+  { id:4, name:"芭樂",     price:50,  unit:"斤", stock:0,  goal:25,   qty:25, sid:"s1" },
+  { id:5, name:"鱸魚片",   price:180, unit:"份", stock:10, goal:null, qty:3,  sid:"s2" },
+];
+const ROUND_BASE = { id:"r1", name:"第12團：三月第三週", open:true, deadline:"2026-03-19T20:00:00+08:00" };
+const PICKUP_POINTS = ["面交點A：中正路全家","面交點B：信義路麥當勞"];
+const INIT_ORDERS = [
+  { id:"ORD-001", nick:"小美",  name:"王小美", phone:"0912-345-678", addr:"台北市信義區松仁路100號",  pickup:null,              email:"mei@gmail.com",    items:[{n:"有機地瓜",q:3,p:60},{n:"放山雞蛋",q:2,p:120}], sub:420, fee:60,   total:480, status:"pending_confirm", paid:480,  last5:"12345", paidAt:"14:32", shipped:null, reason:null, notif:[{t:"payment_confirmed",L:1,E:1}] },
+  { id:"ORD-002", nick:"阿明",  name:"李阿明", phone:"0923-456-789", addr:"新北市板橋區中山路50號",   pickup:null,              email:"ming@gmail.com",   items:[{n:"鱸魚片",q:1,p:180},{n:"空心菜",q:5,p:35}],    sub:355, fee:60,   total:415, status:"pending_payment", paid:null, last5:null,   paidAt:null,   shipped:null, reason:null, notif:[] },
+  { id:"ORD-003", nick:"Jenny", name:"陳珍妮", phone:"0934-567-890", addr:"台中市西區民生路20號",     pickup:"面交點A：中正路全家", email:"jenny@gmail.com",  items:[{n:"芭樂",q:4,p:50}],                            sub:200, fee:null, total:200, status:"confirmed",       paid:200,  last5:"67890", paidAt:"10:15", shipped:null, reason:null, notif:[{t:"payment_confirmed",L:1,E:0}] },
+  { id:"ORD-004", nick:"小美",  name:"王小美", phone:"0912-345-678", addr:"台北市信義區松仁路100號",  pickup:null,              email:"mei@gmail.com",    items:[{n:"空心菜",q:3,p:35}],                          sub:105, fee:60,   total:165, status:"shipped",          paid:165,  last5:"12345", paidAt:"09:20", shipped:"03/16 16:00", reason:null, notif:[{t:"payment_confirmed",L:1,E:1},{t:"shipment",L:1,E:1}] },
+  { id:"ORD-005", nick:"阿花",  name:"張阿花", phone:"0945-678-901", addr:"高雄市左營區博愛路30號",   pickup:null,              email:"flower@gmail.com", items:[{n:"有機地瓜",q:2,p:60}],                        sub:120, fee:60,   total:180, status:"cancelled",        paid:null, last5:null,   paidAt:null,   shipped:null, reason:"客戶要求取消", notif:[{t:"order_cancelled",L:1,E:1}] },
+];
+const ST = {
+  pending_payment: { label:"待付款",   cls:"bg-yellow-100 text-yellow-800" },
+  pending_confirm: { label:"待確認",   cls:"bg-blue-100 text-blue-800" },
+  partial:         { label:"部分付款", cls:"bg-orange-100 text-orange-800" },
+  confirmed:       { label:"已確認",   cls:"bg-green-100 text-green-800" },
+  shipped:         { label:"已出貨",   cls:"bg-purple-100 text-purple-800" },
+  cancelled:       { label:"已取消",   cls:"bg-red-100 text-red-800" },
+};
 
-function ProgressBar({ current, goal, unit }) {
+const Badge = ({ s }) => { const d=ST[s]||ST.pending_payment; return <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${d.cls}`}>{d.label}</span>; };
+
+function ProgressBar({ cur, goal, unit }) {
   if (!goal) return null;
-  const pct = Math.min(100, Math.round((current / goal) * 100));
-  const reached = current >= goal;
+  const pct=Math.min(100,Math.round(cur/goal*100)), ok=cur>=goal;
   return (
-    <div className="mt-2">
-      <div className="flex justify-between text-xs mb-1">
-        <span className={reached ? "text-green-600 font-bold" : "text-orange-600"}>
-          {reached ? "🎉 已達標！" : `目標 ${goal} ${unit}`}
-        </span>
-        <span className="text-gray-500">{current}/{goal} {unit} ({pct}%)</span>
+    <div className="mt-1.5">
+      <div className="flex justify-between text-xs mb-0.5">
+        <span className={ok?"text-green-600 font-medium":"text-orange-500"}>{ok?"達標":`目標 ${goal}${unit}`}</span>
+        <span className="text-gray-400">{cur}/{goal} ({pct}%)</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
-        <div className={`h-2.5 rounded-full transition-all ${reached ? "bg-green-500" : "bg-orange-400"}`} style={{ width: `${pct}%` }} />
+      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${ok?"bg-green-500":"bg-orange-400"}`} style={{width:`${pct}%`}}/>
       </div>
     </div>
   );
 }
 
-function SharePanel({ round }) {
-  const [copied, setCopied] = useState(false);
-  const url = `https://yourshop.vercel.app/?round=${round.id}`;
-  const copy = () => { navigator.clipboard?.writeText(url).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  const shareText = encodeURIComponent(`${round.name} 開團中！快來跟團 👉 ${url}`);
-  return (
-    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
-      <div className="font-bold text-orange-800 text-center">🔥 幫忙揪團，一起達標！</div>
-      <p className="text-xs text-orange-700 text-center">有些商品還沒達到開團目標，分享給朋友一起買更划算</p>
-      <div className="flex gap-2">
-        <button onClick={copy} className="flex-1 bg-white border border-orange-300 text-orange-700 rounded-lg py-2 text-sm font-medium hover:bg-orange-100 transition">
-          {copied ? "✓ 已複製！" : "📋 複製連結"}
-        </button>
-        <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${shareText}`} target="_blank" rel="noreferrer" className="flex-1 bg-green-500 text-white rounded-lg py-2 text-sm font-medium text-center hover:bg-green-600 transition">
-          💬 分享到 LINE
-        </a>
-      </div>
-      <div className="bg-white rounded-lg p-2 text-xs text-gray-500 font-mono break-all">{url}</div>
+function DeadlineBanner({ roundFee }) {
+  const dl=new Date(ROUND_BASE.deadline), diff=dl-new Date();
+  const hrs=Math.max(0,Math.floor(diff/3600000)), mins=Math.max(0,Math.floor((diff%3600000)/60000));
+  return ROUND_BASE.open ? (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-sm text-amber-800 text-center">
+      <span className="font-medium">{ROUND_BASE.name}</span>　截止 {new Date(ROUND_BASE.deadline).toLocaleDateString("zh-TW")} {new Date(ROUND_BASE.deadline).toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}
+      {hrs<48&&<span className="ml-2 text-red-600 font-bold">剩 {hrs}h {mins}m</span>}
     </div>
-  );
+  ) : <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-sm text-red-700 text-center font-medium">本團已截單</div>;
 }
 
-function DeadlineBanner({ round }) {
-  if (!round.is_open) return <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 text-center font-bold">🚫 本團已截單</div>;
-  const dl = new Date(round.deadline);
-  const diff = dl - new Date();
-  const hrs = Math.max(0, Math.floor(diff / 3600000));
-  const mins = Math.max(0, Math.floor((diff % 3600000) / 60000));
-  return (
-    <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 text-center">
-      ⏰ <b>{round.name}</b> — 截止時間：{dl.toLocaleDateString("zh-TW")} {dl.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
-      {hrs < 48 && <span className="ml-2 text-red-600 font-bold">（剩 {hrs}h {mins}m）</span>}
-    </div>
-  );
-}
-
-// ============================================
-// App Root
-// ============================================
-
-export default function App() {
-  const [mode, setMode] = useState(null);
-  if (!mode) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-4 text-center">
-        <h1 className="text-2xl font-bold text-gray-800">生鮮團購系統 v2</h1>
-        <p className="text-gray-500 text-sm">含運費、出貨管理、供應商管理、到貨通知</p>
-        <button onClick={() => setMode("user")} className="w-full p-4 bg-green-600 text-white rounded-xl text-lg font-medium hover:bg-green-700 transition">🛒 用戶端體驗</button>
-        <button onClick={() => setMode("admin")} className="w-full p-4 bg-indigo-600 text-white rounded-xl text-lg font-medium hover:bg-indigo-700 transition">⚙️ Admin 端體驗</button>
-        <button onClick={() => setMode("lookup")} className="w-full p-4 bg-gray-600 text-white rounded-xl text-lg font-medium hover:bg-gray-700 transition">🔍 訂單查詢</button>
-      </div>
-    </div>
-  );
-  if (mode === "user") return <UserFlow onBack={() => setMode(null)} />;
-  if (mode === "lookup") return <LookupFlow onBack={() => setMode(null)} />;
-  return <AdminFlow onBack={() => setMode(null)} />;
-}
-
-// ============================================
-// LOOKUP FLOW
-// ============================================
-
-function LookupFlow({ onBack }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState(null);
-  const search = () => {
-    const q = query.trim();
-    if (!q) return;
-    setResults(mockOrders.filter(o => o.nickname === q || o.id === q));
-  };
-  return (
+/* ── Lookup ─────────────────────────────────────────────────────── */
+function Lookup({ onBack, orders }) {
+  const [q,setQ]=useState(""), [res,setRes]=useState(null), [sel,setSel]=useState(null);
+  const search=()=>{ const t=q.trim(); if(!t)return; setRes(orders.filter(o=>o.nick===t||o.id===t)); };
+  if (sel) return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-gray-600 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={onBack} className="text-xl">←</button>
-        <span className="font-bold">訂單查詢</span>
-      </div>
+      <header className="bg-gray-700 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
+        <button onClick={()=>setSel(null)} className="text-xl leading-none">←</button>
+        <span className="font-bold flex-1">訂單詳情</span><Badge s={sel.status}/>
+      </header>
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-          📌 輸入 LINE 暱稱或訂單編號。試「小美」看歷史訂單（含已出貨）
-        </div>
-        <div className="flex gap-2">
-          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && search()} placeholder="LINE 暱稱 或 訂單編號" className="flex-1 border rounded-lg px-3 py-2 text-sm" />
-          <button onClick={search} className="bg-gray-800 text-white px-4 rounded-lg text-sm font-medium">查詢</button>
-        </div>
-        {results !== null && results.length === 0 && <div className="text-center py-8 text-gray-400">找不到相關訂單</div>}
-        {results && results.length > 0 && (
-          <div className="space-y-3">
-            <div className="text-sm text-gray-500">找到 {results.length} 筆訂單</div>
-            {results.map(o => (
-              <div key={o.id} className="bg-white rounded-lg border p-3 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-bold text-sm">{o.id}</span>
-                    <span className="ml-2 text-gray-500 text-xs">{o.nickname}</span>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${statusColor[o.status]}`}>{statusMap[o.status]}</span>
-                </div>
-                <div className="text-xs text-gray-500">{o.items.map(i => `${i.name}x${i.qty}`).join("、")}</div>
-                <div className="flex justify-between text-sm">
-                  <span>商品 <b>${o.subtotal}</b>{o.shipping_fee ? <span className="text-gray-400 ml-1">+ 運費 ${o.shipping_fee}</span> : null}</span>
-                  <span className="font-bold">合計 ${o.total}</span>
-                </div>
-                {o.status === "shipped" && o.shippedAt && <div className="text-xs text-purple-600">📦 出貨時間：{o.shippedAt}</div>}
-                {o.status === "pending_payment" && (
-                  <div className="flex gap-2 mt-1">
-                    <button className="text-xs bg-blue-600 text-white px-3 py-1 rounded">前往匯款回報</button>
-                    <button className="text-xs border border-red-200 text-red-600 px-3 py-1 rounded hover:bg-red-50">取消訂單</button>
-                  </div>
-                )}
-              </div>
-            ))}
+        <div className="bg-white rounded-xl border p-4 space-y-3">
+          <div><div className="font-bold">{sel.id}</div><div className="text-gray-500 text-sm">{sel.nick} ({sel.name}) · {sel.phone}</div></div>
+          <div className="border-t pt-3 space-y-1 text-sm">
+            {sel.items.map((i,idx)=><div key={idx} className="flex justify-between"><span>{i.n} ×{i.q}</span><span>${i.p*i.q}</span></div>)}
+            {sel.fee>0&&<div className="flex justify-between text-blue-600"><span>運費</span><span>${sel.fee}</span></div>}
+            <div className="border-t pt-1.5 font-bold flex justify-between"><span>合計</span><span>${sel.total}</span></div>
           </div>
-        )}
+          {sel.pickup&&<div className="text-sm text-purple-600 bg-purple-50 rounded-lg p-2">📍 {sel.pickup}</div>}
+          {sel.shipped&&<div className="text-sm text-purple-600 bg-purple-50 rounded-lg p-2">📦 出貨：{sel.shipped}</div>}
+          {sel.reason&&<div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">取消：{sel.reason}</div>}
+        </div>
+        {sel.status==="pending_payment"&&<div className="flex gap-3">
+          <button className="flex-1 bg-blue-600 text-white rounded-xl py-3 text-sm font-bold">前往匯款回報</button>
+          <button className="flex-1 border-2 border-red-200 text-red-600 rounded-xl py-3 text-sm font-medium">取消訂單</button>
+        </div>}
       </div>
     </div>
   );
-}
-
-// ============================================
-// USER FLOW
-// ============================================
-
-function UserFlow({ onBack }) {
-  const [step, setStep] = useState(0);
-  const [cart, setCart] = useState({});
-  const [nickname, setNickname] = useState("");
-  const [found, setFound] = useState(false);
-  const [info, setInfo] = useState({ name: "", phone: "", address: "", email: "", pickup: "" });
-  const [payAmount, setPayAmount] = useState("");
-  const [payLast5, setPayLast5] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const itemsSubtotal = Object.entries(cart).reduce((s, [id, qty]) => {
-    const p = mockProducts.find(x => x.id === +id);
-    return s + (p ? p.price * qty : 0);
-  }, 0);
-  const isDelivery = !info.pickup;
-  const shippingFee = isDelivery && mockRound.shipping_fee ? mockRound.shipping_fee : 0;
-  const cartTotal = itemsSubtotal + shippingFee;
-  const cartCount = Object.values(cart).reduce((s, q) => s + q, 0);
-
-  const addToCart = useCallback((pid) => {
-    const p = mockProducts.find(x => x.id === pid);
-    if (!p || p.stock === 0) return;
-    setCart(c => {
-      const cur = c[pid] || 0;
-      if (p.stock !== null && cur >= p.stock) return c;
-      return { ...c, [pid]: cur + 1 };
-    });
-  }, []);
-
-  const removeFromCart = useCallback((pid) => {
-    setCart(c => ({ ...c, [pid]: Math.max(0, (c[pid] || 0) - 1) }));
-  }, []);
-
-  const handleNickname = (v) => {
-    setNickname(v);
-    if (v === "小美") {
-      setFound(true);
-      setInfo({ name: "王小美", phone: "0912-345-678", address: "台北市信義區松仁路100號", email: "mei@gmail.com", pickup: "" });
-    } else {
-      setFound(false);
-      setInfo({ name: "", phone: "", address: "", email: "", pickup: "" });
-    }
-  };
-
-  const handleSubmit = () => {
-    if (submitting) return;
-    setSubmitting(true);
-    setTimeout(() => { setStep(2); setSubmitting(false); }, 600);
-  };
-
-  const anyUnderGoal = mockProducts.some(p => p.goal_qty && p.current_qty < p.goal_qty);
-  const steps = ["選購商品", "填寫資料", "訂單成立", "回報匯款", "完成"];
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-green-600 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={onBack} className="text-xl">←</button>
-        <span className="font-bold">用戶端模擬</span>
-        <span className="ml-auto text-xs bg-green-800 px-2 py-1 rounded">Step {step + 1}/5</span>
-      </div>
-      <div className="flex px-3 py-2 bg-white border-b text-xs gap-1 overflow-x-auto">
-        {steps.map((s, i) => (
-          <div key={i} className={`flex-1 text-center py-1 rounded ${i === step ? "bg-green-100 text-green-700 font-bold" : i < step ? "text-green-500" : "text-gray-300"}`}>
-            {i < step ? "✓" : ""} {s}
-          </div>
-        ))}
-      </div>
-      <div className="max-w-lg mx-auto p-4">
-
-        {/* STEP 0: 商品選購 */}
-        {step === 0 && (
-          <div className="space-y-3">
-            <DeadlineBanner round={mockRound} />
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-              📌 模擬情境：你在 LINE 群組看到連結，點進來選購。宅配運費 ${mockRound.shipping_fee}
+      <header className="bg-gray-700 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
+        <button onClick={onBack} className="text-xl leading-none">←</button>
+        <span className="font-bold">訂單查詢</span>
+      </header>
+      <div className="max-w-lg mx-auto p-4 space-y-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-sm text-amber-800">輸入 LINE 暱稱或訂單編號。試「小美」</div>
+        <div className="flex gap-2">
+          <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()} placeholder="LINE 暱稱 或 訂單編號" className="flex-1 border rounded-xl px-3 py-2.5 text-sm"/>
+          <button onClick={search} className="bg-gray-800 text-white px-5 rounded-xl text-sm font-medium">查詢</button>
+        </div>
+        {res!==null&&res.length===0&&<div className="text-center py-10 text-gray-400">找不到相關訂單</div>}
+        {res&&res.length>0&&<div className="space-y-2">
+          <div className="text-xs text-gray-400">找到 {res.length} 筆，點擊查看詳情</div>
+          {res.map(o=>(
+            <div key={o.id} onClick={()=>setSel(o)} className="bg-white rounded-xl border p-3 cursor-pointer hover:border-gray-400 transition space-y-1.5">
+              <div className="flex justify-between items-center"><div><span className="font-bold text-sm">{o.id}</span><span className="ml-2 text-gray-500 text-xs">{o.nick}</span></div><Badge s={o.status}/></div>
+              <div className="text-xs text-gray-400">{o.items.map(i=>`${i.n}×${i.q}`).join("、")}</div>
+              <div className="flex justify-between text-sm"><span>小計 ${o.sub}{o.fee?<span className="text-gray-400"> +${o.fee}運</span>:null}</span><span className="font-bold">合計 ${o.total}</span></div>
             </div>
-            <h2 className="font-bold text-lg">本週商品</h2>
-            {mockProducts.map(p => {
-              const soldOut = p.stock === 0;
-              const atMax = p.stock !== null && (cart[p.id] || 0) >= p.stock;
-              return (
-                <div key={p.id} className={`bg-white rounded-lg border p-3 ${soldOut ? "opacity-50" : ""}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium">{p.name} {soldOut && <span className="text-red-500 text-xs ml-1">已售完</span>}</div>
-                      <div className="text-green-600 font-bold">${p.price} / {p.unit}</div>
-                      {p.stock !== null && !soldOut && <div className="text-xs text-gray-400">剩餘 {p.stock - (cart[p.id] || 0)} {p.unit}</div>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => removeFromCart(p.id)} disabled={soldOut} className="w-8 h-8 rounded-full border text-lg flex items-center justify-center hover:bg-gray-100 disabled:opacity-30">−</button>
-                      <span className="w-6 text-center font-bold">{cart[p.id] || 0}</span>
-                      <button onClick={() => addToCart(p.id)} disabled={soldOut || atMax} className="w-8 h-8 rounded-full bg-green-600 text-white text-lg flex items-center justify-center hover:bg-green-700 disabled:opacity-30 disabled:cursor-not-allowed">+</button>
-                    </div>
-                  </div>
-                  <ProgressBar current={p.current_qty + (cart[p.id] || 0)} goal={p.goal_qty} unit={p.unit} />
-                  {atMax && <div className="text-xs text-red-500 mt-1">已達庫存上限</div>}
-                </div>
-              );
-            })}
-            {anyUnderGoal && <SharePanel round={mockRound} />}
-            {cartCount > 0 && (
-              <div className="sticky bottom-4 bg-green-600 text-white rounded-xl p-4 flex justify-between items-center shadow-lg">
-                <div><span className="text-green-200">共 {cartCount} 件</span> <span className="font-bold text-xl ml-2">${itemsSubtotal}</span></div>
-                <button onClick={() => setStep(1)} className="bg-white text-green-700 font-bold px-6 py-2 rounded-lg">下一步 →</button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* STEP 1: 填資料 */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <h2 className="font-bold text-lg">填寫收貨資訊</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">LINE 暱稱</label>
-              <input value={nickname} onChange={e => handleNickname(e.target.value)} placeholder="輸入你在社群的暱稱" className="w-full border rounded-lg px-3 py-2 text-sm" />
-              {found && <p className="text-green-600 text-xs mt-1">✓ 找到了！已自動帶入你的資料</p>}
-              {nickname && !found && <p className="text-gray-400 text-xs mt-1">新用戶，請填寫以下資料</p>}
-              <p className="text-gray-400 text-xs mt-1">💡 試輸入「小美」看自動帶入效果</p>
-            </div>
-            {[["name", "收貨人姓名"], ["phone", "電話"], ["address", "地址"], ["email", "Email"]].map(([f, label]) => (
-              <div key={f}>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{label}</label>
-                <input value={info[f]} onChange={e => setInfo(p => ({ ...p, [f]: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              </div>
-            ))}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">取貨方式</label>
-              <select value={info.pickup} onChange={e => setInfo(p => ({ ...p, pickup: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
-                <option value="">宅配到以上地址</option>
-                
-              </select>
-              {!info.pickup && mockRound.shipping_fee > 0 && (
-                <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-2 text-sm text-blue-800">
-                  🚚 宅配到以上地址，運費 <b>${mockRound.shipping_fee}</b>
-                </div>
-              )}
-              {info.pickup && (
-                <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-2 text-sm text-green-700">
-                  📍 面交取貨，免運費
-                </div>
-              )}
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-sm">
-              <div className="font-medium mb-2">訂單摘要</div>
-              {Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => {
-                const p = mockProducts.find(x => x.id === +id);
-                return <div key={id} className="flex justify-between"><span>{p.name} x{qty}</span><span>${p.price * qty}</span></div>;
-              })}
-              {shippingFee > 0 && (
-                <div className="flex justify-between text-blue-600 mt-1"><span>🚚 運費</span><span>${shippingFee}</span></div>
-              )}
-              <div className="border-t mt-2 pt-2 font-bold flex justify-between"><span>合計</span><span>${cartTotal}</span></div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setStep(0)} className="flex-1 border rounded-lg py-3 font-medium hover:bg-gray-50">← 返回</button>
-              <button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-green-600 text-white rounded-lg py-3 font-bold hover:bg-green-700 disabled:opacity-50">
-                {submitting ? "送出中…" : "送出訂單"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: 訂單成立 */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <div className="text-center py-4">
-              <div className="text-4xl mb-2">✅</div>
-              <h2 className="font-bold text-xl">訂單已成立！</h2>
-              <p className="text-gray-500 text-sm">訂單編號：ORD-20260317-005</p>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
-              <div className="font-bold text-blue-800 text-center">請匯款至以下帳戶</div>
-              <div className="bg-white rounded-lg p-3 space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">銀行</span><span className="font-medium">中國信託 (822)</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">戶名</span><span className="font-medium">王大明</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">帳號</span><span className="font-bold text-lg tracking-wider">1234-5678-9012</span></div>
-                <div className="border-t pt-1 mt-1">
-                  <div className="flex justify-between text-gray-500"><span>商品小計</span><span>${itemsSubtotal}</span></div>
-                  {shippingFee > 0 && <div className="flex justify-between text-blue-600"><span>🚚 運費</span><span>${shippingFee}</span></div>}
-                  <div className="flex justify-between font-bold text-green-600 text-lg"><span>應付金額</span><span>${cartTotal}</span></div>
-                </div>
-              </div>
-            </div>
-            {anyUnderGoal && <SharePanel round={mockRound} />}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-              ⚠️ 匯款完成後請點下方按鈕回報，我們確認後會發通知給你
-            </div>
-            <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white rounded-lg py-3 font-bold hover:bg-blue-700">我已匯款，前往回報 →</button>
-            <button className="w-full border border-red-200 text-red-600 rounded-lg py-2 text-sm hover:bg-red-50">還沒匯款？取消此訂單</button>
-          </div>
-        )}
-
-        {/* STEP 3: 匯款回報 */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <h2 className="font-bold text-lg">回報匯款資訊</h2>
-            <p className="text-gray-500 text-sm">訂單 ORD-20260317-005 ・應付 ${cartTotal}</p>
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">匯款金額</label>
-              <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder={`例：${cartTotal}`} className="w-full border rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">匯款帳號後五碼</label>
-              <input maxLength={5} value={payLast5} onChange={e => setPayLast5(e.target.value)} placeholder="例：56789" className="w-full border rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <button onClick={() => setStep(4)} className="w-full bg-green-600 text-white rounded-lg py-3 font-bold hover:bg-green-700">送出回報</button>
-          </div>
-        )}
-
-        {/* STEP 4: 等待確認 */}
-        {step === 4 && (
-          <div className="space-y-4 text-center py-6">
-            <div className="text-4xl mb-2">⏳</div>
-            <h2 className="font-bold text-xl">匯款已回報</h2>
-            <p className="text-gray-500 text-sm">等待賣家確認中…<br />確認後會收到 LINE 通知 + Email</p>
-            <div className="bg-gray-50 rounded-xl p-4 text-sm text-left space-y-1">
-              <div className="flex justify-between"><span className="text-gray-500">訂單編號</span><span>ORD-20260317-005</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">狀態</span><span className="text-blue-600 font-medium">待確認</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">匯款金額</span><span>${payAmount || cartTotal}</span></div>
-              {shippingFee > 0 && <div className="flex justify-between"><span className="text-gray-500">含運費</span><span>${shippingFee}</span></div>}
-              <div className="flex justify-between"><span className="text-gray-500">帳號後五碼</span><span>{payLast5 || "56789"}</span></div>
-            </div>
-            {anyUnderGoal && <SharePanel round={mockRound} />}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 mt-4">
-              💡 用「訂單查詢」頁面，輸入暱稱隨時查看訂單狀態
-            </div>
-          </div>
-        )}
+          ))}
+        </div>}
       </div>
     </div>
   );
 }
 
-// ============================================
-// ADMIN FLOW
-// ============================================
+/* ── User Flow ──────────────────────────────────────────────────── */
+function UserFlow({ onBack, roundFee }) {
+  const [step,setStep]=useState(0);
+  const [cart,setCart]=useState({});
+  const [nick,setNick]=useState(""), [found,setFound]=useState(false);
+  const [info,setInfo]=useState({name:"",phone:"",addr:"",email:"",pickup:""});
+  const [payAmt,setPayAmt]=useState(""), [payLast5,setPayLast5]=useState("");
+  const [payConfirm,setPayConfirm]=useState(false);
+  const [submitting,setSubmitting]=useState(false);
 
-function AdminFlow({ onBack }) {
-  const [step, setStep] = useState(0);
-  const [orders, setOrders] = useState(mockOrders);
-  const [filter, setFilter] = useState("all");
-  const [selected, setSelected] = useState(null);
-  const [confirmed, setConfirmed] = useState(false);
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [showCsv, setShowCsv] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [showAddSupplier, setShowAddSupplier] = useState(false);
-  const [batchSelected, setBatchSelected] = useState(new Set());
-  const [batchDone, setBatchDone] = useState(false);
-  const [shipBatchSel, setShipBatchSel] = useState(new Set());
-  const [shipBatchDone, setShipBatchDone] = useState(false);
-  const [expandedProduct, setExpandedProduct] = useState(null);
-  const [arrivalSent, setArrivalSent] = useState(new Set());
+  const sub=Object.entries(cart).reduce((s,[id,q])=>{ const p=PRODS.find(x=>x.id===+id); return s+(p?p.price*q:0); },0);
+  const fee=(!info.pickup&&roundFee)?roundFee:0;
+  const total=sub+fee;
+  const count=Object.values(cart).reduce((s,q)=>s+q,0);
 
-  const filtered = orders.filter(o => filter === "all" || o.status === filter);
-  const pendingConfirm = orders.filter(o => o.status === "pending_confirm");
-  const confirmedOrders = orders.filter(o => o.status === "confirmed");
+  const add=id=>{ const p=PRODS.find(x=>x.id===id); if(!p||p.stock===0)return; setCart(c=>{ const cur=c[id]||0; if(p.stock&&cur>=p.stock)return c; return {...c,[id]:cur+1}; }); };
+  const rem=id=>setCart(c=>({...c,[id]:Math.max(0,(c[id]||0)-1)}));
+  const handleNick=v=>{ setNick(v); if(v==="小美"){setFound(true);setInfo({name:"王小美",phone:"0912-345-678",addr:"台北市信義區松仁路100號",email:"mei@gmail.com",pickup:""});}else{setFound(false);setInfo({name:"",phone:"",addr:"",email:"",pickup:""});} };
 
-  const itemAgg = {};
-  orders.filter(o => o.status !== "cancelled").forEach(o => {
-    o.items.forEach(i => {
-      if (!itemAgg[i.name]) itemAgg[i.name] = { qty: 0, revenue: 0 };
-      itemAgg[i.name].qty += i.qty;
-      itemAgg[i.name].revenue += i.qty * i.price;
+  if (step===0) return (
+    <div className="min-h-screen bg-gray-50 pb-28">
+      <header className="bg-green-700 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
+        <button onClick={onBack} className="text-xl leading-none">←</button>
+        <span className="font-bold flex-1 text-sm">{ROUND_BASE.name}</span>
+      </header>
+      <div className="max-w-lg mx-auto p-3 space-y-3">
+        <DeadlineBanner roundFee={roundFee}/>
+        <p className="text-xs text-center text-gray-400">宅配 +${roundFee} · 指定面交點免運費</p>
+        {PRODS.map(p=>{
+          const sold=p.stock===0, atMax=p.stock&&(cart[p.id]||0)>=p.stock;
+          return (
+            <div key={p.id} className={`bg-white rounded-xl border p-3 transition ${sold?"opacity-50":""}`}>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">{p.name}{sold&&<span className="ml-1.5 text-xs text-red-500 bg-red-50 px-1.5 py-0.5 rounded">已售完</span>}</div>
+                  <div className="text-green-600 font-bold text-lg">${p.price}<span className="text-sm font-normal text-gray-400">/{p.unit}</span></div>
+                  {p.stock&&!sold&&<div className="text-xs text-gray-400">庫存 {p.stock-(cart[p.id]||0)} {p.unit}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={()=>rem(p.id)} disabled={sold||!(cart[p.id]>0)} className="w-9 h-9 rounded-full border-2 text-xl font-bold flex items-center justify-center disabled:opacity-20 hover:bg-gray-50">−</button>
+                  <span className="w-7 text-center font-bold text-lg">{cart[p.id]||0}</span>
+                  <button onClick={()=>add(p.id)} disabled={sold||atMax} className="w-9 h-9 rounded-full bg-green-600 text-white text-xl font-bold flex items-center justify-center disabled:opacity-20 hover:bg-green-700">+</button>
+                </div>
+              </div>
+              <ProgressBar cur={p.qty+(cart[p.id]||0)} goal={p.goal} unit={p.unit}/>
+              {atMax&&<p className="text-xs text-orange-500 mt-1">已達庫存上限</p>}
+            </div>
+          );
+        })}
+      </div>
+      {count>0&&(
+        <div className="fixed bottom-0 left-0 right-0 bg-green-700 text-white px-4 py-3 flex items-center justify-between shadow-2xl">
+          <div>
+            <span className="text-green-300 text-sm">{count} 件</span>
+            <span className="font-bold text-2xl ml-2">${sub}</span>
+            <span className="text-green-400 text-xs ml-2">宅配另加 ${roundFee}</span>
+          </div>
+          <button onClick={()=>setStep(1)} className="bg-white text-green-700 font-bold px-6 py-2.5 rounded-xl text-sm">結帳 →</button>
+        </div>
+      )}
+    </div>
+  );
+
+  if (step===1) return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-green-700 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
+        <button onClick={()=>setStep(0)} className="text-xl leading-none">←</button>
+        <span className="font-bold">確認訂單</span>
+      </header>
+      <div className="max-w-lg mx-auto p-4 space-y-4">
+        <div className="bg-white rounded-xl border p-4">
+          <div className="font-medium text-gray-600 mb-2 text-sm">訂單明細</div>
+          {Object.entries(cart).filter(([,q])=>q>0).map(([id,q])=>{ const p=PRODS.find(x=>x.id===+id); return <div key={id} className="flex justify-between text-sm py-0.5"><span>{p.name} ×{q}</span><span>${p.price*q}</span></div>; })}
+          <div className="border-t mt-2 pt-2 space-y-1">
+            <div className="flex justify-between text-sm text-gray-500"><span>商品小計</span><span>${sub}</span></div>
+            {!info.pickup&&<div className="flex justify-between text-sm text-blue-600"><span>宅配運費</span><span>${roundFee}</span></div>}
+            {info.pickup&&<div className="flex justify-between text-sm text-green-600"><span>面交免運</span><span>$0</span></div>}
+            <div className="flex justify-between font-bold text-lg pt-1"><span>合計</span><span>${total}</span></div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border p-4 space-y-3">
+          <div className="font-medium text-gray-600 text-sm">收貨資訊</div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">LINE 暱稱 <span className="text-gray-400">（輸入「小美」可自動帶入）</span></label>
+            <div className="relative">
+              <input value={nick} onChange={e=>handleNick(e.target.value)} placeholder="你在群組的暱稱" className={`w-full border rounded-xl px-3 py-2.5 text-sm pr-24 transition ${found?"border-green-400 bg-green-50":""}`}/>
+              {found&&<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded-full">已自動帶入</span>}
+            </div>
+          </div>
+          {[["name","收貨人"],["phone","電話"],["email","Email"]].map(([f,l])=>(
+            <div key={f}><label className="block text-xs text-gray-500 mb-1">{l}</label><input value={info[f]} onChange={e=>setInfo(p=>({...p,[f]:e.target.value}))} className="w-full border rounded-xl px-3 py-2.5 text-sm"/></div>
+          ))}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">取貨方式</label>
+            <select value={info.pickup} onChange={e=>setInfo(p=>({...p,pickup:e.target.value}))} className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white">
+              <option value="">宅配到府（+${roundFee} 運費）</option>
+              {PICKUP_POINTS.map(pt=><option key={pt} value={pt}>{pt}（免運）</option>)}
+            </select>
+          </div>
+          {!info.pickup&&(
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">收貨地址</label>
+              <input value={info.addr} onChange={e=>setInfo(p=>({...p,addr:e.target.value}))} placeholder="縣市、區、路、號" className="w-full border rounded-xl px-3 py-2.5 text-sm"/>
+            </div>
+          )}
+        </div>
+        <button onClick={()=>{ setSubmitting(true); setTimeout(()=>{ setStep(2); setSubmitting(false); },500); }} disabled={submitting||(!info.pickup&&!info.addr)} className="w-full bg-green-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-50 hover:bg-green-700 transition">
+          {submitting?"送出中…":`送出訂單 · $${total}`}
+        </button>
+        {!info.pickup&&!info.addr&&<p className="text-xs text-center text-gray-400">宅配請填寫收貨地址</p>}
+      </div>
+    </div>
+  );
+
+  if (step===2) return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-green-700 text-white p-3 sticky top-0 z-10"><span className="font-bold">訂單成立</span></header>
+      <div className="max-w-lg mx-auto p-4 space-y-4">
+        <div className="text-center py-4"><div className="text-5xl mb-2">✅</div><h2 className="font-bold text-xl">訂單已成立</h2><p className="text-gray-400 text-sm mt-1 font-mono">ORD-20260318-007</p></div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="font-bold text-blue-800 text-center mb-3 text-sm">匯款帳戶資訊</div>
+          <div className="bg-white rounded-xl p-3 space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-gray-500">銀行</span><span className="font-medium">中國信託 (822)</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">戶名</span><span className="font-medium">王大明</span></div>
+            <div className="flex justify-between items-center"><span className="text-gray-500">帳號</span><span className="font-bold font-mono text-lg tracking-widest">1234-5678-9012</span></div>
+            <div className="border-t pt-2">
+              <div className="flex justify-between text-gray-400"><span>商品小計</span><span>${sub}</span></div>
+              {fee>0&&<div className="flex justify-between text-blue-500"><span>宅配運費</span><span>${fee}</span></div>}
+              {info.pickup&&<div className="flex justify-between text-green-600"><span>面交免運</span><span>$0</span></div>}
+              <div className="flex justify-between font-bold text-green-700 text-2xl mt-1"><span>應付</span><span>${total}</span></div>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={()=>setStep(3)} className="flex-1 bg-blue-600 text-white rounded-xl py-3.5 font-bold">我已匯款，前往回報</button>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={()=>setStep(0)} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600">繼續選購</button>
+          <button className="flex-1 border-2 border-red-100 text-red-500 rounded-xl py-2.5 text-sm">取消訂單</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (step===3&&!payConfirm) return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-green-700 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
+        <button onClick={()=>setStep(2)} className="text-xl leading-none">←</button>
+        <span className="font-bold">回報匯款</span>
+      </header>
+      <div className="max-w-lg mx-auto p-4 space-y-4">
+        <div className="bg-gray-100 rounded-xl p-3 flex justify-between items-center text-sm">
+          <span className="text-gray-500">ORD-20260318-007 · 應付</span>
+          <span className="font-bold text-xl">${total}</span>
+        </div>
+        <div><label className="block text-sm font-medium text-gray-600 mb-1.5">匯款金額</label><input type="number" value={payAmt} onChange={e=>setPayAmt(e.target.value)} placeholder={String(total)} className="w-full border rounded-xl px-4 py-3.5 text-2xl font-bold" autoFocus/></div>
+        <div><label className="block text-sm font-medium text-gray-600 mb-1.5">帳號後五碼</label><input maxLength={5} value={payLast5} onChange={e=>setPayLast5(e.target.value)} placeholder="56789" className="w-full border rounded-xl px-4 py-3.5 text-2xl font-bold tracking-widest"/></div>
+        <button onClick={()=>setPayConfirm(true)} disabled={!payAmt||payLast5.length<5} className="w-full bg-green-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-40">核對後確認送出 →</button>
+      </div>
+    </div>
+  );
+
+  if (step===3&&payConfirm) {
+    const match=+payAmt===total;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-green-700 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
+          <button onClick={()=>setPayConfirm(false)} className="text-xl leading-none">←</button>
+          <span className="font-bold">確認送出</span>
+        </header>
+        <div className="max-w-lg mx-auto p-4 space-y-4">
+          <div className={`rounded-xl p-4 border-2 ${match?"border-green-400 bg-green-50":"border-orange-300 bg-orange-50"}`}>
+            <div className="font-bold text-center mb-3">{match?"✅ 金額吻合":"⚠️ 金額不符，請確認"}</div>
+            <div className="space-y-2 text-sm bg-white rounded-xl p-3">
+              <div className="flex justify-between"><span className="text-gray-500">訂單應付</span><span className="font-bold">${total}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">填寫匯款</span><span className={`font-bold ${match?"text-green-700":"text-orange-600"}`}>${payAmt}</span></div>
+              <div className="flex justify-between border-t pt-2"><span className="text-gray-500">帳號後五碼</span><span className="font-bold font-mono tracking-widest">{payLast5}</span></div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={()=>setPayConfirm(false)} className="flex-1 border-2 rounded-xl py-3 font-medium text-gray-600">← 修改</button>
+            <button onClick={()=>setStep(4)} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-bold">確認送出</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center gap-6">
+      <div className="text-5xl">⏳</div>
+      <div><h2 className="font-bold text-xl">匯款回報完成</h2><p className="text-gray-400 text-sm mt-1">等待賣家確認，確認後收到 LINE + Email 通知</p></div>
+      <div className="w-full max-w-sm bg-white rounded-xl border p-4 text-sm text-left space-y-2">
+        <div className="flex justify-between"><span className="text-gray-400">訂單</span><span className="font-mono">ORD-20260318-007</span></div>
+        <div className="flex justify-between"><span className="text-gray-400">狀態</span><span className="text-blue-600 font-medium">待確認</span></div>
+        <div className="flex justify-between"><span className="text-gray-400">匯款</span><span>${payAmt||total}</span></div>
+        <div className="flex justify-between"><span className="text-gray-400">後五碼</span><span className="font-mono tracking-widest">{payLast5}</span></div>
+      </div>
+      <div className="w-full max-w-sm space-y-2">
+        <button onClick={()=>{ setStep(0); setCart({}); }} className="w-full bg-green-600 text-white rounded-xl py-3 font-bold">繼續選購</button>
+        <button onClick={onBack} className="w-full border-2 rounded-xl py-3 text-sm text-gray-600">返回首頁</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Cancel Dialog ──────────────────────────────────────────────── */
+function CancelDialog({ order, onConfirm, onClose }) {
+  const [reason,setReason]=useState("");
+  const ref=useRef(null);
+  useEffect(()=>{ ref.current?.focus(); },[]);
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4">
+        <div className="font-bold text-lg">取消訂單</div>
+        <div className="text-sm bg-gray-50 rounded-xl p-3 space-y-0.5">
+          <div className="font-medium">{order.id} · {order.nick} ({order.name})</div>
+          <div className="text-gray-500">{order.items.map(i=>`${i.n}×${i.q}`).join("、")}</div>
+          <div className="font-bold text-lg">${order.total}</div>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">取消原因（選填）</label>
+          <textarea ref={ref} value={reason} onChange={e=>setReason(e.target.value)} placeholder="例：客戶要求取消" className="w-full border rounded-xl px-3 py-2 text-sm h-20 resize-none"/>
+        </div>
+        <p className="text-xs text-gray-400">取消後自動發 LINE + Email 通知</p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 border-2 rounded-xl py-2.5 font-medium text-gray-600">返回</button>
+          <button onClick={()=>onConfirm(order.id,reason||"管理員取消")} className="flex-1 bg-red-600 text-white rounded-xl py-2.5 font-bold">確認取消</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── POS Modal ──────────────────────────────────────────────────── */
+function POSModal({ onClose, onSubmit, roundFee }) {
+  const [data,setData]=useState({ nick:"", name:"", phone:"", pickup:"onsite", addr:"", fee:roundFee, items:{} });
+  const nickRef=useRef(null);
+  useEffect(()=>{ nickRef.current?.focus(); },[]);
+  useEffect(()=>{ const h=e=>{ if(e.key==="Escape")onClose(); }; window.addEventListener("keydown",h); return ()=>window.removeEventListener("keydown",h); },[onClose]);
+
+  const isDelivery = data.pickup === "delivery";
+  const isOnsite   = data.pickup === "onsite";
+  // 現場收款：no fee. 宅配：custom fee field. 面交點：0
+  const displayFee = isDelivery ? (parseInt(data.fee)||0) : 0;
+  const sub=Object.entries(data.items).reduce((s,[id,q])=>{ const p=PRODS.find(x=>x.id===+id); return s+(p?p.price*q:0); },0);
+  const total=sub+displayFee;
+  const valid=Object.values(data.items).some(q=>q>0)&&data.nick.trim()&&(!isDelivery||data.addr.trim());
+  const setQty=(id,v)=>setData(p=>({...p,items:{...p.items,[id]:Math.max(0,parseInt(v)||0)}}));
+
+  const handleSubmit=(quick)=>{
+    const items=Object.entries(data.items).filter(([,q])=>q>0).map(([id,q])=>{ const p=PRODS.find(x=>x.id===+id); return {n:p.name,q:parseInt(q),p:p.price}; });
+    if (!items.length||!data.nick.trim()) return;
+    const itemSub=items.reduce((s,i)=>s+i.q*i.p,0);
+    // 現場收款 = always no fee; 宅配 = roundFee; 面交 = 0
+    const orderFee = (quick||!isDelivery) ? null : (parseInt(data.fee)||0);
+    const orderTotal = itemSub + (orderFee||0);
+    let pickupLabel = null;
+    if (isOnsite)         pickupLabel = "現場取貨";
+    else if (!isDelivery) pickupLabel = data.pickup; // named 面交 point
+    onSubmit({
+      nick:data.nick, name:data.name||data.nick, phone:data.phone||"—",
+      addr:isDelivery?data.addr:"—",
+      pickup:pickupLabel,
+      items, sub:itemSub, fee:orderFee, total:orderTotal,
+      quick
     });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[92vh] flex flex-col">
+        <div className="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center rounded-t-2xl shrink-0">
+          <span className="font-bold text-lg">代客下單 <span className="text-xs text-gray-400 font-normal">[Esc 關閉]</span></span>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">✕</button>
+        </div>
+        <div className="overflow-y-auto p-4 space-y-4">
+          {/* Customer info */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">LINE 暱稱 *</label>
+              <input ref={nickRef} value={data.nick} onChange={e=>setData(p=>({...p,nick:e.target.value}))} placeholder="暱稱" className="w-full border rounded-xl px-3 py-2.5 text-sm"/>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">姓名</label>
+              <input value={data.name} onChange={e=>setData(p=>({...p,name:e.target.value}))} placeholder="收貨人" className="w-full border rounded-xl px-3 py-2 text-sm"/>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">電話</label>
+              <input value={data.phone} onChange={e=>setData(p=>({...p,phone:e.target.value}))} placeholder="電話" className="w-full border rounded-xl px-3 py-2 text-sm"/>
+            </div>
+          </div>
+
+          {/* Pickup method — 3 clear options */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1.5">取貨方式</label>
+            <div className="grid grid-cols-3 gap-1.5 text-sm">
+              {[
+                ["onsite",   "現場取貨", "免運"],
+                ["delivery", "宅配到府", `+$${roundFee}`],
+                ...PICKUP_POINTS.map(pt=>[pt, pt.split("：")[0], "免運"]),
+              ].map(([val,label,sub])=>(
+                <button key={val} onClick={()=>setData(p=>({...p,pickup:val,addr:""}))}
+                  className={`border-2 rounded-xl py-2 px-1 text-center transition ${data.pickup===val?"border-indigo-500 bg-indigo-50 text-indigo-700":"border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+                  <div className="font-medium text-xs">{label}</div>
+                  <div className={`text-xs mt-0.5 ${data.pickup===val?"text-indigo-500":"text-gray-400"}`}>{sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Address + fee — only for delivery */}
+          {isDelivery&&(
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">收貨地址 *</label>
+                <input value={data.addr} onChange={e=>setData(p=>({...p,addr:e.target.value}))} placeholder="縣市、區、路、號" className="w-full border rounded-xl px-3 py-2.5 text-sm"/>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">宅配運費</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400">$</span>
+                  <input type="number" min="0" value={data.fee} onChange={e=>setData(p=>({...p,fee:e.target.value}))} className="w-28 border rounded-xl px-3 py-2 text-sm font-bold"/>
+                  {parseInt(data.fee)!==roundFee&&(
+                    <button onClick={()=>setData(p=>({...p,fee:roundFee}))} className="text-xs text-gray-400 hover:text-blue-500 underline">還原預設 ${roundFee}</button>
+                  )}
+                </div>
+                {parseInt(data.fee)!==roundFee&&<p className="text-xs text-orange-500 mt-1">預設運費 ${roundFee}，此單已手動調整</p>}
+              </div>
+            </div>
+          )}
+
+          {/* 現場收款 fee notice */}
+          {isOnsite&&(
+            <div className="bg-green-50 border border-green-200 rounded-xl p-2.5 text-xs text-green-700">
+              現場取貨：客戶當面取貨，不計運費
+            </div>
+          )}
+
+          {/* Products */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-2">商品</label>
+            <div className="space-y-2">
+              {PRODS.filter(p=>p.stock>0).map(p=>(
+                <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl p-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{p.name}</div>
+                    <div className="text-xs text-gray-400">${p.price}/{p.unit}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={()=>setQty(p.id,(data.items[p.id]||0)-1)} className="w-8 h-8 rounded-full border bg-white text-lg flex items-center justify-center">−</button>
+                    <input type="number" min="0" value={data.items[p.id]||""} onChange={e=>setQty(p.id,e.target.value)} placeholder="0" className="w-14 text-center border rounded-xl py-1.5 text-sm font-bold"/>
+                    <button onClick={()=>setQty(p.id,(data.items[p.id]||0)+1)} className="w-8 h-8 rounded-full bg-indigo-600 text-white text-lg flex items-center justify-center">+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Running total */}
+          {sub>0&&(
+            <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+              <div className="flex justify-between text-gray-500"><span>商品</span><span>${sub}</span></div>
+              {isDelivery&&<div className="flex justify-between text-blue-600"><span>宅配運費</span><span>${roundFee}</span></div>}
+              {!isDelivery&&<div className="flex justify-between text-green-600"><span>運費</span><span>免運</span></div>}
+              <div className="flex justify-between font-bold text-xl border-t pt-1"><span>合計</span><span>${total}</span></div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <button onClick={()=>handleSubmit(false)} disabled={!valid} className="w-full bg-indigo-600 text-white rounded-xl py-3 font-bold disabled:opacity-40">
+            建立訂單（待付款）
+          </button>
+          {/* Quick-confirm only for non-delivery: customer is physically present */}
+          {!isDelivery&&sub>0&&(
+            <button onClick={()=>handleSubmit(true)} disabled={!valid} className="w-full border-2 border-green-500 text-green-700 rounded-xl py-2.5 font-bold disabled:opacity-40 text-sm">
+              建立並現場收款 · ${sub}（免運費·直接確認）
+            </button>
+          )}
+          {isDelivery&&sub>0&&(
+            <p className="text-xs text-center text-gray-400">宅配訂單無法現場收款</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Admin Flow ─────────────────────────────────────────────────── */
+function AdminFlow({ onBack, roundFee, setRoundFee }) {
+  const [orders,setOrders]=useState(INIT_ORDERS);
+  const [tab,setTab]=useState("orders");
+  const [filter,setFilter]=useState("all");
+  const [search,setSearch]=useState("");
+  const [expandedId,setExpandedId]=useState(null);
+  const [batchSel,setBatchSel]=useState(new Set());
+  const [shipBatchSel,setShipBatchSel]=useState(new Set());
+  const [showPOS,setShowPOS]=useState(false);
+  const [cancelTarget,setCancelTarget]=useState(null);
+  const [arrivalSent,setArrivalSent]=useState(new Set());
+  const [expandedProd,setExpandedProd]=useState(null);
+  const [editingFee,setEditingFee]=useState(false);
+  const [feeInput,setFeeInput]=useState(String(roundFee));
+  const searchRef=useRef(null);
+
+  useEffect(()=>{
+    const TABS=["dashboard","orders","shipments","products","rounds","suppliers"];
+    const h=e=>{
+      if(["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName))return;
+      if(e.key==="/"){ e.preventDefault(); setTab("orders"); setTimeout(()=>searchRef.current?.focus(),50); }
+      if(e.key==="n"||e.key==="N"){ e.preventDefault(); setShowPOS(true); }
+      if(e.key==="Escape"){ setExpandedId(null); setBatchSel(new Set()); setShowPOS(false); }
+      const n=parseInt(e.key); if(n>=1&&n<=6){ e.preventDefault(); setTab(TABS[n-1]); }
+    };
+    window.addEventListener("keydown",h); return ()=>window.removeEventListener("keydown",h);
+  },[]);
+
+  const filtered=orders.filter(o=>{
+    if(filter!=="all"&&o.status!==filter)return false;
+    const q=search.trim().toLowerCase(); if(!q)return true;
+    return o.nick.toLowerCase().includes(q)||o.phone.includes(q)||o.id.toLowerCase().includes(q)||o.name.includes(q);
   });
+  const pendingConfirm=orders.filter(o=>o.status==="pending_confirm");
+  const confirmedOrders=orders.filter(o=>o.status==="confirmed");
 
-  const getCustomersByProduct = (productName) => {
-    const customers = [];
-    orders.filter(o => o.status !== "cancelled").forEach(o => {
-      o.items.forEach(i => {
-        if (i.name === productName) customers.push({ nickname: o.nickname, name: o.name, phone: o.phone, qty: i.qty, orderId: o.id, status: o.status });
-      });
-    });
-    return customers;
+  const confirmOrder  =id=>setOrders(p=>p.map(o=>o.id===id?{...o,status:"confirmed"}:o));
+  const shipOrder     =id=>setOrders(p=>p.map(o=>o.id===id?{...o,status:"shipped",shipped:"03/18 18:00"}:o));
+  const revertOrder   =id=>setOrders(p=>p.map(o=>o.id===id?{...o,status:"pending_payment"}:o));
+  const markPartial   =id=>setOrders(p=>p.map(o=>o.id===id?{...o,status:"partial"}:o));
+  const cancelOrder   =(id,reason)=>{ setOrders(p=>p.map(o=>o.id===id?{...o,status:"cancelled",reason}:o)); setExpandedId(null); };
+  const batchConfirm  =()=>{ setOrders(p=>p.map(o=>batchSel.has(o.id)?{...o,status:"confirmed"}:o)); setBatchSel(new Set()); };
+  const batchShip     =()=>{ setOrders(p=>p.map(o=>shipBatchSel.has(o.id)?{...o,status:"shipped",shipped:"03/18 18:00"}:o)); setShipBatchSel(new Set()); };
+  const selectAllPending=()=>{ const ns=new Set(); pendingConfirm.forEach(o=>ns.add(o.id)); setBatchSel(ns); };
+
+  const posSubmit=data=>{
+    const {items,nick,name,phone,addr,pickup,sub,fee,total,quick}=data;
+    setOrders(p=>[{
+      id:`POS-${Date.now().toString().slice(-4)}`, nick, name, phone, addr,
+      pickup:pickup||null, email:"", items, sub, fee, total,
+      status:quick?"confirmed":"pending_payment",
+      paid:quick?total:null, last5:null, paidAt:quick?"現場":null,
+      shipped:null, reason:null, notif:[]
+    },...p]);
+    setShowPOS(false);
   };
 
-  const toggleBatch = (id) => setBatchSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleShipBatch = (id) => setShipBatchSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const saveFee=()=>{ const v=parseInt(feeInput); if(!isNaN(v)&&v>=0){ setRoundFee(v); } setEditingFee(false); };
 
-  const handleBatchConfirm = () => {
-    setOrders(prev => prev.map(o => batchSelected.has(o.id) ? { ...o, status: "confirmed" } : o));
-    setBatchDone(true);
-    setTimeout(() => { setBatchDone(false); setBatchSelected(new Set()); }, 2000);
-  };
-
-  const handleBatchShip = () => {
-    setOrders(prev => prev.map(o => shipBatchSel.has(o.id) ? { ...o, status: "shipped", shippedAt: "2026-03-17 18:00" } : o));
-    setShipBatchDone(true);
-    setTimeout(() => { setShipBatchDone(false); setShipBatchSel(new Set()); }, 2000);
-  };
-
-  const handleArrivalNotify = (productName) => {
-    setArrivalSent(prev => new Set([...prev, productName]));
-    setTimeout(() => setArrivalSent(prev => { const n = new Set(prev); n.delete(productName); return n; }), 3000);
-  };
-
-  const supplierForProduct = (productName) => {
-    const p = mockProducts.find(x => x.name === productName);
-    return p ? mockSuppliers.find(s => s.id === p.supplier_id) : null;
-  };
-
-  const tabs = [["dashboard", "📊 儀表板"], ["orders", "📋 訂單"], ["shipments", "📦 待出貨"], ["products", "🏷️ 商品"], ["rounds", "🔄 開團"], ["suppliers", "🏭 供應商"]];
+  const itemAgg={};
+  orders.filter(o=>o.status!=="cancelled").forEach(o=>o.items.forEach(i=>{ if(!itemAgg[i.n])itemAgg[i.n]={qty:0,rev:0}; itemAgg[i.n].qty+=i.q; itemAgg[i.n].rev+=i.q*i.p; }));
+  const getCustomers=name=>{ const cs=[]; orders.filter(o=>o.status!=="cancelled").forEach(o=>o.items.forEach(i=>{ if(i.n===name)cs.push({nick:o.nick,name:o.name,phone:o.phone,qty:i.q,id:o.id}); })); return cs; };
+  const deliveryOrders=confirmedOrders.filter(o=>!o.pickup);
+  const pickupGroups=confirmedOrders.filter(o=>o.pickup).reduce((acc,o)=>{ acc[o.pickup]=acc[o.pickup]||[]; acc[o.pickup].push(o); return acc; },{});
+  const sendArrival=name=>{ setArrivalSent(p=>new Set([...p,name])); setTimeout(()=>setArrivalSent(p=>{ const n=new Set(p); n.delete(name); return n; }),3000); };
+  const TABS=[["dashboard","📊","儀表板"],["orders","📋","訂單"],["shipments","📦","出貨"],["products","🏷","商品"],["rounds","🔄","開團"],["suppliers","🏭","供應商"]];
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="bg-indigo-600 text-white p-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={onBack} className="text-xl">←</button>
-        <span className="font-bold">Admin 後台模擬</span>
-      </div>
-      <div className="max-w-2xl mx-auto p-4">
+      {cancelTarget&&<CancelDialog order={cancelTarget} onConfirm={(id,r)=>{cancelOrder(id,r);setCancelTarget(null);}} onClose={()=>setCancelTarget(null)}/>}
+      {showPOS&&<POSModal onClose={()=>setShowPOS(false)} onSubmit={posSubmit} roundFee={roundFee}/>}
 
-        {/* Login */}
-        {step === 0 && (
-          <div className="max-w-sm mx-auto space-y-4 mt-8">
-            <h2 className="font-bold text-xl text-center">Admin 登入</h2>
-            <div><label className="block text-sm font-medium text-gray-600 mb-1">Email</label><input defaultValue="admin@shop.com" className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-            <div><label className="block text-sm font-medium text-gray-600 mb-1">密碼</label><input type="password" defaultValue="password123" className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-            <button onClick={() => setStep(1)} className="w-full bg-indigo-600 text-white rounded-lg py-3 font-bold hover:bg-indigo-700">登入</button>
+      {batchSel.size>0&&(
+        <div className="fixed bottom-0 left-0 right-0 bg-indigo-700 text-white px-4 py-3 flex items-center justify-between z-40 shadow-2xl">
+          <span className="font-medium text-sm">已選 <b>{batchSel.size}</b> 筆</span>
+          <div className="flex gap-2">
+            <button onClick={()=>setBatchSel(new Set())} className="px-3 py-1.5 border border-indigo-500 rounded-xl text-sm">清除 [Esc]</button>
+            <button onClick={batchConfirm} className="px-4 py-1.5 bg-green-500 rounded-xl text-sm font-bold">批次確認付款</button>
           </div>
-        )}
+        </div>
+      )}
+      {shipBatchSel.size>0&&batchSel.size===0&&(
+        <div className="fixed bottom-0 left-0 right-0 bg-purple-700 text-white px-4 py-3 flex items-center justify-between z-40 shadow-2xl">
+          <span className="font-medium text-sm">已選 <b>{shipBatchSel.size}</b> 筆</span>
+          <div className="flex gap-2">
+            <button onClick={()=>setShipBatchSel(new Set())} className="px-3 py-1.5 border border-purple-500 rounded-xl text-sm">清除</button>
+            <button onClick={batchShip} className="px-4 py-1.5 bg-white text-purple-700 rounded-xl text-sm font-bold">批次出貨</button>
+          </div>
+        </div>
+      )}
 
-        {/* Main Admin */}
-        {step === 1 && !selected && (
+      <header className="bg-indigo-700 text-white sticky top-0 z-20">
+        <div className="max-w-2xl mx-auto px-3 pt-2 flex items-center gap-2">
+          <button onClick={onBack} className="text-xl leading-none mr-1">←</button>
+          <span className="font-bold text-sm flex-1">Admin 後台</span>
+          <span className="text-xs text-indigo-300 hidden sm:block">/ 搜尋 · N 新增 · 1–6 切換</span>
+          <button onClick={()=>setShowPOS(true)} className="bg-white text-indigo-700 px-3 py-1.5 rounded-xl text-sm font-bold shrink-0">+ 代客下單 [N]</button>
+        </div>
+        <div className="max-w-2xl mx-auto px-3 py-2 flex gap-1 overflow-x-auto">
+          {TABS.map(([k,icon,label],i)=>(
+            <button key={k} onClick={()=>setTab(k)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition ${tab===k?"bg-white text-indigo-700":"text-indigo-200 hover:bg-indigo-600"}`}>
+              <span style={{fontSize:"12px"}}>{icon}</span> {label}
+              {k==="orders"&&pendingConfirm.length>0&&<span className="bg-red-500 text-white rounded-full px-1.5 ml-0.5 text-xs leading-tight">{pendingConfirm.length}</span>}
+              <span className={`text-xs ml-0.5 ${tab===k?"text-indigo-400":"text-indigo-500"}`}>[{i+1}]</span>
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto p-3 space-y-3 pb-28">
+
+        {/* DASHBOARD */}
+        {tab==="dashboard"&&(
           <div className="space-y-3">
-            <div className="flex gap-1.5 mb-2 flex-wrap">
-              {tabs.map(([k, label]) => (
-                <button key={k} onClick={() => setActiveTab(k)} className={`px-2.5 py-1.5 rounded-lg text-xs font-medium ${activeTab === k ? "bg-indigo-600 text-white" : "bg-white border"}`}>{label}</button>
+            <h3 className="font-bold text-gray-700 text-sm">{ROUND_BASE.name} · 宅配運費 ${roundFee}</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ["總訂單",`${orders.length}`,null],
+                ["總營收",`$${orders.filter(o=>o.status!=="cancelled").reduce((s,o)=>s+o.total,0)}`,null],
+                ["待確認",`${pendingConfirm.length}`,()=>{setTab("orders");setFilter("pending_confirm");}],
+                ["待付款",`${orders.filter(o=>o.status==="pending_payment").length}`,()=>{setTab("orders");setFilter("pending_payment");}],
+                ["待出貨",`${confirmedOrders.length}`,()=>setTab("shipments")],
+                ["已出貨",`${orders.filter(o=>o.status==="shipped").length}`,()=>{setTab("orders");setFilter("shipped");}],
+              ].map(([l,v,fn],i)=>(
+                <div key={i} onClick={fn||undefined} className={`bg-white rounded-xl border p-3 text-center transition ${fn?"cursor-pointer hover:border-indigo-400":""}`}>
+                  <div className="text-xs text-gray-400 mb-0.5">{l}</div>
+                  <div className="font-bold text-xl">{v}</div>
+                  {fn&&<div className="text-xs text-indigo-400 mt-0.5">→</div>}
+                </div>
               ))}
             </div>
-
-            {/* ===== DASHBOARD ===== */}
-            {activeTab === "dashboard" && (
-              <div className="space-y-3">
-                <h3 className="font-bold">本團摘要 — {mockRound.name}</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    ["總訂單", `${orders.length} 筆`],
-                    ["總營收", `$${orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0)}`],
-                    ["待確認", `${pendingConfirm.length} 筆`],
-                    ["待付款", `${orders.filter(o => o.status === "pending_payment").length} 筆`],
-                    ["待出貨", `${confirmedOrders.length} 筆`],
-                    ["已出貨", `${orders.filter(o => o.status === "shipped").length} 筆`],
-                  ].map(([label, val], i) => (
-                    <div key={i} className="bg-white rounded-lg border p-3 text-center">
-                      <div className="text-xs text-gray-500">{label}</div>
-                      <div className="font-bold text-lg">{val}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="bg-white rounded-lg border p-4">
-                  <div className="font-bold text-sm mb-3">📦 商品需求彙總（供貨商採購用）</div>
-                  <div className="space-y-2">
-                    {Object.entries(itemAgg).map(([name, data]) => {
-                      const p = mockProducts.find(x => x.name === name);
-                      const sup = supplierForProduct(name);
-                      const expanded = expandedProduct === name;
-                      const customers = expanded ? getCustomersByProduct(name) : [];
-                      const sent = arrivalSent.has(name);
-                      return (
-                        <div key={name} className="border-b pb-2">
-                          <div className="flex justify-between items-center text-sm">
-                            <button onClick={() => setExpandedProduct(expanded ? null : name)} className="font-medium text-left hover:text-indigo-600 flex items-center gap-1">
-                              <span className="text-xs">{expanded ? "▼" : "▶"}</span> {name}
-                              {sup && <span className="text-xs text-gray-400 ml-1">({sup.name})</span>}
-                            </button>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-indigo-600">{data.qty} {p?.unit || "份"}</span>
-                              <span className="text-gray-400">(${data.revenue})</span>
-                              <button onClick={() => handleArrivalNotify(name)} disabled={sent} className={`text-xs px-2 py-1 rounded ${sent ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700 hover:bg-orange-200"}`}>
-                                {sent ? "✓ 已通知" : "📢 到貨"}
-                              </button>
-                            </div>
-                          </div>
-                          {expanded && (
-                            <div className="mt-2 ml-4 bg-gray-50 rounded-lg p-2 space-y-1">
-                              <div className="text-xs text-gray-500 flex gap-3 font-medium border-b pb-1 mb-1">
-                                <span className="w-14">暱稱</span><span className="w-16">收貨人</span><span className="w-24">電話</span><span className="w-10 text-right">數量</span><span className="flex-1 text-right">訂單</span>
-                              </div>
-                              {customers.map((c, i) => (
-                                <div key={i} className="text-xs flex gap-3 items-center">
-                                  <span className="w-14 font-medium">{c.nickname}</span>
-                                  <span className="w-16">{c.name}</span>
-                                  <span className="w-24 text-gray-500">{c.phone}</span>
-                                  <span className="w-10 text-right font-bold text-indigo-600">{c.qty}</span>
-                                  <span className="flex-1 text-right text-gray-400">{c.orderId}</span>
-                                </div>
-                              ))}
-                              {sent && <div className="text-xs text-green-600 mt-1">📢 已發送到貨通知：「您訂購的【{name}】已到達理貨中心」→ {customers.length} 位客戶</div>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg border p-4">
-                  <div className="font-bold text-sm mb-3">📡 通知發送狀態</div>
-                  <div className="space-y-2 text-sm">
-                    {orders.filter(o => o.notif && o.notif.length > 0).map(o => (
-                      <div key={o.id} className="flex justify-between items-center border-b pb-2">
-                        <span className="text-gray-600 text-xs">{o.id}</span>
-                        <div className="flex gap-1 flex-wrap justify-end">
-                          {o.notif.map((n, i) => (
-                            <span key={i} className="text-xs">
-                              <span className="text-gray-400 mr-1">{notifTypeLabel[n.type]}:</span>
-                              <span className={`px-1.5 py-0.5 rounded ${n.line === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>L{n.line === "success" ? "✓" : "✗"}</span>
-                              {" "}
-                              <span className={`px-1.5 py-0.5 rounded ${n.email === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>E{n.email === "success" ? "✓" : "✗"}</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ===== ORDERS ===== */}
-            {activeTab === "orders" && (
-              <>
-                <div className="flex gap-1.5 items-center flex-wrap">
-                  {["all", "pending_payment", "pending_confirm", "confirmed", "shipped", "cancelled"].map(s => (
-                    <button key={s} onClick={() => setFilter(s)} className={`text-xs px-2.5 py-1 rounded-full ${filter === s ? "bg-indigo-600 text-white" : "bg-white border"}`}>
-                      {s === "all" ? "全部" : statusMap[s]}
-                      {s === "pending_confirm" && pendingConfirm.length > 0 && ` 🔴${pendingConfirm.length}`}
-                    </button>
-                  ))}
-                  <button onClick={() => setShowCsv(true)} className="ml-auto text-xs px-3 py-1 bg-gray-800 text-white rounded-full">📥 CSV</button>
-                </div>
-
-                {pendingConfirm.length > 0 && (filter === "all" || filter === "pending_confirm") && (
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex justify-between items-center">
-                    <div className="text-sm text-indigo-800">已選 <b>{batchSelected.size}</b> 筆</div>
-                    <button onClick={handleBatchConfirm} disabled={batchSelected.size === 0} className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg disabled:opacity-30">
-                      {batchDone ? "✓ 已確認！" : "批次確認付款"}
-                    </button>
-                  </div>
-                )}
-
-                {showCsv && (
-                  <div className="bg-gray-800 text-green-400 rounded-lg p-3 text-xs font-mono">
-                    <div className="text-white mb-1">📄 orders_export.csv（含運費欄位）</div>
-                    訂單編號,暱稱,收貨人,電話,地址,取貨,商品,小計,運費,合計,狀態
-                    <button onClick={() => setShowCsv(false)} className="block mt-2 text-gray-400 underline">關閉</button>
-                  </div>
-                )}
-
-                {filtered.map(o => (
-                  <div key={o.id} onClick={() => { if (o.status === "pending_confirm") setSelected(o); }} className={`bg-white rounded-lg border p-3 space-y-2 ${o.status === "pending_confirm" ? "cursor-pointer hover:border-indigo-400 border-indigo-200" : ""}`}>
-                    <div className="flex items-start gap-2">
-                      {o.status === "pending_confirm" && (
-                        <input type="checkbox" checked={batchSelected.has(o.id)} onChange={() => toggleBatch(o.id)} onClick={e => e.stopPropagation()} className="mt-1 accent-indigo-600" />
-                      )}
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="font-bold text-sm">{o.id}</span>
-                            <span className="ml-2 text-gray-500 text-xs">{o.nickname}</span>
-                            {o.pickup && <span className="ml-1 text-xs text-purple-600">📍</span>}
-                          </div>
-                          <span className={`text-xs px-2 py-1 rounded-full ${statusColor[o.status]}`}>{statusMap[o.status]}</span>
-                        </div>
-                        <div className="text-xs text-gray-500">{o.items.map(i => `${i.name}x${i.qty}`).join("、")}</div>
-                        <div className="flex justify-between text-sm">
-                          <span>${o.subtotal}{o.shipping_fee ? <span className="text-gray-400">+${o.shipping_fee}運</span> : ""} = <b>${o.total}</b></span>
-                          {o.payAmount && <span className="text-blue-600 text-xs">匯${o.payAmount}/{o.payLast5}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-
-            {/* ===== SHIPMENTS ===== */}
-            {activeTab === "shipments" && (
-              <div className="space-y-3">
-                <h3 className="font-bold">待出貨管理</h3>
-                {confirmedOrders.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">目前沒有待出貨的訂單</div>
-                ) : (
-                  <>
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 flex justify-between items-center">
-                      <div className="text-sm text-purple-800">已選 <b>{shipBatchSel.size}</b> 筆</div>
-                      <button onClick={handleBatchShip} disabled={shipBatchSel.size === 0} className="text-xs bg-purple-600 text-white px-3 py-1 rounded-lg disabled:opacity-30">
-                        {shipBatchDone ? "✓ 已出貨！" : "📦 批次確認寄出"}
+            <div className="bg-white rounded-xl border p-4">
+              <div className="font-medium text-sm mb-3 text-gray-700">商品需求彙總</div>
+              {Object.entries(itemAgg).map(([name,d])=>{
+                const p=PRODS.find(x=>x.name===name), sup=SUPP.find(s=>s.id===p?.sid), exp=expandedProd===name, customers=exp?getCustomers(name):[], sent=arrivalSent.has(name);
+                return (
+                  <div key={name} className="border-b last:border-0 py-2">
+                    <div className="flex justify-between items-center">
+                      <button onClick={()=>setExpandedProd(exp?null:name)} className="flex items-center gap-1 text-sm font-medium hover:text-indigo-600">
+                        <span className="text-xs text-gray-400">{exp?"▼":"▶"}</span> {name}
+                        {sup&&<span className="text-xs text-gray-400">({sup.name})</span>}
                       </button>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-800">
-                      📌 確認寄出後會自動發 LINE + Email 出貨通知
-                    </div>
-                    {confirmedOrders.map(o => (
-                      <div key={o.id} className="bg-white rounded-lg border p-3 space-y-2">
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" checked={shipBatchSel.has(o.id)} onChange={() => toggleShipBatch(o.id)} className="mt-1 accent-purple-600" />
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <span className="font-bold text-sm">{o.id}</span>
-                                <span className="ml-2 text-gray-500 text-xs">{o.nickname}</span>
-                              </div>
-                              <span className={`text-xs px-2 py-1 rounded-full ${statusColor[o.status]}`}>{statusMap[o.status]}</span>
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              <span className="font-medium">{o.name}</span> ・ {o.phone}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {o.pickup ? <span className="text-purple-600">📍 {o.pickup}</span> : <span>🏠 {o.address}</span>}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">{o.items.map(i => `${i.name}x${i.qty}`).join("、")}</div>
-                            <div className="flex justify-between items-center mt-1">
-                              <span className="text-sm font-bold">${o.total}</span>
-                              <button onClick={() => setOrders(prev => prev.map(x => x.id === o.id ? { ...x, status: "shipped", shippedAt: "2026-03-17 18:00" } : x))} className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">
-                                確認寄出
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-indigo-600 text-sm">{d.qty}{p?.unit}</span>
+                        <span className="text-xs text-gray-400">${d.rev}</span>
+                        <button onClick={()=>sendArrival(name)} disabled={sent} className={`text-xs px-2 py-1 rounded-lg ${sent?"bg-green-100 text-green-700":"bg-orange-100 text-orange-700 hover:bg-orange-200"}`}>{sent?"✓ 通知":"📢"}</button>
                       </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* ===== PRODUCTS ===== */}
-            {activeTab === "products" && (
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold">商品列表</h3>
-                  <button onClick={() => setShowAdd(!showAdd)} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded-lg">+ 新增</button>
-                </div>
-                {showAdd && (
-                  <div className="bg-white border-2 border-dashed border-indigo-300 rounded-lg p-3 space-y-2">
-                    <div className="grid grid-cols-3 gap-2">
-                      <input placeholder="品名" className="border rounded px-2 py-1 text-sm" />
-                      <input placeholder="單價" type="number" className="border rounded px-2 py-1 text-sm" />
-                      <select className="border rounded px-2 py-1 text-sm"><option>斤</option><option>盒</option><option>把</option><option>份</option><option>包</option></select>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input placeholder="庫存" type="number" className="border rounded px-2 py-1 text-sm" />
-                      <input placeholder="目標數量" type="number" className="border rounded px-2 py-1 text-sm" />
-                    </div>
-                    <select className="w-full border rounded px-2 py-1 text-sm">
-                      <option value="">選擇供應商（選填）</option>
-                      {mockSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                    <input placeholder="圖片網址（選填）" className="w-full border rounded px-2 py-1 text-sm" />
-                    <div className="flex gap-2">
-                      <button onClick={() => setShowAdd(false)} className="flex-1 bg-indigo-600 text-white rounded py-1 text-sm">儲存</button>
-                      <button onClick={() => setShowAdd(false)} className="flex-1 border rounded py-1 text-sm">取消</button>
-                    </div>
+                    {exp&&<div className="mt-2 ml-4 bg-gray-50 rounded-xl p-2.5 space-y-1">
+                      {customers.map((c,i)=><div key={i} className="flex text-xs gap-2"><span className="w-12 font-medium">{c.nick}</span><span className="w-14">{c.name}</span><span className="flex-1 text-gray-400">{c.phone}</span><span className="font-bold text-indigo-600">{c.qty}{p?.unit}</span></div>)}
+                    </div>}
                   </div>
-                )}
-                {mockProducts.map(p => {
-                  const sup = mockSuppliers.find(s => s.id === p.supplier_id);
-                  return (
-                    <div key={p.id} className="bg-white rounded-lg border p-3 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{p.name}</span>
-                          <span className="text-gray-500 ml-2 text-sm">${p.price}/{p.unit}</span>
-                          {sup && <span className="ml-2 text-xs text-gray-400">🏭 {sup.name}</span>}
-                        </div>
-                        <div className="flex gap-2 items-center">
-                          <span className={`text-xs px-2 py-1 rounded ${p.stock === 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                            {p.stock === 0 ? "售完" : "上架"}
-                          </span>
-                          <button className="text-xs text-gray-400 hover:text-blue-500">編輯</button>
-                        </div>
-                      </div>
-                      <div className="flex gap-4 text-xs text-gray-500">
-                        <span>庫存：{p.stock === null ? "不限" : p.stock}</span>
-                        <span>目標：{p.goal_qty || "—"}</span>
-                        <span>已訂：{p.current_qty}</span>
-                      </div>
-                      <ProgressBar current={p.current_qty} goal={p.goal_qty} unit={p.unit} />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ===== ROUNDS ===== */}
-            {activeTab === "rounds" && (
-              <div className="space-y-3">
-                <h3 className="font-bold">開團管理</h3>
-                <div className="bg-white rounded-lg border p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-bold">{mockRound.name}</div>
-                      <div className="text-xs text-gray-500">截止：{new Date(mockRound.deadline).toLocaleString("zh-TW")}</div>
-                      <div className="text-xs text-blue-600 mt-1">🚚 宅配運費：${mockRound.shipping_fee}</div>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${mockRound.is_open ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                      {mockRound.is_open ? "開團中" : "已截單"}
+                );
+              })}
+            </div>
+            <div className="bg-white rounded-xl border p-4">
+              <div className="font-medium text-sm mb-2 text-gray-700">通知狀態</div>
+              {orders.filter(o=>o.notif?.length>0).map(o=>(
+                <div key={o.id} className="flex justify-between items-center text-xs py-1.5 border-b last:border-0">
+                  <span className="text-gray-500">{o.id} · {o.nick}</span>
+                  <div className="flex gap-1">{o.notif.map((n,i)=>(
+                    <span key={i} className="flex gap-0.5">
+                      <span className={`px-1 py-0.5 rounded ${n.L?"bg-green-100 text-green-700":"bg-red-100 text-red-700"}`}>L{n.L?"✓":"✗"}</span>
+                      <span className={`px-1 py-0.5 rounded ${n.E?"bg-green-100 text-green-700":"bg-red-100 text-red-700"}`}>E{n.E?"✓":"✗"}</span>
                     </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="flex-1 bg-red-600 text-white rounded-lg py-2 text-sm font-medium">截單</button>
-                    <button className="flex-1 border rounded-lg py-2 text-sm font-medium">改截止</button>
-                    <button className="flex-1 border rounded-lg py-2 text-sm font-medium">改運費</button>
-                  </div>
+                  ))}</div>
                 </div>
-                <button className="w-full bg-indigo-600 text-white rounded-lg py-3 font-bold">+ 新開一團</button>
-                <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500 space-y-1">
-                  <div className="font-medium text-gray-700">說明</div>
-                  <div>• 開團設定名稱、截止時間、宅配運費</div>
-                  <div>• 運費修改不影響已成立訂單（快照機制）</div>
-                  <div>• 截單後用戶端顯示「本團已截單」</div>
-                </div>
-              </div>
-            )}
-
-            {/* ===== SUPPLIERS ===== */}
-            {activeTab === "suppliers" && (
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold">供應商管理</h3>
-                  <button onClick={() => setShowAddSupplier(!showAddSupplier)} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded-lg">+ 新增</button>
-                </div>
-                {showAddSupplier && (
-                  <div className="bg-white border-2 border-dashed border-indigo-300 rounded-lg p-3 space-y-2">
-                    <input placeholder="供應商名稱" className="w-full border rounded px-2 py-1 text-sm" />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input placeholder="聯絡人" className="border rounded px-2 py-1 text-sm" />
-                      <input placeholder="電話" className="border rounded px-2 py-1 text-sm" />
-                    </div>
-                    <input placeholder="Email" className="w-full border rounded px-2 py-1 text-sm" />
-                    <input placeholder="備註" className="w-full border rounded px-2 py-1 text-sm" />
-                    <div className="flex gap-2">
-                      <button onClick={() => setShowAddSupplier(false)} className="flex-1 bg-indigo-600 text-white rounded py-1 text-sm">儲存</button>
-                      <button onClick={() => setShowAddSupplier(false)} className="flex-1 border rounded py-1 text-sm">取消</button>
-                    </div>
-                  </div>
-                )}
-                {mockSuppliers.map(s => {
-                  const products = mockProducts.filter(p => p.supplier_id === s.id);
-                  return (
-                    <div key={s.id} className="bg-white rounded-lg border p-4 space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-bold">{s.name}</div>
-                          <div className="text-xs text-gray-500">{s.contact_name} ・ {s.phone}</div>
-                          {s.email && <div className="text-xs text-gray-400">{s.email}</div>}
-                          {s.note && <div className="text-xs text-orange-600 mt-1">📝 {s.note}</div>}
-                        </div>
-                        <div className="flex gap-2">
-                          <button className="text-xs text-gray-400 hover:text-blue-500">編輯</button>
-                          <button className="text-xs text-gray-400 hover:text-red-500">刪除</button>
-                        </div>
-                      </div>
-                      <div className="border-t pt-2">
-                        <div className="text-xs font-medium text-gray-600 mb-2">關聯商品（{products.length} 項）</div>
-                        {products.map(p => {
-                          const agg = itemAgg[p.name];
-                          const expKey = `sup-${s.id}-${p.name}`;
-                          const expanded = expandedProduct === expKey;
-                          const customers = expanded ? getCustomersByProduct(p.name) : [];
-                          const sent = arrivalSent.has(p.name);
-                          return (
-                            <div key={p.id} className="mb-2">
-                              <div className="flex justify-between items-center text-sm">
-                                <button onClick={() => setExpandedProduct(expanded ? null : expKey)} className="hover:text-indigo-600 flex items-center gap-1 text-left">
-                                  <span className="text-xs">{expanded ? "▼" : "▶"}</span>
-                                  {p.name} <span className="text-gray-400 text-xs">${p.price}/{p.unit}</span>
-                                </button>
-                                <div className="flex items-center gap-2">
-                                  {agg && <span className="text-xs font-bold text-indigo-600">需{agg.qty}{p.unit}</span>}
-                                  <button onClick={() => handleArrivalNotify(p.name)} disabled={sent} className={`text-xs px-2 py-1 rounded ${sent ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700 hover:bg-orange-200"}`}>
-                                    {sent ? "✓ 已通知" : "📢 到貨"}
-                                  </button>
-                                </div>
-                              </div>
-                              {expanded && customers.length > 0 && (
-                                <div className="mt-1 ml-4 bg-gray-50 rounded-lg p-2 space-y-1">
-                                  {customers.map((c, i) => (
-                                    <div key={i} className="text-xs flex justify-between">
-                                      <span>{c.nickname} ({c.name}) ・ {c.phone}</span>
-                                      <span className="font-bold text-indigo-600">{c.qty} {p.unit}</span>
-                                    </div>
-                                  ))}
-                                  {sent && <div className="text-xs text-green-600 mt-1">📢 「您訂購的【{p.name}】已到達理貨中心」→ {customers.length} 位</div>}
-                                </div>
-                              )}
-                              <ProgressBar current={p.current_qty} goal={p.goal_qty} unit={p.unit} />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
 
-        {/* ===== ORDER DETAIL ===== */}
-        {step === 1 && selected && !confirmed && (
-          <div className="space-y-4">
-            <h2 className="font-bold text-lg">確認付款</h2>
+        {/* ORDERS */}
+        {tab==="orders"&&(
+          <div className="space-y-2">
+            <div className="flex gap-2 items-center">
+              <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋 暱稱 / 電話 / 訂單號  [/]" className="flex-1 border rounded-xl px-3 py-2.5 text-sm"/>
+              {search&&<button onClick={()=>setSearch("")} className="w-9 h-9 flex items-center justify-center border rounded-xl text-gray-400 hover:text-red-500">✕</button>}
+            </div>
+            <div className="flex gap-1.5 flex-wrap items-center">
+              {["all","pending_payment","pending_confirm","confirmed","shipped","cancelled"].map(s=>(
+                <button key={s} onClick={()=>setFilter(s)} className={`text-xs px-3 py-1.5 rounded-full transition ${filter===s?"bg-indigo-600 text-white":"bg-white border"}`}>
+                  {s==="all"?"全部":ST[s]?.label}
+                </button>
+              ))}
+              {pendingConfirm.length>0&&(filter==="all"||filter==="pending_confirm")&&(
+                <button onClick={selectAllPending} className="text-xs px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 ml-auto">全選待確認</button>
+              )}
+            </div>
+            {filtered.length===0&&<div className="text-center py-10 text-gray-400">沒有符合的訂單</div>}
+            {filtered.map(o=>{
+              const exp=expandedId===o.id, amtOk=o.paid&&o.paid===o.total, amtOver=o.paid&&o.paid!==o.total;
+              return (
+                <div key={o.id} className={`bg-white rounded-xl border transition ${exp?"border-indigo-400 shadow-md":"hover:border-gray-300"}`}>
+                  <div onClick={()=>setExpandedId(exp?null:o.id)} className="flex items-center gap-2 p-3 cursor-pointer select-none">
+                    {(o.status==="pending_confirm"||o.status==="pending_payment")&&(
+                      <input type="checkbox" checked={batchSel.has(o.id)} onChange={()=>setBatchSel(p=>{ const n=new Set(p); n.has(o.id)?n.delete(o.id):n.add(o.id); return n; })} onClick={e=>e.stopPropagation()} className="accent-indigo-600 w-4 h-4 shrink-0"/>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-gray-400">{o.id}</span>
+                        <span className="font-semibold text-sm">{o.nick}</span>
+                        {o.pickup&&<span className="text-xs text-purple-500 bg-purple-50 px-1.5 rounded">{o.pickup==="現場取貨"?"現場":"面交"}</span>}
+                        {!o.pickup&&<span className="text-xs text-blue-400 bg-blue-50 px-1.5 rounded">宅配</span>}
+                      </div>
+                      <div className="text-xs text-gray-400 truncate">{o.items.map(i=>`${i.n}×${i.q}`).join("、")}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-bold text-sm">${o.total}</span>
+                      <Badge s={o.status}/>
+                      <span className="text-gray-300 text-xs">{exp?"▲":"▼"}</span>
+                    </div>
+                  </div>
+                  {exp&&(
+                    <div className="border-t px-3 pb-3 space-y-3">
+                      <div className="pt-2 space-y-1 text-sm">
+                        {o.items.map((i,idx)=><div key={idx} className="flex justify-between text-gray-600"><span>{i.n} ×{i.q}</span><span>${i.p*i.q}</span></div>)}
+                        {o.fee>0&&<div className="flex justify-between text-blue-500"><span>宅配運費</span><span>${o.fee}</span></div>}
+                        {o.pickup&&!o.fee&&<div className="flex justify-between text-green-500"><span>面交免運</span><span>$0</span></div>}
+                        <div className="flex justify-between font-bold border-t pt-1"><span>合計</span><span>${o.total}</span></div>
+                      </div>
+                      {o.paid!=null&&(
+                        <div className={`rounded-xl p-2.5 text-sm ${amtOk?"bg-green-50 border border-green-200":"bg-orange-50 border border-orange-200"}`}>
+                          <div className="flex flex-wrap gap-4">
+                            <span>{amtOk?"✅":"⚠️"} 匯款 <b>${o.paid}</b></span>
+                            <span>後五碼 <b>{o.last5||"現場"}</b></span>
+                            {o.paidAt&&<span className="text-gray-400">{o.paidAt}</span>}
+                          </div>
+                          {amtOver&&<div className="text-orange-700 text-xs mt-1">金額不符：訂單 ${o.total} ≠ 匯款 ${o.paid}</div>}
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-500 bg-gray-50 rounded-xl p-2.5 space-y-0.5">
+                        <div><span className="font-medium">{o.name}</span> · {o.phone}</div>
+                        {o.pickup?<div className="text-purple-600">📍 {o.pickup}</div>:<div className="text-blue-500">🚚 {o.addr}</div>}
+                        {o.reason&&<div className="text-red-500 mt-0.5">{o.reason}</div>}
+                        {o.shipped&&<div className="text-purple-600 mt-0.5">📦 {o.shipped}</div>}
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        {o.status==="pending_confirm"&&<>
+                          <button onClick={()=>{confirmOrder(o.id);setExpandedId(null);}} className="flex-1 min-w-0 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold">✓ 確認付款</button>
+                          <button onClick={()=>{revertOrder(o.id);setExpandedId(null);}} className="px-3 py-2.5 border rounded-xl text-sm text-gray-600" title="退回待付款">↩</button>
+                          {amtOver&&<button onClick={()=>{markPartial(o.id);setExpandedId(null);}} className="px-3 py-2.5 bg-orange-100 text-orange-700 rounded-xl text-xs font-medium">部分</button>}
+                          <button onClick={()=>setCancelTarget(o)} className="px-3 py-2.5 border border-red-200 rounded-xl text-sm text-red-500">✕</button>
+                        </>}
+                        {o.status==="pending_payment"&&<>
+                          <button onClick={()=>{confirmOrder(o.id);setExpandedId(null);}} className="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold">✓ 已現場收款</button>
+                          <button onClick={()=>setCancelTarget(o)} className="px-3 py-2.5 border border-red-200 rounded-xl text-sm text-red-500">✕</button>
+                        </>}
+                        {o.status==="partial"&&<>
+                          <button onClick={()=>{confirmOrder(o.id);setExpandedId(null);}} className="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold">✓ 確認（尾款已收）</button>
+                          <button onClick={()=>setCancelTarget(o)} className="px-3 py-2.5 border border-red-200 rounded-xl text-sm text-red-500">✕</button>
+                        </>}
+                        {o.status==="confirmed"&&<>
+                          <button onClick={()=>{shipOrder(o.id);setExpandedId(null);}} className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-bold">{o.pickup?"確認取貨 📍":"確認寄出 🚚"}</button>
+                          <button onClick={()=>setCancelTarget(o)} className="px-3 py-2.5 border border-red-200 rounded-xl text-sm text-red-500">✕</button>
+                        </>}
+                        {o.status==="shipped"&&<span className="text-sm text-gray-400 py-2">出貨 {o.shipped}</span>}
+                        {o.status==="cancelled"&&<span className="text-sm text-red-400 py-2">{o.reason}</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* SHIPMENTS */}
+        {tab==="shipments"&&(
+          <div className="space-y-3">
+            <div className="flex justify-between items-center"><h3 className="font-bold text-gray-700 text-sm">待出貨 ({confirmedOrders.length})</h3></div>
+            {confirmedOrders.length===0&&<div className="text-center py-16 text-gray-400">目前沒有待出貨訂單</div>}
+            {deliveryOrders.length>0&&(
+              <div>
+                <div className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-2">🚚 宅配 <span className="bg-gray-200 rounded-full px-2 py-0.5">{deliveryOrders.length}</span></div>
+                <div className="space-y-2">
+                  {deliveryOrders.map(o=>(
+                    <div key={o.id} className="bg-white rounded-xl border p-3 flex items-center gap-2">
+                      <input type="checkbox" checked={shipBatchSel.has(o.id)} onChange={()=>setShipBatchSel(p=>{ const n=new Set(p); n.has(o.id)?n.delete(o.id):n.add(o.id); return n; })} className="accent-purple-600 w-4 h-4 shrink-0"/>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5"><span className="font-semibold text-sm">{o.nick}</span><span className="text-xs text-gray-400">{o.phone}</span></div>
+                        <div className="text-xs text-gray-400 truncate">🏠 {o.addr}</div>
+                        <div className="text-xs text-gray-400">{o.items.map(i=>`${i.n}×${i.q}`).join("、")}</div>
+                      </div>
+                      <div className="text-right shrink-0"><div className="font-bold">${o.total}</div><button onClick={()=>shipOrder(o.id)} className="mt-1 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg">確認寄出</button></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {Object.entries(pickupGroups).map(([pt,grp])=>(
+              <div key={pt}>
+                <div className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-2">📍 {pt} <span className="bg-gray-200 rounded-full px-2 py-0.5">{grp.length}</span></div>
+                <div className="space-y-2">
+                  {grp.map(o=>(
+                    <div key={o.id} className="bg-white rounded-xl border p-3 flex items-center gap-2">
+                      <input type="checkbox" checked={shipBatchSel.has(o.id)} onChange={()=>setShipBatchSel(p=>{ const n=new Set(p); n.has(o.id)?n.delete(o.id):n.add(o.id); return n; })} className="accent-purple-600 w-4 h-4 shrink-0"/>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5"><span className="font-semibold text-sm">{o.nick}</span><span className="text-xs text-gray-400">{o.phone}</span></div>
+                        <div className="text-xs text-gray-400">{o.items.map(i=>`${i.n}×${i.q}`).join("、")}</div>
+                      </div>
+                      <div className="text-right shrink-0"><div className="font-bold">${o.total}</div><button onClick={()=>shipOrder(o.id)} className="mt-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg">確認取貨</button></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* PRODUCTS */}
+        {tab==="products"&&(
+          <div className="space-y-3">
+            <div className="flex justify-between items-center"><h3 className="font-bold text-gray-700 text-sm">商品管理</h3><button className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-sm">+ 新增</button></div>
+            {PRODS.map(p=>{ const sup=SUPP.find(s=>s.id===p.sid); return (
+              <div key={p.id} className="bg-white rounded-xl border p-3">
+                <div className="flex justify-between items-center">
+                  <div><span className="font-medium">{p.name}</span><span className="text-gray-400 ml-2 text-sm">${p.price}/{p.unit}</span>{sup&&<span className="text-xs text-gray-400 ml-2">{sup.name}</span>}</div>
+                  <div className="flex gap-2 items-center">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${p.stock===0?"bg-red-100 text-red-700":"bg-green-100 text-green-700"}`}>{p.stock===0?"售完":"上架"}</span>
+                    <button className="text-xs text-gray-400 hover:text-blue-500">編輯</button>
+                  </div>
+                </div>
+                <div className="flex gap-4 text-xs text-gray-400 mt-1"><span>庫存 {p.stock??"不限"}</span><span>目標 {p.goal||"—"}</span><span>已訂 {p.qty}</span></div>
+                <ProgressBar cur={p.qty} goal={p.goal} unit={p.unit}/>
+              </div>
+            ); })}
+          </div>
+        )}
+
+        {/* ROUNDS */}
+        {tab==="rounds"&&(
+          <div className="space-y-3">
+            <h3 className="font-bold text-gray-700 text-sm">開團管理</h3>
             <div className="bg-white rounded-xl border p-4 space-y-3">
               <div className="flex justify-between items-start">
                 <div>
-                  <div className="font-bold">{selected.id}</div>
-                  <div className="text-gray-500 text-sm">{selected.nickname} ({selected.name})</div>
+                  <div className="font-bold">{ROUND_BASE.name}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">截止 {new Date(ROUND_BASE.deadline).toLocaleString("zh-TW")}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-blue-500">宅配運費：</span>
+                    {editingFee?(
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-400">$</span>
+                        <input type="number" min="0" value={feeInput} onChange={e=>setFeeInput(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter")saveFee(); if(e.key==="Escape")setEditingFee(false); }} className="w-20 border rounded-lg px-2 py-1 text-sm font-bold" autoFocus/>
+                        <button onClick={saveFee} className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg">儲存</button>
+                        <button onClick={()=>setEditingFee(false)} className="text-xs text-gray-400">取消</button>
+                      </div>
+                    ):(
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-blue-600">${roundFee}</span>
+                        <button onClick={()=>{ setFeeInput(String(roundFee)); setEditingFee(true); }} className="text-xs text-gray-400 hover:text-blue-500 underline">修改</button>
+                      </div>
+                    )}
+                  </div>
+                  {editingFee&&<p className="text-xs text-gray-400 mt-1">Enter 儲存 · Esc 取消 · 修改後立即生效於新訂單</p>}
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${statusColor[selected.status]}`}>{statusMap[selected.status]}</span>
+                <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">開團中</span>
               </div>
-              <div className="border-t pt-3 space-y-1 text-sm">
-                <div className="font-medium mb-2">訂購明細</div>
-                {selected.items.map((item, i) => (
-                  <div key={i} className="flex justify-between"><span>{item.name} x{item.qty}</span><span>${item.price * item.qty}</span></div>
-                ))}
-                {selected.shipping_fee > 0 && <div className="flex justify-between text-blue-600"><span>🚚 運費</span><span>${selected.shipping_fee}</span></div>}
-                <div className="border-t mt-2 pt-2 font-bold flex justify-between"><span>合計</span><span>${selected.total}</span></div>
-              </div>
-              <div className="border-t pt-3 space-y-1 text-sm">
-                <div className="font-medium mb-2">匯款資訊</div>
-                <div className="flex justify-between"><span className="text-gray-500">金額</span><span className="font-bold text-blue-600">${selected.payAmount}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">後五碼</span><span className="font-bold">{selected.payLast5}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">時間</span><span>{selected.paidAt}</span></div>
-                {selected.payAmount === selected.total ? (
-                  <div className="bg-green-50 text-green-700 rounded-lg p-2 text-xs mt-2">✅ 金額吻合（${selected.total} = ${selected.payAmount}）</div>
-                ) : (
-                  <div className="bg-red-50 text-red-700 rounded-lg p-2 text-xs mt-2">⚠️ 不符！訂單 ${selected.total} ≠ 匯款 ${selected.payAmount}</div>
-                )}
-              </div>
-              <div className="border-t pt-3 space-y-1 text-sm">
-                <div className="font-medium mb-2">收貨</div>
-                <div className="flex justify-between"><span className="text-gray-500">姓名</span><span>{selected.name}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">電話</span><span>{selected.phone}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">地址</span><span className="text-right max-w-48">{selected.address}</span></div>
-                {selected.pickup ? (
-                  <div className="flex justify-between"><span className="text-gray-500">取貨</span><span className="text-purple-600">{selected.pickup}</span></div>
-                ) : (
-                  <div className="flex justify-between"><span className="text-gray-500">配送</span><span className="text-blue-600">宅配（運費 ${selected.shipping_fee}）</span></div>
-                )}
+              <div className="flex gap-2">
+                <button className="flex-1 bg-red-600 text-white rounded-xl py-2 text-sm font-medium">截單</button>
+                <button className="flex-1 border rounded-xl py-2 text-sm">改截止</button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => setSelected(null)} className="flex-1 border rounded-lg py-3 font-medium hover:bg-gray-50">← 返回</button>
-              <button onClick={() => setConfirmed(true)} className="flex-1 bg-green-600 text-white rounded-lg py-3 font-bold hover:bg-green-700">✓ 確認付款</button>
+            <button className="w-full bg-indigo-600 text-white rounded-xl py-3 font-bold">+ 新開一團</button>
+            <div className="bg-white rounded-xl border p-3">
+              <div className="font-medium text-sm mb-2 text-gray-700">歷史記錄（最近 5 團）</div>
+              {["第11團：三月第二週","第10團：三月第一週","第9團：二月第四週","第8團：二月第三週","第7團：二月第二週"].map((r,i)=>(
+                <div key={i} className="flex justify-between text-sm text-gray-500 py-1.5 border-b last:border-0"><span>{r}</span><span className="text-xs text-gray-300">已截單</span></div>
+              ))}
             </div>
-            <button onClick={() => setSelected(null)} className="w-full border border-red-200 text-red-600 rounded-lg py-2 text-sm hover:bg-red-50">✕ 取消訂單</button>
           </div>
         )}
 
-        {/* ===== CONFIRM RESULT ===== */}
-        {step === 1 && selected && confirmed && (
-          <div className="space-y-4 py-6">
-            <div className="text-center">
-              <div className="text-4xl mb-2">🎉</div>
-              <h2 className="font-bold text-xl">訂單已確認！</h2>
-              <p className="text-gray-500 text-sm mt-1">{selected.id}</p>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
-              <div className="font-bold text-green-800">💬 LINE Notify</div>
-              <div className="bg-white rounded-lg p-3 text-sm font-mono text-gray-700 space-y-0.5">
-                <div className="text-green-600 font-bold">【訂單確認】</div>
-                <div>Hi {selected.nickname}，訂單已確認！</div>
-                <div>{selected.id}</div>
-                <div>{selected.items.map(i => `${i.name}x${i.qty}`).join("、")}</div>
-                <div>${selected.total}（含運費 ${selected.shipping_fee || 0}）</div>
-              </div>
-              <p className="text-xs text-green-600">type=payment_confirmed, line=success</p>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
-              <div className="font-bold text-blue-800">📧 Email → {selected.email}</div>
-              <div className="bg-white rounded-lg p-3 text-sm space-y-1">
-                <div className="font-bold">訂單確認 — {selected.id}</div>
-                <div className="bg-gray-50 rounded p-2 text-xs mt-1">
-                  {selected.items.map((item, i) => (
-                    <div key={i} className="flex justify-between"><span>{item.name} x{item.qty}</span><span>${item.price * item.qty}</span></div>
-                  ))}
-                  {selected.shipping_fee > 0 && <div className="flex justify-between text-blue-600"><span>運費</span><span>${selected.shipping_fee}</span></div>}
-                  <div className="border-t mt-1 pt-1 font-bold flex justify-between"><span>合計</span><span>${selected.total}</span></div>
+        {/* SUPPLIERS */}
+        {tab==="suppliers"&&(
+          <div className="space-y-3">
+            <div className="flex justify-between items-center"><h3 className="font-bold text-gray-700 text-sm">供應商</h3><button className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-sm">+ 新增</button></div>
+            {SUPP.map(s=>{ const prods=PRODS.filter(p=>p.sid===s.id); return (
+              <div key={s.id} className="bg-white rounded-xl border p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div><div className="font-bold">{s.name}</div><div className="text-xs text-gray-400">{s.contact} · {s.phone}</div>{s.note&&<div className="text-xs text-orange-500 mt-0.5">{s.note}</div>}</div>
+                  <div className="flex gap-2 text-xs text-gray-400"><button className="hover:text-blue-500">編輯</button><button className="hover:text-red-500">刪除</button></div>
+                </div>
+                <div className="border-t pt-2 space-y-2">
+                  {prods.map(p=>{ const agg=itemAgg[p.name], sent=arrivalSent.has(p.name); return (
+                    <div key={p.id} className="flex justify-between items-center">
+                      <span className="text-sm">{p.name} <span className="text-gray-400 text-xs">${p.price}/{p.unit}</span></span>
+                      <div className="flex items-center gap-2">
+                        {agg&&<span className="text-xs font-bold text-indigo-600">需{agg.qty}{p.unit}</span>}
+                        <button onClick={()=>sendArrival(p.name)} disabled={sent} className={`text-xs px-2 py-1 rounded-lg ${sent?"bg-green-100 text-green-700":"bg-orange-100 text-orange-700"}`}>{sent?"✓":"📢 到貨"}</button>
+                      </div>
+                    </div>
+                  ); })}
                 </div>
               </div>
-              <p className="text-xs text-blue-600">type=payment_confirmed, email=success</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 space-y-1">
-              <div className="font-medium text-sm text-gray-800">系統摘要</div>
-              {["pending_confirm → confirmed", "confirmed_at 已寫入", "LINE Notify ✓ (payment_confirmed)", "Email ✓ (payment_confirmed)", "下一步：到貨通知 → 確認寄出"].map((t, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs shrink-0">✓</span>{t}
-                </div>
-              ))}
-            </div>
-            <button onClick={() => { setSelected(null); setConfirmed(false); }} className="w-full bg-indigo-600 text-white rounded-lg py-3 font-bold hover:bg-indigo-700">← 返回後台</button>
+            ); })}
           </div>
         )}
+
       </div>
     </div>
   );
 }
 
+/* ── Root ───────────────────────────────────────────────────────── */
+export default function App() {
+  const [mode,setMode]=useState(null);
+  const [roundFee,setRoundFee]=useState(60);
+  const [orders]=useState(INIT_ORDERS);
+
+  if (mode==="user")   return <UserFlow   onBack={()=>setMode(null)} roundFee={roundFee}/>;
+  if (mode==="admin")  return <AdminFlow  onBack={()=>setMode(null)} roundFee={roundFee} setRoundFee={setRoundFee}/>;
+  if (mode==="lookup") return <Lookup     onBack={()=>setMode(null)} orders={orders}/>;
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-sm w-full text-center space-y-3">
+        <div className="text-4xl mb-1">🛒</div>
+        <h1 className="text-2xl font-bold text-gray-800">生鮮團購系統</h1>
+        <p className="text-gray-400 text-sm">v3.1 · 運費同步 · POS 修正版</p>
+        <div className="space-y-2 pt-2">
+          <button onClick={()=>setMode("user")}   className="w-full p-4 bg-green-600  text-white rounded-2xl text-base font-semibold hover:bg-green-700 transition">用戶端體驗</button>
+          <button onClick={()=>setMode("admin")}  className="w-full p-4 bg-indigo-600 text-white rounded-2xl text-base font-semibold hover:bg-indigo-700 transition">Admin POS 後台</button>
+          <button onClick={()=>setMode("lookup")} className="w-full p-4 bg-gray-700   text-white rounded-2xl text-base font-semibold hover:bg-gray-800 transition">訂單查詢</button>
+        </div>
+        <p className="text-xs text-gray-300 pt-1">目前宅配運費 <b className="text-gray-500">${roundFee}</b>（可在 Admin → 開團 修改）</p>
+      </div>
+    </div>
+  );
+}
 // ============================================
 // Supabase Migration SQL — REMOVED
 // ============================================
