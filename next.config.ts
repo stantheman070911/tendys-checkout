@@ -9,8 +9,8 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: "/admin", destination: "/bitchassnigga", permanent: false },
-      { source: "/admin/:path*", destination: "/bitchassnigga/:path*", permanent: false },
+      { source: "/admin", destination: "/gtfo", permanent: false },
+      { source: "/admin/:path*", destination: "/gtfo", permanent: false },
     ];
   },
 };
