@@ -224,50 +224,50 @@ npm run build        # must pass
 
 ### Tasks
 
-- [ ] **3.1** `app/api/submit-order/route.ts` — POST
+- [x] **3.1** `app/api/submit-order/route.ts` — POST
   - Validate body: cart items, nickname, recipient info, pickup, submission_key
   - Check round is open
   - Call `createWithItems()` (handles stock + dedup + shipping fee)
   - Return order data or error
-- [ ] **3.2** `app/api/report-payment/route.ts` — POST
+- [x] **3.2** `app/api/report-payment/route.ts` — POST
   - Validate: orderId, amount, last5 (len 5)
   - Check status = `pending_payment`
   - Call `reportPayment()`
-- [ ] **3.3** `app/api/cancel-order/route.ts` — POST
+- [x] **3.3** `app/api/cancel-order/route.ts` — POST
   - Two modes: user cancel (no auth, pending_payment only) and admin cancel (auth required, any status, optional cancel_reason)
   - User: check status = `pending_payment` → cancel + restore stock
   - Admin: any status → cancel + restore stock (except shipped) + send cancellation notification
-- [ ] **3.4** `app/api/confirm-order/route.ts` — POST (admin)
+- [x] **3.4** `app/api/confirm-order/route.ts` — POST (admin)
   - Verify admin → confirm → send payment_confirmed notifications → return results
-- [ ] **3.5** `app/api/batch-confirm/route.ts` — POST (admin)
+- [x] **3.5** `app/api/batch-confirm/route.ts` — POST (admin)
   - Verify admin → batch confirm → send notifications for each
-- [ ] **3.6** `app/api/confirm-shipment/route.ts` — POST (admin)
+- [x] **3.6** `app/api/confirm-shipment/route.ts` — POST (admin)
   - Verify admin
   - Accept single `orderId` or array `orderIds` (handles both single + batch)
   - For each: update to `shipped` → send shipment notifications → log
   - Return results array
-- [ ] **3.7** `app/api/notify-arrival/route.ts` — POST (admin)
+- [x] **3.7** `app/api/notify-arrival/route.ts` — POST (admin)
   - Verify admin
   - Validate: `productId`, `roundId`
   - Call `getOrdersByProduct()` to find all relevant customers
   - Call `sendProductArrivalNotifications()` with product name + customer list
   - Return: count notified, successes, failures
-- [ ] **3.8** `app/api/quick-confirm/route.ts` — POST (admin)
+- [x] **3.8** `app/api/quick-confirm/route.ts` — POST (admin)
   - POS shortcut: takes `orderId` + `paymentAmount`
   - Verify admin → set status to `confirmed`, auto-fill payment fields, write `confirmed_at`
   - Send payment_confirmed notifications
   - Use case: admin collects cash in person, skips pending_confirm step
-- [ ] **3.9** `app/api/export-csv/route.ts` — GET (admin)
+- [x] **3.9** `app/api/export-csv/route.ts` — GET (admin)
   - CSV with shipping fee column added
-- [ ] **3.10** `app/api/rounds/route.ts` — CRUD (admin)
+- [x] **3.10** `app/api/rounds/route.ts` — CRUD (admin)
   - POST (create) includes `shipping_fee`
   - PUT (update) can change `shipping_fee`
-- [ ] **3.11** `app/api/products/route.ts` — CRUD (admin)
+- [x] **3.11** `app/api/products/route.ts` — CRUD (admin)
   - Includes `supplier_id` in create/update
-- [ ] **3.12** `app/api/suppliers/route.ts` — CRUD (admin)
+- [x] **3.12** `app/api/suppliers/route.ts` — CRUD (admin)
   - GET: list all with product count
   - POST: create, PUT: update, DELETE: delete (only if no linked products)
-- [ ] **3.13** `app/api/orders-by-product/route.ts` — GET (admin)
+- [x] **3.13** `app/api/orders-by-product/route.ts` — GET (admin)
   - Query params: `productId`, `roundId`
   - Returns customer list: nickname, name, phone, quantity, order number
 
@@ -280,16 +280,16 @@ npm run build        # must pass
 ```
 
 **Verify:**
-- [ ] Every route validates input before DB
-- [ ] Every route returns `{ error }` + HTTP status on failure
-- [ ] Admin routes check `verifyAdminSession()` — return 401 if not admin
-- [ ] `submit-order` calculates shipping fee correctly (宅配 vs 面交)
-- [ ] `confirm-shipment` handles both single and batch
-- [ ] `notify-arrival` finds customers by product, not by order
-- [ ] `confirm-order`/`confirm-shipment` don't rollback on notification failure
-- [ ] Supplier DELETE is blocked if products reference it
-- [ ] `cancel-order` handles both user mode (pending_payment only) and admin mode (any status + reason + notification)
-- [ ] `quick-confirm` skips pending_confirm for POS cash payments
+- [x] Every route validates input before DB
+- [x] Every route returns `{ error }` + HTTP status on failure
+- [x] Admin routes check `verifyAdminSession()` — return 401 if not admin
+- [x] `submit-order` calculates shipping fee correctly (宅配 vs 面交)
+- [x] `confirm-shipment` handles both single and batch
+- [x] `notify-arrival` finds customers by product, not by order
+- [x] `confirm-order`/`confirm-shipment` don't rollback on notification failure
+- [x] Supplier DELETE is blocked if products reference it
+- [x] `cancel-order` handles both user mode (pending_payment only) and admin mode (any status + reason + notification)
+- [x] `quick-confirm` skips pending_confirm for POS cash payments
 
 **Done when:** All 13 routes compile and build passes. Backend feature-complete.
 

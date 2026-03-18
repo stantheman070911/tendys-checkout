@@ -239,7 +239,7 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 | 5 | **shadcn/ui components are editable copies** | Don't regenerate without warning — local changes get overwritten. |
 | 6 | **Stock decrement must be atomic** | `UPDATE products SET stock = stock - $qty WHERE stock >= $qty` in transaction. Never read-then-write. |
 | 7 | **Order number trigger needs advisory lock** | `pg_advisory_xact_lock` prevents duplicate sequence numbers. |
-| 8 | **LINE Notify is a simple POST** | `POST https://notify-api.line.me/api/notify` with Bearer token and form-encoded message. Not the Messaging API. |
+| 8 | **LINE Messaging API broadcast** | `POST https://api.line.me/v2/bot/message/broadcast` with Bearer `LINE_CHANNEL_ACCESS_TOKEN` and JSON body. |
 | 9 | **RLS + Prisma** | Anon operations use Supabase anon key client. Admin operations use service role key. Don't mix. |
 | 10 | **`submission_key` must be UUID** | Use `crypto.randomUUID()`. Strings/timestamps will collide. |
 | 11 | **Shipping fee snapshot** | Store `shipping_fee` on the order at creation time. If admin changes round fee later, existing orders are unaffected. |
@@ -257,7 +257,8 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 | `DIRECT_URL` | Yes | Supabase direct connection (Prisma migrations) |
 | `RESEND_API_KEY` | Yes | Email sending |
 | `RESEND_FROM_EMAIL` | Yes | Sender address |
-| `LINE_NOTIFY_TOKEN` | Yes | LINE Notify access token |
+| `LINE_CHANNEL_ACCESS_TOKEN` | Yes | LINE Messaging API channel access token |
+| `LINE_CHANNEL_SECRET` | Yes | LINE Messaging API channel secret |
 | `NEXT_PUBLIC_BANK_NAME` | Yes | Bank name shown to users |
 | `NEXT_PUBLIC_BANK_ACCOUNT` | Yes | Bank account number |
 | `NEXT_PUBLIC_BANK_HOLDER` | Yes | Account holder name |

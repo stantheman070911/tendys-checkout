@@ -1,24 +1,31 @@
 export type NotifyResult = { success: boolean; error?: string };
 
+/**
+ * Send a LINE message via LINE Messaging API (broadcast to all followers).
+ * Replaces the deprecated LINE Notify.
+ * Uses LINE_CHANNEL_ACCESS_TOKEN env var.
+ */
 export async function sendLineNotify(message: string): Promise<NotifyResult> {
   try {
-    const token = process.env.LINE_NOTIFY_TOKEN;
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) {
-      return { success: false, error: "LINE_NOTIFY_TOKEN not configured" };
+      return { success: false, error: "LINE_CHANNEL_ACCESS_TOKEN not configured" };
     }
 
-    const res = await fetch("https://notify-api.line.me/api/notify", {
+    const res = await fetch("https://api.line.me/v2/bot/message/broadcast", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
       },
-      body: new URLSearchParams({ message }),
+      body: JSON.stringify({
+        messages: [{ type: "text", text: message }],
+      }),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      return { success: false, error: `LINE Notify ${res.status}: ${text}` };
+      return { success: false, error: `LINE API ${res.status}: ${text}` };
     }
 
     return { success: true };

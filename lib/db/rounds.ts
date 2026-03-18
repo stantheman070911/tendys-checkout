@@ -39,3 +39,22 @@ export async function updateShippingFee(id: string, fee: number | null) {
     data: { shipping_fee: fee },
   });
 }
+
+export async function update(
+  id: string,
+  data: Partial<{
+    name: string;
+    is_open: boolean;
+    deadline: Date | string | null;
+    shipping_fee: number | null;
+  }>
+) {
+  return prisma.round.update({ where: { id }, data });
+}
+
+export async function listRecent(limit = 5) {
+  return prisma.round.findMany({
+    orderBy: { created_at: "desc" },
+    take: limit,
+  });
+}

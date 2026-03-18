@@ -65,3 +65,39 @@ export async function restoreStock(
     WHERE id = ${productId}::uuid
   `;
 }
+
+// ─── CRUD ────────────────────────────────────────────────────
+
+export async function findById(id: string) {
+  return prisma.product.findUnique({ where: { id } });
+}
+
+export async function create(data: {
+  name: string;
+  price: number;
+  unit: string;
+  round_id: string;
+  supplier_id?: string | null;
+  stock?: number | null;
+  goal_qty?: number | null;
+  image_url?: string | null;
+}) {
+  return prisma.product.create({ data });
+}
+
+export async function update(
+  id: string,
+  data: Partial<{
+    name: string;
+    price: number;
+    unit: string;
+    round_id: string;
+    supplier_id: string | null;
+    is_active: boolean;
+    stock: number | null;
+    goal_qty: number | null;
+    image_url: string | null;
+  }>
+) {
+  return prisma.product.update({ where: { id }, data });
+}
