@@ -328,7 +328,7 @@ npm run build        # must pass
 - [x] **3.5.9** Update `types/index.ts` — add `line_user_id: string | null` to Order interface
 - [x] **3.5.10** Update `app/api/notify-arrival/route.ts` — pass `line_user_id` in customer data
 - [x] **3.5.11** Delete `lib/notifications/line-notify.ts` (dead code, replaced by `lib/line/push.ts`)
-- [x] **3.5.12** Add `order-link-template/` to `tsconfig.json` exclude array
+- [x] **3.5.12** ~~Add `order-link-template/` to `tsconfig.json` exclude array~~ (removed: template directory deleted in cleanup)
 
 ### Checkpoint 3.5
 

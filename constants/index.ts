@@ -35,11 +35,6 @@ export const PICKUP_OPTIONS = [
   { value: "面交點 B", label: "面交點 B" },
 ];
 
-export const NOTIFICATION_CHANNELS = {
-  LINE: "line",
-  EMAIL: "email",
-} as const;
-
 export const BANK_INFO = {
   name: process.env.NEXT_PUBLIC_BANK_NAME ?? "",
   account: process.env.NEXT_PUBLIC_BANK_ACCOUNT ?? "",

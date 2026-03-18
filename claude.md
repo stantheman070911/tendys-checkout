@@ -98,7 +98,7 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
     send.ts                   # Orchestrator: send LINE push + email, log results
   auth/
     supabase-admin.ts         # Supabase Auth helpers (admin login/session check)
-  utils.ts                    # Order number helpers, date formatting, share URL builder
+  utils.ts                    # cn(), formatCurrency, formatOrderItems, share URL builders, submission key, calcOrderTotal
 components/
   ui/                         # shadcn/ui generated components
   ProductCard.tsx
