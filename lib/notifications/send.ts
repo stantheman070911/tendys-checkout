@@ -31,7 +31,6 @@ interface ItemForNotify {
 interface CustomerForArrival {
   email?: string | null;
   line_user_id?: string | null;
-  orderId?: string | null;
 }
 
 // ─── Payment Confirmed ──────────────────────────────────────
@@ -193,7 +192,7 @@ export async function sendProductArrivalNotifications(
     if (!customer.email) continue;
     const result = await sendProductArrivalEmail(customer.email, productName);
     await logNotification(
-      customer.orderId ?? null,
+      null,
       "email",
       "product_arrival",
       result.success ? "success" : "failed",

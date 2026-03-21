@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
-import { prisma } from "@/lib/db/prisma";
+import { findById as findProductById } from "@/lib/db/products";
+import { getCustomersForArrivalNotification } from "@/lib/db/orders";
 import { sendProductArrivalNotifications } from "@/lib/notifications/send";
 
 export async function POST(request: NextRequest) {
@@ -17,10 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { productId, roundId, productName } = body as {
+    const { productId, roundId } = body as {
       productId?: string;
       roundId?: string;
-      productName?: string;
     };
 
     if (!productId || typeof productId !== "string" || !productId.trim()) {
@@ -29,52 +29,23 @@ export async function POST(request: NextRequest) {
     if (!roundId || typeof roundId !== "string" || !roundId.trim()) {
       return NextResponse.json({ error: "roundId is required" }, { status: 400 });
     }
-    if (!productName || typeof productName !== "string" || !productName.trim()) {
-      return NextResponse.json(
-        { error: "productName is required" },
-        { status: 400 }
-      );
+
+    const product = await findProductById(productId.trim());
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Query order items with user emails (getOrdersByProduct doesn't include email)
-    const items = await prisma.orderItem.findMany({
-      where: {
-        product_id: productId.trim(),
-        order: {
-          round_id: roundId.trim(),
-          status: { not: "cancelled" },
-        },
-      },
-      include: {
-        order: { include: { user: true } },
-      },
-    });
-
-    // Deduplicate customers by user_id
-    const seen = new Set<string>();
-    const customers: Array<{
-      email?: string | null;
-      line_user_id?: string | null;
-      orderId?: string | null;
-    }> = [];
-
-    for (const item of items) {
-      const userId = item.order.user_id;
-      if (!userId || seen.has(userId)) continue;
-      seen.add(userId);
-      customers.push({
-        email: item.order.user?.email ?? null,
-        line_user_id: item.order.line_user_id ?? null,
-        orderId: item.order.id,
-      });
-    }
+    const customers = await getCustomersForArrivalNotification(
+      productId.trim(),
+      roundId.trim()
+    );
 
     if (customers.length === 0) {
       return NextResponse.json({ customersNotified: 0 });
     }
 
     const result = await sendProductArrivalNotifications(
-      productName.trim(),
+      product.name,
       customers
     );
 

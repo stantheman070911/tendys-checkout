@@ -170,6 +170,34 @@ export async function getOrdersByProduct(productId: string, roundId: string) {
   }));
 }
 
+export async function getCustomersForArrivalNotification(
+  productId: string,
+  roundId: string
+): Promise<Array<{ email: string | null; line_user_id: string | null }>> {
+  const items = await prisma.orderItem.findMany({
+    where: {
+      product_id: productId,
+      order: { round_id: roundId, status: { not: "cancelled" } },
+    },
+    include: {
+      order: { include: { user: true } },
+    },
+  });
+
+  const seen = new Set<string>();
+  const customers: Array<{ email: string | null; line_user_id: string | null }> = [];
+  for (const item of items) {
+    const userId = item.order.user_id;
+    if (!userId || seen.has(userId)) continue;
+    seen.add(userId);
+    customers.push({
+      email: item.order.user?.email ?? null,
+      line_user_id: item.order.line_user_id ?? null,
+    });
+  }
+  return customers;
+}
+
 // ─── Status Mutations ────────────────────────────────────────
 
 export async function reportPayment(

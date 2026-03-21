@@ -1,6 +1,7 @@
 import { validateOrderNumber } from "./validate-order-code";
 import { sendLineMessage } from "./push";
 import { prisma } from "../db/prisma";
+import { STATUS_LABELS } from "@/constants";
 
 // ─── Response strings ────────────────────────────────────────
 
@@ -21,14 +22,6 @@ const MSG_UNKNOWN =
 
 const MSG_ERROR =
   "系統有點問題，等一下再試試看 🙏";
-
-const STATUS_LABELS: Record<string, string> = {
-  pending_payment: "待付款",
-  pending_confirm: "待確認",
-  confirmed: "已確認",
-  shipped: "已出貨",
-  cancelled: "已取消",
-};
 
 // ─── Order number pattern: ORD-YYYYMMDD-NNN ─────────────────
 
@@ -75,8 +68,7 @@ export async function handleMessage(
         replyToken
       );
       return;
-    } catch (err) {
-      console.error("[handleMessage] validateOrderNumber error:", err);
+    } catch {
       await sendLineMessage(lineUserId, MSG_ERROR, replyToken);
       return;
     }
