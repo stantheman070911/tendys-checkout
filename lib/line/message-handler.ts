@@ -1,4 +1,5 @@
 import { validateOrderNumber } from "./validate-order-code";
+import { extractOrderNumber } from "./extract-order-number";
 import { sendLineMessage } from "./push";
 import { prisma } from "../db/prisma";
 import { STATUS_LABELS } from "@/constants";
@@ -24,10 +25,6 @@ const MSG_UNKNOWN =
 const MSG_ERROR =
   "系統有點問題，等一下再試試看 🙏";
 
-// ─── Order number pattern: ORD-YYYYMMDD-NNN ─────────────────
-
-const ORDER_NUMBER_PATTERN = /^ORD-\d{8}-\d{3}$/i;
-
 // ─── Handler ─────────────────────────────────────────────────
 
 /**
@@ -43,16 +40,20 @@ export async function handleMessage(
   replyToken?: string
 ): Promise<void> {
   const trimmed = text.trim().toUpperCase();
+  const orderNumber = extractOrderNumber(text);
 
   // ── If message matches order number pattern, try to validate ─
-  if (ORDER_NUMBER_PATTERN.test(trimmed)) {
+  if (orderNumber) {
     try {
-      const result = await validateOrderNumber(trimmed, lineUserId);
+      const result = await validateOrderNumber(orderNumber, lineUserId);
 
       if (result.valid) {
+        const replyText = result.alreadyLinked
+          ? MSG_ALREADY_LINKED(result.orderNumber, result.status)
+          : MSG_LINKED_SUCCESS(result.orderNumber);
         await sendLineMessage(
           lineUserId,
-          MSG_LINKED_SUCCESS(result.orderNumber),
+          replyText,
           replyToken
         );
         return;

@@ -1,3 +1,4 @@
+import type { OrderStatus } from "@/types";
 import { prisma } from "../db/prisma";
 
 // ─── Types ───────────────────────────────────────────────────
@@ -8,6 +9,8 @@ export interface ValidationSuccess {
   valid: true;
   orderId: string;
   orderNumber: string;
+  status: OrderStatus;
+  alreadyLinked: boolean;
 }
 
 export interface ValidationFailure {
@@ -48,7 +51,13 @@ export async function validateOrderNumber(
 
   // Already linked to this same user — success (idempotent)
   if (order.line_user_id === lineUserId) {
-    return { valid: true, orderId: order.id, orderNumber: order.order_number };
+    return {
+      valid: true,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      status: order.status as OrderStatus,
+      alreadyLinked: true,
+    };
   }
 
   // Link LINE user ID to the order
@@ -57,5 +66,11 @@ export async function validateOrderNumber(
     data: { line_user_id: lineUserId },
   });
 
-  return { valid: true, orderId: order.id, orderNumber: order.order_number };
+  return {
+    valid: true,
+    orderId: order.id,
+    orderNumber: order.order_number,
+    status: order.status as OrderStatus,
+    alreadyLinked: false,
+  };
 }

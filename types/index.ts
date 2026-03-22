@@ -14,6 +14,7 @@ export type NotificationType =
   | "order_cancelled";
 
 export type NotificationChannel = "line" | "email";
+export type NotificationLogStatus = "success" | "failed" | "skipped";
 
 // ─── Entity Interfaces ─────────────────────────────────────
 
@@ -96,9 +97,11 @@ export interface OrderItem {
 export interface NotificationLog {
   id: string;
   order_id: string | null;
+  round_id: string | null;
+  product_id: string | null;
   channel: NotificationChannel;
   type: NotificationType;
-  status: "success" | "failed";
+  status: NotificationLogStatus;
   error_message: string | null;
   created_at: string;
 }

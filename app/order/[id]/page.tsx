@@ -173,13 +173,13 @@ export default async function OrderPage({
               <span className="text-lg mr-1.5">💬</span> 接收 LINE 出貨通知
             </h3>
             <p className="text-green-700 text-xs mb-3 text-balance leading-relaxed">
-              點擊下方按鈕加入官方 LINE，傳送您的專屬綁定碼，隨時掌握訂單最新動態！
+              把下方訂單編號直接貼到官方 LINE，即可綁定這筆訂單的個人通知。
             </p>
             <div className="bg-white rounded-lg p-3 text-center border font-mono text-green-800 font-bold tracking-widest text-sm shadow-inner select-all mb-3 cursor-text">
-              綁定 {order.order_number}
+              {order.order_number}
             </div>
             <div className="text-center text-xs text-green-600 mb-2">
-              (長按複製上方代碼)
+              (長按複製上方訂單編號)
             </div>
           </div>
         )}
@@ -238,17 +238,22 @@ export default async function OrderPage({
 
         {/* Actions for pending_payment */}
         {status === "pending_payment" && (
-          <div className="flex gap-3">
+          <div className="space-y-3">
             {order.round_id && (
-              <a
-                href={buildShareUrl(order.round_id)}
-                className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 text-center"
-              >
-                繼續選購
-              </a>
+              <SharePanel roundId={order.round_id} show={anyUnderGoal} />
             )}
-            <div className="flex-1">
-              <CancelOrderButton orderId={order.id} />
+            <div className="flex gap-3">
+              {order.round_id && (
+                <a
+                  href={buildShareUrl(order.round_id)}
+                  className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 text-center"
+                >
+                  繼續選購
+                </a>
+              )}
+              <div className="flex-1">
+                <CancelOrderButton orderId={order.id} />
+              </div>
             </div>
           </div>
         )}

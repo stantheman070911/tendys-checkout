@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
     ) {
       const trimmedIds = orderIds.map((id) => id.trim());
       const shippedOrders = await batchConfirmShipment(trimmedIds);
+      const changedIds = new Set(shippedOrders.map((order) => order.id));
+      const skipped = trimmedIds.filter((id) => !changedIds.has(id));
 
       // Send notifications concurrently (EFF-1)
       const settled = await Promise.allSettled(
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         shipped: shippedOrders.length,
+        skipped,
         results: notificationResults,
       });
     }

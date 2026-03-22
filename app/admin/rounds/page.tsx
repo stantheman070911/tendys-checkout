@@ -11,6 +11,7 @@ export default function RoundsPage() {
   const { toast } = useToast();
   const [rounds, setRounds] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Inline edit states for current round
   const [editingFee, setEditingFee] = useState(false);
@@ -26,11 +27,12 @@ export default function RoundsPage() {
   const [creating, setCreating] = useState(false);
 
   const fetchData = useCallback(async () => {
+    setError(null);
     try {
       const data = await adminFetch<{ rounds: Round[] }>("/api/rounds?all=true");
       setRounds(data.rounds);
-    } catch {
-      // silent
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "資料載入失敗");
     } finally {
       setLoading(false);
     }
@@ -112,6 +114,14 @@ export default function RoundsPage() {
     return (
       <div className="flex justify-center py-20">
         <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {error}
       </div>
     );
   }

@@ -67,6 +67,7 @@ app/                          → Next.js pages and API routes only
     rounds/page.tsx           # Round management (open/close, deadline, shipping fee)
     suppliers/page.tsx        # Supplier CRUD + product-arrival notifications
   api/
+    admin/session/route.ts    # Admin shell auth probe (server-verified allowlist check)
     submit-order/route.ts     # Create order (submission_key dedup, stock check, shipping fee calc)
     report-payment/route.ts   # User reports payment (pending_payment → pending_confirm)
     cancel-order/route.ts     # User cancels (pending_payment only) OR Admin cancels (any status, with reason)
@@ -95,6 +96,7 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
   line/
     push.ts                   # LINE push/multicast/reply API (raw fetch, never-throw)
     webhook.ts                # HMAC-SHA256 signature verification for LINE webhooks
+    extract-order-number.ts   # Extracts ORD-YYYYMMDD-NNN from raw or prefixed LINE messages
     validate-order-code.ts    # Validates order number format, links line_user_id to order
     message-handler.ts        # Handles incoming LINE text messages (order linking + status check)
   notifications/
@@ -102,6 +104,10 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
     send.ts                   # Orchestrator: send LINE push + email, log results
   auth/
     supabase-admin.ts         # Supabase Auth helpers (admin login/session check)
+  admin/
+    paths.ts                  # Shared admin path builder (real base path, no hardcoded /admin links)
+    notification-summary.ts   # Notification log grouping helpers for dashboard/admin feedback
+    order-search.ts           # Shared admin order search + shipment grouping helpers
   utils.ts                    # cn(), formatCurrency, formatOrderItems, share URL builders, submission key, calcOrderTotal
 components/
   ui/                         # shadcn/ui generated components
@@ -123,6 +129,7 @@ prisma/
   schema.prisma               # 7 models: Round, Product, User, Order, OrderItem, NotificationLog, Supplier
   migration.sql               # Initial migration (all tables, triggers, RLS, views)
   migration_002_line_push.sql # Add line_user_id column to orders
+  migration_003_notification_log_context.sql # Add notification_logs round/product context + skipped status
   seed.ts                     # Dev seed data
 ```
 
@@ -189,6 +196,7 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 - **Auto `updated_at`**: Trigger on `users` and `suppliers` tables.
 - **Shipping fee calculation**: `submit-order` route checks `pickup_location`: if null/empty (宅配), adds `round.shipping_fee` to total and snapshots it in `orders.shipping_fee`.
 - **LINE order linking**: User pastes `ORD-YYYYMMDD-NNN` in LINE OA → webhook writes `line_user_id` on that order. Per-order (not per-user). Idempotent — re-pasting same order by same user is a no-op. One order = one LINE account.
+- **LINE message extraction**: The webhook parser accepts raw order numbers and prefixed text containing an order number (for example `綁定 ORD-20260318-001`). If multiple order numbers appear, the first match currently wins; ambiguity rejection is deferred.
 
 ### RLS Policies (critical — get these right)
 
@@ -271,6 +279,7 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key (client-side, RLS-gated) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role (server-side, bypasses RLS) |
+| `ADMIN_EMAILS` | Yes | Comma-separated email allowlist for admin access |
 | `DATABASE_URL` | Yes | Supabase pooled connection (Prisma runtime) |
 | `DIRECT_URL` | Yes | Supabase direct connection (Prisma migrations) |
 | `RESEND_API_KEY` | Yes | Email sending |
@@ -281,6 +290,49 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 | `NEXT_PUBLIC_BANK_ACCOUNT` | Yes | Bank account number |
 | `NEXT_PUBLIC_BANK_HOLDER` | Yes | Account holder name |
 | `NEXT_PUBLIC_SITE_URL` | Yes | Base URL for share links |
+
+---
+
+## Audit Closeout (2026-03-22)
+
+Phase 1–5 is now considered complete for merge after the audit/remediation pass documented in `phase-1-5-audit.md`. Phase 6 should start from the existing codebase, not by re-auditing earlier phases.
+
+### What Was Fixed
+
+- **Schema alignment:** `prisma/schema.prisma`, `prisma/migration.sql`, `prisma/migration_003_notification_log_context.sql`, and `types/index.ts` now agree on `notification_logs.round_id`, `notification_logs.product_id`, and `status = 'skipped'`.
+- **LINE flow correctness:** Order detail copy now tells users to paste the raw order number; the webhook parser accepts raw and prefixed text; the pending-payment share CTA was restored.
+- **Admin routing:** Admin print/navigation paths now use shared helpers instead of hardcoded `/admin/...`, so obfuscation via `ADMIN_BASE` remains intact.
+- **Idempotent batch ops:** Batch confirm/shipment now transition-guard on source state and send notifications only for rows actually changed in that call.
+- **Dashboard gaps:** Product-demand expansion now shows order numbers, product demand uses cached product lookups, and admins have a per-product packing-list print action instead of page-only printing.
+
+### Structural Changes
+
+- Added `prisma/migration_003_notification_log_context.sql` for notification-log context columns and `skipped` status support.
+- Added `/api/admin/session` so the admin shell verifies allowlisted access before loading protected UI.
+- Added shared admin helpers under `lib/admin/` for real admin path generation, notification summaries, and reusable order search/grouping.
+- Added `lib/line/extract-order-number.ts` so LINE parsing is reusable and testable.
+- Added focused Vitest unit coverage for notification summaries, LINE extraction, batch idempotency, admin paths, and admin order search/grouping.
+
+### Merge-Validated Guarantees
+
+- Migration is structurally safe for existing rows: new notification-log context columns are nullable, and the status check was widened rather than tightened.
+- Batch confirm/shipment is transition-guarded and notification-safe: side effects are triggered only from rows updated in the current call.
+- Admin auth remains enforced server-side on admin data routes through `verifyAdminSession()`. `/api/admin/session` hardens the shell; it does not replace route enforcement.
+- Admin routing no longer depends on hardcoded `/admin/...` links for navigational flows.
+
+### Caveats And Deferred Work
+
+- **Historical analytics gap:** Older `product_arrival` logs without `order_id` / `round_id` / `product_id` cannot be back-attributed. Round-level analytics are incomplete for that historical slice.
+- **LINE ambiguity handling:** Multiple order numbers in one LINE message currently resolve to the first match. Ambiguity rejection is not implemented yet.
+- **Test depth:** Confirm → notify behavior is covered at the unit level only. There is still no integration test covering the full route-to-notification path.
+- **Dependencies:** Existing `npm audit` findings are deferred to a dedicated dependency upgrade pass.
+
+### Deferred Backlog
+
+- Decide whether historical arrival analytics should remain explicitly partial or gain a forward-only reporting annotation strategy.
+- Reject or disambiguate LINE messages containing multiple order numbers instead of using first-match-wins.
+- Add an integration-level confirm → notify regression test.
+- Run a separate dependency remediation pass for current `npm audit` issues.
 
 ---
 

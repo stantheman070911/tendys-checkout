@@ -493,6 +493,32 @@ npm run build        # must pass
 - [x] **UI UX Polish**: Added a dedicated LINE-linking guide block to the order completion page. Added `🎉` to progress bars at 100%. Storefront supports explicit `?round=` queries. Deadline banner is urgent only `< 1h`.
 - [x] **Admin Polish**: Restricted bulk confirm checkboxes to `pending_confirm`. Fixed Active toggle labels. Added print wrappers for Product Demand Sheets and individual Packing Slips. Normalized batch API formats.
 
+### Phase 1–5 Audit Closeout & Phase 6 Readiness (2026-03-22 Session 3)
+
+- [x] **Audit artifact**: Added `phase-1-5-audit.md` with a phase-by-phase validation record and discrepancy log.
+- [x] **Schema/type/source-of-truth alignment**: Reconciled `prisma/schema.prisma`, `prisma/migration.sql`, `types/index.ts`, and added `prisma/migration_003_notification_log_context.sql` for `notification_logs.round_id`, `notification_logs.product_id`, and `status = 'skipped'`.
+- [x] **LINE flow fix**: Order detail now instructs users to paste the raw order number; LINE parsing accepts raw or prefixed text; pending-payment share CTA restored.
+- [x] **Admin routing hardening**: Replaced hardcoded `/admin/...` navigational paths with shared `ADMIN_BASE` helpers so obfuscation remains correct.
+- [x] **Batch idempotency**: `batchConfirm()` / `batchConfirmShipment()` now use transition guards and only notify from rows mutated in the current call.
+- [x] **Dashboard completion gap**: Product-demand detail now includes order number and supports per-product packing-list printing. Product lookups are cached instead of repeatedly scanning arrays.
+- [x] **Admin shell auth hardening**: Added `/api/admin/session` so the shell verifies allowlisted access before loading admin UI; server-side data routes still enforce `verifyAdminSession()`.
+- [x] **Phase 6 extension points**: Added shared admin helpers for path generation, notification summaries, and order search/grouping.
+- [x] **Focused tests**: Added Vitest unit coverage for notification summary mapping, LINE extraction, admin path generation, and batch idempotency.
+
+**Phase 1–5 status after audit:** COMPLETE for merge. The codebase is now the accepted baseline for Phase 6 work, and future sessions should continue from here without re-auditing earlier phases.
+
+**Merge-validated points:**
+- [x] Migration is structurally safe for existing rows.
+- [x] Batch confirm/shipment is transition-guarded and notification-safe.
+- [x] Admin auth remains enforced server-side on admin data routes.
+- [x] Admin routing no longer depends on hardcoded `/admin/...` paths.
+
+**Explicit caveats carried forward:**
+- [x] **Historical analytics gap**: Older `product_arrival` logs without `order_id` / `round_id` / `product_id` cannot be back-attributed. Round-level analytics remain incomplete for that historical slice.
+- [x] **LINE ambiguity handling**: Multiple order numbers in one message resolve to the first match. Ambiguity rejection is not implemented yet.
+- [x] **Test depth**: confirm → notify coverage is still unit-level; there is no integration-level regression test yet.
+- [x] **Dependency debt**: Existing `npm audit` issues are deferred to a separate dependency pass.
+
 ---
 
 ## Phase 6: Admin Pages — Shipments & Suppliers
@@ -623,6 +649,17 @@ npx vitest run       # must pass (if tests exist)
 - [ ] Customer-by-product view accurate
 
 **Done when:** System ready for first real group-buy round with real users.
+
+---
+
+## Deferred Backlog
+
+> These items are known and intentionally deferred. Do not re-audit completed phases before Phase 6 unless one of these backlog items becomes the active task.
+
+- [ ] **Historical analytics gap** — Older `product_arrival` logs without `order_id` / `round_id` / `product_id` cannot be back-attributed. Decide whether to leave reporting explicitly partial or add a forward-only reporting annotation strategy.
+- [ ] **LINE ambiguity handling** — Reject or explicitly disambiguate LINE messages containing multiple order numbers instead of using first-match-wins.
+- [ ] **Integration coverage** — Add an integration-level confirm → notify regression test covering route execution and notification dispatch boundaries.
+- [ ] **Dependency remediation** — Resolve existing `npm audit` issues in a dedicated dependency upgrade/security pass.
 
 ---
 

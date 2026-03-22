@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
-import { ADMIN_BASE, STATUS_LABELS } from "@/constants";
+import { ADMIN_BASE } from "@/constants";
+import { summarizeNotificationLogs } from "@/lib/admin/notification-summary";
 import { formatCurrency } from "@/lib/utils";
 import { ProductAggregationTable } from "@/components/admin/ProductAggregationTable";
 import type {
@@ -26,9 +27,11 @@ export default function DashboardPage() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [products, setProducts] = useState<ProductWithProgress[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
+    setError(null);
     try {
       // Get open round first
       const roundsData = await adminFetch<{ rounds: Round[] }>("/api/rounds?all=true");
@@ -55,8 +58,8 @@ export default function DashboardPage() {
       setOrders(ordersData.orders);
       setProducts(productsData.products);
       setLogs(logsData.logs);
-    } catch {
-      // silent — user will see empty state
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "資料載入失敗");
     } finally {
       setLoading(false);
     }
@@ -70,6 +73,14 @@ export default function DashboardPage() {
     return (
       <div className="flex justify-center py-20">
         <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {error}
       </div>
     );
   }
@@ -110,30 +121,7 @@ export default function DashboardPage() {
     }))
   );
 
-  // Group logs by notification type for a round-level summary
-  const logsByType = new Map<
-    string,
-    {
-      line: { success: number; failed: number; skipped: number };
-      email: { success: number; failed: number; skipped: number };
-    }
-  >();
-
-  for (const log of logs) {
-    if (!logsByType.has(log.type)) {
-      logsByType.set(log.type, {
-        line: { success: 0, failed: 0, skipped: 0 },
-        email: { success: 0, failed: 0, skipped: 0 },
-      });
-    }
-    const stats = logsByType.get(log.type)!;
-    if (log.channel === "line" || log.channel === "email") {
-      const channelStats = stats[log.channel];
-      if (log.status === "success") channelStats.success++;
-      else if (log.status === "failed") channelStats.failed++;
-      else if (log.status === "skipped") channelStats.skipped++;
-    }
-  }
+  const notificationSummary = summarizeNotificationLogs(logs);
 
   return (
     <div className="space-y-3">
@@ -168,28 +156,28 @@ export default function DashboardPage() {
       />
 
       {/* Notification Summary */}
-      {logsByType.size > 0 && (
+      {notificationSummary.length > 0 && (
         <div className="bg-white rounded-xl border p-4">
           <div className="font-medium text-sm mb-3 text-gray-700">通知發送統計 (本團)</div>
           <div className="space-y-3">
-            {Array.from(logsByType.entries()).map(([type, counts]) => (
-              <div key={type} className="border-b last:border-0 pb-3 last:pb-0">
-                <div className="text-xs font-bold text-gray-600 mb-1">{type}</div>
+            {notificationSummary.map((entry) => (
+              <div key={entry.type} className="border-b last:border-0 pb-3 last:pb-0">
+                <div className="text-xs font-bold text-gray-600 mb-1">{entry.type}</div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
                     <span className="font-medium text-gray-500">LINE</span>
                     <span>
-                      <span className="text-green-600 font-medium mr-2">✓ {counts.line.success}</span>
-                      <span className="text-red-500 font-medium mr-2">✗ {counts.line.failed}</span>
-                      <span className="text-gray-400 font-medium">— {counts.line.skipped}</span>
+                      <span className="text-green-600 font-medium mr-2">✓ {entry.line.success}</span>
+                      <span className="text-red-500 font-medium mr-2">✗ {entry.line.failed}</span>
+                      <span className="text-gray-400 font-medium">— {entry.line.skipped}</span>
                     </span>
                   </div>
                   <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
                     <span className="font-medium text-gray-500">Email</span>
                     <span>
-                      <span className="text-green-600 font-medium mr-2">✓ {counts.email.success}</span>
-                      <span className="text-red-500 font-medium mr-2">✗ {counts.email.failed}</span>
-                      <span className="text-gray-400 font-medium">— {counts.email.skipped}</span>
+                      <span className="text-green-600 font-medium mr-2">✓ {entry.email.success}</span>
+                      <span className="text-red-500 font-medium mr-2">✗ {entry.email.failed}</span>
+                      <span className="text-gray-400 font-medium">— {entry.email.skipped}</span>
                     </span>
                   </div>
                 </div>

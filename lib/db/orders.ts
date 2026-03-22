@@ -266,13 +266,26 @@ export async function confirmOrder(orderId: string) {
 }
 
 export async function batchConfirm(orderIds: string[]) {
-  await prisma.order.updateMany({
-    where: { id: { in: orderIds }, status: "pending_confirm" },
-    data: { status: "confirmed", confirmed_at: new Date() },
-  });
-  return prisma.order.findMany({
-    where: { id: { in: orderIds }, status: "confirmed" },
-    include: { order_items: true, user: true },
+  return prisma.$transaction(async (tx) => {
+    const pendingOrders = await tx.order.findMany({
+      where: { id: { in: orderIds }, status: "pending_confirm" },
+      select: { id: true },
+    });
+
+    const pendingIds = pendingOrders.map((order) => order.id);
+    if (pendingIds.length === 0) {
+      return [];
+    }
+
+    await tx.order.updateMany({
+      where: { id: { in: pendingIds }, status: "pending_confirm" },
+      data: { status: "confirmed", confirmed_at: new Date() },
+    });
+
+    return tx.order.findMany({
+      where: { id: { in: pendingIds }, status: "confirmed" },
+      include: { order_items: true, user: true },
+    });
   });
 }
 
@@ -295,13 +308,26 @@ export async function confirmShipment(orderId: string) {
 }
 
 export async function batchConfirmShipment(orderIds: string[]) {
-  await prisma.order.updateMany({
-    where: { id: { in: orderIds }, status: "confirmed" },
-    data: { status: "shipped", shipped_at: new Date() },
-  });
-  return prisma.order.findMany({
-    where: { id: { in: orderIds }, status: "shipped" },
-    include: { order_items: true, user: true },
+  return prisma.$transaction(async (tx) => {
+    const confirmedOrders = await tx.order.findMany({
+      where: { id: { in: orderIds }, status: "confirmed" },
+      select: { id: true },
+    });
+
+    const confirmedIds = confirmedOrders.map((order) => order.id);
+    if (confirmedIds.length === 0) {
+      return [];
+    }
+
+    await tx.order.updateMany({
+      where: { id: { in: confirmedIds }, status: "confirmed" },
+      data: { status: "shipped", shipped_at: new Date() },
+    });
+
+    return tx.order.findMany({
+      where: { id: { in: confirmedIds }, status: "shipped" },
+      include: { order_items: true, user: true },
+    });
   });
 }
 

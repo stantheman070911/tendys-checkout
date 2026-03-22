@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { matchesOrderSearch } from "@/lib/admin/order-search";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { STATUS_LABELS } from "@/constants";
@@ -38,6 +39,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderWithRelations[]>([]);
   const [products, setProducts] = useState<ProductWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>(
     searchParams.get("status") ?? "all"
   );
@@ -49,6 +51,7 @@ export default function OrdersPage() {
   );
 
   const fetchData = useCallback(async () => {
+    setError(null);
     try {
       const roundsData = await adminFetch<{ rounds: Round[] }>(
         "/api/rounds?all=true"
@@ -71,8 +74,8 @@ export default function OrdersPage() {
 
       setOrders(ordersData.orders);
       setProducts(productsData.products);
-    } catch {
-      // silent
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "資料載入失敗");
     } finally {
       setLoading(false);
     }
@@ -85,14 +88,7 @@ export default function OrdersPage() {
   // Filter + search
   const filtered = orders.filter((o) => {
     if (filter !== "all" && o.status !== filter) return false;
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (o.user?.nickname ?? "").toLowerCase().includes(q) ||
-      (o.user?.phone ?? "").includes(q) ||
-      o.order_number.toLowerCase().includes(q) ||
-      (o.user?.recipient_name ?? "").toLowerCase().includes(q)
-    );
+    return matchesOrderSearch(o, search);
   });
 
   const pendingConfirm = orders.filter(
@@ -127,21 +123,26 @@ export default function OrdersPage() {
     try {
       const res = await adminFetch<{
         results?: Array<{ orderId: string; success: boolean }>;
-        error?: string;
+        skipped?: string[];
       }>("/api/batch-confirm", {
         method: "POST",
         body: JSON.stringify({ orderIds: Array.from(batchSel) }),
       });
-      if (res.error) {
-        toast({ title: res.error, variant: "destructive" });
-      } else {
-        const count = res.results?.filter((r) => r.success).length ?? 0;
-        toast({ title: `已確認 ${count} 筆訂單` });
-        setBatchSel(new Set());
-        fetchData();
-      }
-    } catch {
-      toast({ title: "批次確認失敗", variant: "destructive" });
+      const confirmed = res.results?.filter((r) => r.success).length ?? 0;
+      const skipped = res.skipped?.length ?? 0;
+      toast({
+        title:
+          skipped > 0
+            ? `已確認 ${confirmed} 筆訂單，略過 ${skipped} 筆`
+            : `已確認 ${confirmed} 筆訂單`,
+      });
+      setBatchSel(new Set());
+      fetchData();
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "批次確認失敗",
+        variant: "destructive",
+      });
     } finally {
       setBatchActing(false);
     }
@@ -183,6 +184,14 @@ export default function OrdersPage() {
     return (
       <div className="flex justify-center py-20">
         <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {error}
       </div>
     );
   }

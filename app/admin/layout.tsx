@@ -23,7 +23,7 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, loading, signOut } = useAdminSession();
+  const { session, authorized, loading, signOut } = useAdminSession();
   const { adminFetch } = useAdminFetch();
   const [round, setRound] = useState<Round | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -34,7 +34,7 @@ export default function AdminLayout({
 
   // Fetch current round + pending count for nav
   useEffect(() => {
-    if (!session || isLoginPage) return;
+    if (!session || !authorized || isLoginPage) return;
     adminFetch<{ rounds: Round[] }>("/api/rounds?all=true")
       .then(({ rounds }) => {
         const open = rounds.find((r) => r.is_open);
@@ -48,18 +48,18 @@ export default function AdminLayout({
         }
       })
       .catch(() => {});
-  }, [session, isLoginPage, adminFetch]);
+  }, [session, authorized, isLoginPage, adminFetch]);
 
   // Auth guard
   useEffect(() => {
     if (loading) return;
-    if (!session && !isLoginPage) {
+    if ((!session || !authorized) && !isLoginPage) {
       router.replace(ADMIN_BASE);
     }
-    if (session && isLoginPage) {
+    if (session && authorized && isLoginPage) {
       router.replace(`${ADMIN_BASE}/dashboard`);
     }
-  }, [loading, session, isLoginPage, router]);
+  }, [loading, session, authorized, isLoginPage, router]);
 
   // Loading state
   if (loading) {
@@ -76,7 +76,7 @@ export default function AdminLayout({
   }
 
   // Not authenticated — show nothing while redirecting
-  if (!session) return null;
+  if (!session || !authorized) return null;
 
   // Active tab detection
   const activeTab = TABS.find(([key]) =>

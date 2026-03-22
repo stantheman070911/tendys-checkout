@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { STATUS_LABELS } from "@/constants";
+import { buildAdminPath } from "@/lib/admin/paths";
 import { formatCurrency, formatOrderItems } from "@/lib/utils";
 import {
   Dialog,
@@ -41,8 +42,7 @@ export function OrderCard({
   const [cancelReason, setCancelReason] = useState("");
 
   const o = order;
-  const showCheckbox =
-    o.status === "pending_confirm" || o.status === "pending_payment";
+  const showCheckbox = o.status === "pending_confirm";
   const amtMatch =
     o.payment_amount != null && o.payment_amount === o.total_amount;
   const amtMismatch =
@@ -55,19 +55,18 @@ export function OrderCard({
   ) => {
     setActing(true);
     try {
-      const res = await adminFetch<{ error?: string }>(url, {
+      await adminFetch(url, {
         method: "POST",
         body: JSON.stringify(body),
       });
-      if (res.error) {
-        toast({ title: res.error, variant: "destructive" });
-      } else {
-        toast({ title: successMsg });
-        setExpanded(false);
-        onRefresh();
-      }
-    } catch {
-      toast({ title: "操作失敗", variant: "destructive" });
+      toast({ title: successMsg });
+      setExpanded(false);
+      onRefresh();
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "操作失敗",
+        variant: "destructive",
+      });
     } finally {
       setActing(false);
     }
@@ -97,7 +96,7 @@ export function OrderCard({
   const handleCancel = async () => {
     setActing(true);
     try {
-      const res = await adminFetch<{ error?: string }>("/api/cancel-order", {
+      await adminFetch("/api/cancel-order", {
         method: "POST",
         body: JSON.stringify({
           orderId: o.id,
@@ -105,17 +104,16 @@ export function OrderCard({
           cancel_reason: cancelReason.trim() || undefined,
         }),
       });
-      if (res.error) {
-        toast({ title: res.error, variant: "destructive" });
-      } else {
-        toast({ title: "訂單已取消" });
-        setCancelOpen(false);
-        setCancelReason("");
-        setExpanded(false);
-        onRefresh();
-      }
-    } catch {
-      toast({ title: "取消失敗", variant: "destructive" });
+      toast({ title: "訂單已取消" });
+      setCancelOpen(false);
+      setCancelReason("");
+      setExpanded(false);
+      onRefresh();
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "取消失敗",
+        variant: "destructive",
+      });
     } finally {
       setActing(false);
     }
@@ -322,7 +320,9 @@ export function OrderCard({
               )}
               {o.status !== "cancelled" && (
                 <button
-                  onClick={() => window.open(`/admin/orders/${o.id}/print`, "_blank")}
+                  onClick={() =>
+                    window.open(buildAdminPath(`/orders/${o.id}/print`), "_blank")
+                  }
                   className="px-3 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
                 >
                   🖨️ 列印裝箱單
