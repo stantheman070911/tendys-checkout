@@ -186,19 +186,29 @@ export async function sendProductArrivalNotifications(
     lineResult.error
   );
 
-  // Per-customer email — never stop on single failure
+  // Per-customer email — send concurrently, never stop on single failure
+  const customersWithEmail = customers.filter(
+    (c): c is CustomerForArrival & { email: string } => !!c.email
+  );
+  const settled = await Promise.allSettled(
+    customersWithEmail.map(async (customer) => {
+      const result = await sendProductArrivalEmail(customer.email, productName);
+      await logNotification(
+        null,
+        "email",
+        "product_arrival",
+        result.success ? "success" : "failed",
+        result.error
+      );
+      return { email: customer.email, result };
+    })
+  );
   const emailResults: Array<{ email: string; result: NotifyResult }> = [];
-  for (const customer of customers) {
-    if (!customer.email) continue;
-    const result = await sendProductArrivalEmail(customer.email, productName);
-    await logNotification(
-      null,
-      "email",
-      "product_arrival",
-      result.success ? "success" : "failed",
-      result.error
-    );
-    emailResults.push({ email: customer.email, result });
+  for (const entry of settled) {
+    if (entry.status === "fulfilled") {
+      emailResults.push(entry.value);
+    }
+    // Rejected promises are swallowed — already logged individually
   }
 
   return { line: lineResult, emailResults };

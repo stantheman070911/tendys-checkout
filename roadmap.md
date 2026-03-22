@@ -477,6 +477,14 @@ npm run build        # must pass
 
 **Status: COMPLETE** — All 6 tasks done. `tsc`, `lint`, `build` all pass. Auth: browser Supabase client + useAdminSession hook + useAdminFetch hook. Layout: indigo sticky header with tab pills, auth guard, POS button, logout. Dashboard: 6 stat cards (clickable), product aggregation table with expand + 通知到貨, notification summary. Orders: search + filter + batch confirm + OrderCard with per-status actions + POS form + CSV export. Products: CRUD with supplier dropdown + progress bars + toggle active. Rounds: current round with inline fee/deadline edit + 截單 + new round form + history.
 
+### Post-Phase 5 Bug Fixes & Optimizations (2026-03-22)
+
+- [x] **Fix:** Cancel idempotency — duplicate cancel calls no longer re-send notifications (`cancelOrder()` returns `{ order, changed }`)
+- [x] **Security:** LINE webhook signature verification now uses `timingSafeEqual` (timing-attack resistant)
+- [x] **Perf:** Product arrival emails sent concurrently via `Promise.allSettled()` instead of sequential loop
+- [x] **Prep:** Phase 6 type stubs added to `types/index.ts` (`ShipmentGroup`, `ShipmentConfirmResult`, `SupplierCardData`, `SupplierFormValues`)
+- [x] **Prep:** Implementation spec comments added to shipments + suppliers placeholder pages
+
 ---
 
 ## Phase 6: Admin Pages — Shipments & Suppliers

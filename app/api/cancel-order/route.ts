@@ -38,17 +38,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // Admin cancel: send cancellation notifications
+    // Admin cancel: send cancellation notifications only if status actually changed
     let notifications = null;
-    if (isAdmin && result.order_items) {
+    if (isAdmin && result.changed && result.order.order_items) {
       notifications = await sendOrderCancelledNotifications(
-        result,
-        result.order_items,
+        result.order,
+        result.order.order_items,
         reason
       );
     }
 
-    return NextResponse.json({ order: result, notifications });
+    return NextResponse.json({ order: result.order, notifications });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

@@ -275,7 +275,9 @@ export async function cancelOrder(
       include: { order_items: true, user: true },
     });
     if (!order) return null;
-    if (order.status === "cancelled") return order;
+    if (order.status === "cancelled") {
+      return { order, changed: false as const };
+    }
 
     // User can only cancel pending_payment; admin can cancel any status
     if (!isAdmin && order.status !== "pending_payment") {
@@ -303,7 +305,8 @@ export async function cancelOrder(
       }
     }
 
-    return { ...order, status: "cancelled" as const, cancel_reason: cancelReason || null };
+    const cancelled = { ...order, status: "cancelled" as const, cancel_reason: cancelReason || null };
+    return { order: cancelled, changed: true as const };
   });
 }
 
