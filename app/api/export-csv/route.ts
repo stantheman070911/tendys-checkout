@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/auth/supabase-admin";
+import { verifyAdminSession, getSupabaseAdmin } from "@/lib/auth/supabase-admin";
 import { listByRound } from "@/lib/db/orders";
 import { STATUS_LABELS } from "@/constants";
 
 export async function GET(request: NextRequest) {
   try {
-    const isAdmin = await verifyAdminSession(request);
+    // Support both header auth and token query param (for window.open downloads)
+    const tokenParam = request.nextUrl.searchParams.get("token");
+    let isAdmin = false;
+    if (tokenParam) {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data, error } = await supabase.auth.getUser(tokenParam);
+        isAdmin = !error && !!data.user;
+      } catch {
+        isAdmin = false;
+      }
+    } else {
+      isAdmin = await verifyAdminSession(request);
+    }
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -27,7 +27,12 @@ export async function getLogsByOrder(orderId: string) {
 
 export async function getLogsByRound(roundId: string) {
   return prisma.notificationLog.findMany({
-    where: { order: { round_id: roundId } },
+    where: {
+      OR: [
+        { order: { round_id: roundId } },
+        { order_id: null, type: "product_arrival" },
+      ],
+    },
     orderBy: { created_at: "desc" },
   });
 }

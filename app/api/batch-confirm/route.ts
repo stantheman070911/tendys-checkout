@@ -33,19 +33,23 @@ export async function POST(request: NextRequest) {
     const trimmedIds = orderIds.map((id) => id.trim());
     const confirmedOrders = await batchConfirm(trimmedIds);
 
-    // Send notifications sequentially to avoid rate limiting
-    const notificationResults = [];
-    for (const order of confirmedOrders) {
-      const notifications = await sendPaymentConfirmedNotifications(
-        order,
-        order.order_items
-      );
-      notificationResults.push({
-        orderId: order.id,
-        orderNumber: order.order_number,
-        notifications,
-      });
-    }
+    // Send notifications concurrently (EFF-2)
+    const settled = await Promise.allSettled(
+      confirmedOrders.map(async (order) => {
+        const notifications = await sendPaymentConfirmedNotifications(
+          order,
+          order.order_items
+        );
+        return {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          notifications,
+        };
+      })
+    );
+    const notificationResults = settled
+      .filter((r) => r.status === "fulfilled")
+      .map((r) => (r as PromiseFulfilledResult<{ orderId: string; orderNumber: string; notifications: unknown }>).value);
 
     return NextResponse.json({
       confirmed: confirmedOrders.length,

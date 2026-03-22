@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
     // Single mode
     if (orderId && typeof orderId === "string" && orderId.trim()) {
       const order = await confirmShipment(orderId.trim());
+      if (!order) {
+        return NextResponse.json(
+          { error: "Order not found or not in confirmed status" },
+          { status: 404 }
+        );
+      }
       const notifications = await sendShipmentNotifications(
         order,
         order.order_items
@@ -44,18 +50,23 @@ export async function POST(request: NextRequest) {
       const trimmedIds = orderIds.map((id) => id.trim());
       const shippedOrders = await batchConfirmShipment(trimmedIds);
 
-      const notificationResults = [];
-      for (const order of shippedOrders) {
-        const notifications = await sendShipmentNotifications(
-          order,
-          order.order_items
-        );
-        notificationResults.push({
-          orderId: order.id,
-          orderNumber: order.order_number,
-          notifications,
-        });
-      }
+      // Send notifications concurrently (EFF-1)
+      const settled = await Promise.allSettled(
+        shippedOrders.map(async (order) => {
+          const notifications = await sendShipmentNotifications(
+            order,
+            order.order_items
+          );
+          return {
+            orderId: order.id,
+            orderNumber: order.order_number,
+            notifications,
+          };
+        })
+      );
+      const notificationResults = settled
+        .filter((r) => r.status === "fulfilled")
+        .map((r) => (r as PromiseFulfilledResult<{ orderId: string; orderNumber: string; notifications: unknown }>).value);
 
       return NextResponse.json({
         shipped: shippedOrders.length,

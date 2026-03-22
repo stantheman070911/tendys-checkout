@@ -227,11 +227,21 @@ export async function reportPayment(
 }
 
 export async function confirmOrder(orderId: string) {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: "confirmed", confirmed_at: new Date() },
-    include: { order_items: true, user: true },
-  });
+  try {
+    return await prisma.order.update({
+      where: { id: orderId, status: "pending_confirm" },
+      data: { status: "confirmed", confirmed_at: new Date() },
+      include: { order_items: true, user: true },
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function batchConfirm(orderIds: string[]) {
@@ -246,11 +256,21 @@ export async function batchConfirm(orderIds: string[]) {
 }
 
 export async function confirmShipment(orderId: string) {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: "shipped", shipped_at: new Date() },
-    include: { order_items: true, user: true },
-  });
+  try {
+    return await prisma.order.update({
+      where: { id: orderId, status: "confirmed" },
+      data: { status: "shipped", shipped_at: new Date() },
+      include: { order_items: true, user: true },
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function batchConfirmShipment(orderIds: string[]) {

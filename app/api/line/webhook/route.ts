@@ -22,20 +22,25 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(rawBody) as { events?: LineEvent[] };
     const events = body.events ?? [];
 
-    // Process events (fire-and-forget — LINE expects 200 quickly)
-    for (const event of events) {
-      if (
-        event.type === "message" &&
-        event.message?.type === "text" &&
-        event.message.text &&
-        event.source?.userId
-      ) {
-        await handleMessage(
-          event.source.userId,
-          event.message.text,
-          event.replyToken
-        );
-      }
+    // Process events — fire-and-forget (LINE expects 200 quickly)
+    const messageEvents = events.filter(
+      (e) =>
+        e.type === "message" &&
+        e.message?.type === "text" &&
+        e.message.text &&
+        e.source?.userId
+    );
+    if (messageEvents.length > 0) {
+      // Don't await — process in background so we return 200 immediately
+      void Promise.allSettled(
+        messageEvents.map((event) =>
+          handleMessage(
+            event.source!.userId!,
+            event.message!.text!,
+            event.replyToken
+          )
+        )
+      );
     }
 
     // LINE requires 200 OK regardless of processing outcome

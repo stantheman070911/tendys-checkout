@@ -138,10 +138,17 @@ export default function OrdersPage() {
     }
   };
 
-  const handleCSVExport = () => {
+  const handleCSVExport = async () => {
     if (!round) return;
-    // Use window.open to trigger download — the API route sets Content-Disposition
-    window.open(`/api/export-csv?roundId=${round.id}`, "_blank");
+    try {
+      const { getSupabaseBrowser } = await import("@/lib/auth/supabase-browser");
+      const supabase = getSupabaseBrowser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      window.open(`/api/export-csv?roundId=${round.id}&token=${encodeURIComponent(token)}`, "_blank");
+    } catch {
+      window.open(`/api/export-csv?roundId=${round.id}`, "_blank");
+    }
   };
 
   if (loading) {

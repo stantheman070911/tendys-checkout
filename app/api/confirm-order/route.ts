@@ -25,6 +25,13 @@ export async function POST(request: NextRequest) {
 
     const order = await confirmOrder(orderId.trim());
 
+    if (!order) {
+      return NextResponse.json(
+        { error: "Order not found or not in pending_confirm status" },
+        { status: 404 }
+      );
+    }
+
     // Send notifications (fire-and-forget — failure doesn't affect response)
     const notifications = await sendPaymentConfirmedNotifications(
       order,

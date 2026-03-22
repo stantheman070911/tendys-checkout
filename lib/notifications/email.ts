@@ -16,6 +16,14 @@ function getFrom(): string {
   return process.env.RESEND_FROM_EMAIL ?? "noreply@example.com";
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 // ─── Payment Confirmed Email ─────────────────────────────────
 
 export async function sendOrderConfirmationEmail(
@@ -36,7 +44,7 @@ export async function sendOrderConfirmationEmail(
     const itemRows = items
       .map(
         (i) =>
-          `<tr><td style="padding:4px 8px">${i.product_name}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`
+          `<tr><td style="padding:4px 8px">${escapeHtml(i.product_name)}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`
       )
       .join("");
 
@@ -47,7 +55,7 @@ export async function sendOrderConfirmationEmail(
     const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>訂單付款已確認</h2>
-        <p>訂單編號：<strong>${order.order_number}</strong></p>
+        <p>訂單編號：<strong>${escapeHtml(order.order_number)}</strong></p>
         <table style="width:100%;border-collapse:collapse">
           <thead><tr style="border-bottom:1px solid #ddd">
             <th style="padding:4px 8px;text-align:left">品項</th>
@@ -94,13 +102,13 @@ export async function sendShipmentEmail(
     }
 
     const itemList = items
-      .map((i) => `<li>${i.product_name} x ${i.quantity}</li>`)
+      .map((i) => `<li>${escapeHtml(i.product_name)} x ${i.quantity}</li>`)
       .join("");
 
     const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>出貨通知</h2>
-        <p>訂單編號：<strong>${order.order_number}</strong></p>
+        <p>訂單編號：<strong>${escapeHtml(order.order_number)}</strong></p>
         <p>您的訂單已出貨 / 已備妥可取貨：</p>
         <ul>${itemList}</ul>
         <p>感謝您的訂購！</p>
@@ -144,7 +152,7 @@ export async function sendOrderCancelledEmail(
     const itemRows = items
       .map(
         (i) =>
-          `<tr><td style="padding:4px 8px">${i.product_name}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`
+          `<tr><td style="padding:4px 8px">${escapeHtml(i.product_name)}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`
       )
       .join("");
 
@@ -153,13 +161,13 @@ export async function sendOrderCancelledEmail(
       : "";
 
     const reasonBlock = cancelReason
-      ? `<p><strong>取消原因：</strong>${cancelReason}</p>`
+      ? `<p><strong>取消原因：</strong>${escapeHtml(cancelReason)}</p>`
       : "";
 
     const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>訂單取消通知</h2>
-        <p>訂單編號：<strong>${order.order_number}</strong></p>
+        <p>訂單編號：<strong>${escapeHtml(order.order_number)}</strong></p>
         <p>您的訂單已被取消。</p>
         ${reasonBlock}
         <table style="width:100%;border-collapse:collapse">
@@ -209,7 +217,7 @@ export async function sendProductArrivalEmail(
     const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>商品到貨通知</h2>
-        <p>您訂購的【<strong>${productName}</strong>】已到達理貨中心，我們會盡快安排出貨！</p>
+        <p>您訂購的【<strong>${escapeHtml(productName)}</strong>】已到達理貨中心，我們會盡快安排出貨！</p>
       </div>
     `;
 
