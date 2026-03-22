@@ -118,11 +118,11 @@ export default function ProductsPage() {
                   onClick={() => toggleActive(p)}
                   className={`text-xs px-2 py-0.5 rounded-full ${
                     p.is_active
-                      ? "bg-green-100 text-green-700"
-                      : "bg-red-100 text-red-700"
+                      ? "bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700 transition-colors"
+                      : "bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700 transition-colors"
                   }`}
                 >
-                  {p.is_active ? "上架" : "下架"}
+                  {p.is_active ? "下架" : "上架"}
                 </button>
                 <button
                   onClick={() => {

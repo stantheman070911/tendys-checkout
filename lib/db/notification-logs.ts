@@ -1,19 +1,26 @@
 import { prisma } from "@/lib/db/prisma";
+import type { NotificationChannel, NotificationType } from "@/types";
 
-export async function logNotification(
-  orderId: string | null,
-  channel: string,
-  type: string,
-  status: string,
-  errorMessage?: string | null
-) {
+export interface LogNotificationPayload {
+  orderId?: string | null;
+  roundId?: string | null;
+  productId?: string | null;
+  channel: NotificationChannel;
+  type: NotificationType;
+  status: "success" | "skipped" | "failed";
+  errorMessage?: string | null;
+}
+
+export async function logNotification(payload: LogNotificationPayload) {
   return prisma.notificationLog.create({
     data: {
-      order_id: orderId,
-      channel,
-      type,
-      status,
-      error_message: errorMessage ?? null,
+      order_id: payload.orderId ?? null,
+      round_id: payload.roundId ?? null,
+      product_id: payload.productId ?? null,
+      channel: payload.channel,
+      type: payload.type,
+      status: payload.status,
+      error_message: payload.errorMessage ?? null,
     },
   });
 }
@@ -28,10 +35,7 @@ export async function getLogsByOrder(orderId: string) {
 export async function getLogsByRound(roundId: string) {
   return prisma.notificationLog.findMany({
     where: {
-      OR: [
-        { order: { round_id: roundId } },
-        { order_id: null, type: "product_arrival" },
-      ],
+      OR: [{ round_id: roundId }, { order: { round_id: roundId } }],
     },
     orderBy: { created_at: "desc" },
   });

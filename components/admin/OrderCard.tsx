@@ -320,6 +320,14 @@ export function OrderCard({
                   </button>
                 </>
               )}
+              {o.status !== "cancelled" && (
+                <button
+                  onClick={() => window.open(`/admin/orders/${o.id}/print`, "_blank")}
+                  className="px-3 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
+                >
+                  🖨️ 列印裝箱單
+                </button>
+              )}
               {o.status === "shipped" && (
                 <span className="text-sm text-gray-400 py-2">
                   出貨{" "}

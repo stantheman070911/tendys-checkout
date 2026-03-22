@@ -110,24 +110,28 @@ export default function DashboardPage() {
     }))
   );
 
-  // Group logs by order for notification summary
-  const orderLogs = new Map<
+  // Group logs by notification type for a round-level summary
+  const logsByType = new Map<
     string,
-    { orderNumber: string; nickname: string; results: NotificationLog[] }
+    {
+      line: { success: number; failed: number; skipped: number };
+      email: { success: number; failed: number; skipped: number };
+    }
   >();
+
   for (const log of logs) {
-    if (!log.order_id) continue;
-    const order = orders.find((o) => o.id === log.order_id);
-    if (!order) continue;
-    const existing = orderLogs.get(log.order_id);
-    if (existing) {
-      existing.results.push(log);
-    } else {
-      orderLogs.set(log.order_id, {
-        orderNumber: order.order_number,
-        nickname: order.user?.nickname ?? "—",
-        results: [log],
+    if (!logsByType.has(log.type)) {
+      logsByType.set(log.type, {
+        line: { success: 0, failed: 0, skipped: 0 },
+        email: { success: 0, failed: 0, skipped: 0 },
       });
+    }
+    const stats = logsByType.get(log.type)!;
+    if (log.channel === "line" || log.channel === "email") {
+      const channelStats = stats[log.channel];
+      if (log.status === "success") channelStats.success++;
+      else if (log.status === "failed") channelStats.failed++;
+      else if (log.status === "skipped") channelStats.skipped++;
     }
   }
 
@@ -164,74 +168,36 @@ export default function DashboardPage() {
       />
 
       {/* Notification Summary */}
-      {orderLogs.size > 0 && (
+      {logsByType.size > 0 && (
         <div className="bg-white rounded-xl border p-4">
-          <div className="font-medium text-sm mb-2 text-gray-700">通知狀態</div>
-          {Array.from(orderLogs.values()).map((entry) => (
-            <div
-              key={entry.orderNumber}
-              className="flex justify-between items-center text-xs py-1.5 border-b last:border-0"
-            >
-              <span className="text-gray-500">
-                {entry.orderNumber} · {entry.nickname}
-              </span>
-              <div className="flex gap-1">
-                {/* Group by type, show latest LINE + Email result */}
-                {groupNotifResults(entry.results).map((g, i) => (
-                  <span key={i} className="flex gap-0.5">
-                    <span
-                      className={`px-1 py-0.5 rounded text-xs ${
-                        g.line === "success"
-                          ? "bg-green-100 text-green-700"
-                          : g.line === "failed"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-400"
-                      }`}
-                    >
-                      L{g.line === "success" ? "✓" : g.line === "failed" ? "✗" : "—"}
+          <div className="font-medium text-sm mb-3 text-gray-700">通知發送統計 (本團)</div>
+          <div className="space-y-3">
+            {Array.from(logsByType.entries()).map(([type, counts]) => (
+              <div key={type} className="border-b last:border-0 pb-3 last:pb-0">
+                <div className="text-xs font-bold text-gray-600 mb-1">{type}</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
+                    <span className="font-medium text-gray-500">LINE</span>
+                    <span>
+                      <span className="text-green-600 font-medium mr-2">✓ {counts.line.success}</span>
+                      <span className="text-red-500 font-medium mr-2">✗ {counts.line.failed}</span>
+                      <span className="text-gray-400 font-medium">— {counts.line.skipped}</span>
                     </span>
-                    <span
-                      className={`px-1 py-0.5 rounded text-xs ${
-                        g.email === "success"
-                          ? "bg-green-100 text-green-700"
-                          : g.email === "failed"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-400"
-                      }`}
-                    >
-                      E{g.email === "success" ? "✓" : g.email === "failed" ? "✗" : "—"}
+                  </div>
+                  <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
+                    <span className="font-medium text-gray-500">Email</span>
+                    <span>
+                      <span className="text-green-600 font-medium mr-2">✓ {counts.email.success}</span>
+                      <span className="text-red-500 font-medium mr-2">✗ {counts.email.failed}</span>
+                      <span className="text-gray-400 font-medium">— {counts.email.skipped}</span>
                     </span>
-                  </span>
-                ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
-}
-
-function groupNotifResults(
-  results: NotificationLog[]
-): Array<{ type: string; line: string | null; email: string | null }> {
-  const byType = new Map<
-    string,
-    { type: string; line: string | null; email: string | null }
-  >();
-  for (const r of results) {
-    const key = r.type;
-    const existing = byType.get(key);
-    if (!existing) {
-      byType.set(key, {
-        type: key,
-        line: r.channel === "line" ? r.status : null,
-        email: r.channel === "email" ? r.status : null,
-      });
-    } else {
-      if (r.channel === "line") existing.line = r.status;
-      if (r.channel === "email") existing.email = r.status;
-    }
-  }
-  return Array.from(byType.values());
 }

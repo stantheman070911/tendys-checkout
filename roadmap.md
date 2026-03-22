@@ -485,6 +485,14 @@ npm run build        # must pass
 - [x] **Prep:** Phase 6 type stubs added to `types/index.ts` (`ShipmentGroup`, `ShipmentConfirmResult`, `SupplierCardData`, `SupplierFormValues`)
 - [x] **Prep:** Implementation spec comments added to shipments + suppliers placeholder pages
 
+### Post-Phase 5 Security Hardening & UI Polish Pass (2026-03-22 Session 2)
+
+- [x] **Admin Security**: Replaced URL `?token=` parameter with secure `fetch` headers and `verifyAdminSession` for CSV Exports.
+- [x] **Server Enforcement**: Removed client-side trust for logic; the server strictly recalculates totals inside a transaction and enforces deadlines.
+- [x] **Notification Analytics**: Migrated Prisma schema to include `round_id` and `product_id` in `NotificationLog`. Redesigned dashboard admin summary to accurately group by type and include "Skipped" statuses.
+- [x] **UI UX Polish**: Added a dedicated LINE-linking guide block to the order completion page. Added `🎉` to progress bars at 100%. Storefront supports explicit `?round=` queries. Deadline banner is urgent only `< 1h`.
+- [x] **Admin Polish**: Restricted bulk confirm checkboxes to `pending_confirm`. Fixed Active toggle labels. Added print wrappers for Product Demand Sheets and individual Packing Slips. Normalized batch API formats.
+
 ---
 
 ## Phase 6: Admin Pages — Shipments & Suppliers

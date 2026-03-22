@@ -166,6 +166,24 @@ export default async function OrderPage({
           </div>
         )}
 
+        {/* LINE Linking Guide */}
+        {status !== "cancelled" && !order.line_user_id && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm">
+            <h3 className="font-bold text-green-800 text-sm mb-1.5 flex items-center">
+              <span className="text-lg mr-1.5">💬</span> 接收 LINE 出貨通知
+            </h3>
+            <p className="text-green-700 text-xs mb-3 text-balance leading-relaxed">
+              點擊下方按鈕加入官方 LINE，傳送您的專屬綁定碼，隨時掌握訂單最新動態！
+            </p>
+            <div className="bg-white rounded-lg p-3 text-center border font-mono text-green-800 font-bold tracking-widest text-sm shadow-inner select-all mb-3 cursor-text">
+              綁定 {order.order_number}
+            </div>
+            <div className="text-center text-xs text-green-600 mb-2">
+              (長按複製上方代碼)
+            </div>
+          </div>
+        )}
+
         {/* Payment report form */}
         {status === "pending_payment" && (
           <PaymentReportForm

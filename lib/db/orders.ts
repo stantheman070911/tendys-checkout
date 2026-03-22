@@ -12,10 +12,7 @@ interface CreateOrderData {
 
 interface CreateOrderItem {
   product_id: string;
-  product_name: string;
-  unit_price: number;
   quantity: number;
-  subtotal: number;
 }
 
 export async function createWithItems(
@@ -32,24 +29,55 @@ export async function createWithItems(
       });
       if (existing) return { order: existing, deduplicated: true };
 
-      // 2. Validate round is open + get shipping fee
+      // 2. Validate round is open + check deadline + get shipping fee
       const round = await tx.round.findUnique({
         where: { id: data.round_id },
       });
       if (!round || !round.is_open) {
         return { error: "Round is not open" };
       }
+      if (round.deadline && new Date() > new Date(round.deadline)) {
+        return { error: "This round has closed" };
+      }
 
-      // 3. Atomic stock decrement for each item
+      // 2.5 Load canonical products for authoritative pricing/validation
+      const canonicalProducts = await tx.product.findMany({
+        where: { id: { in: items.map((i) => i.product_id) } },
+      });
+      const productMap = new Map(canonicalProducts.map((p) => [p.id, p]));
+
+      // 3. Process items: validate, atomic stock, compute DB-driven subtotal
+      const resolvedItems = [];
+      let itemsTotal = 0;
+
       for (const item of items) {
+        const product = productMap.get(item.product_id);
+        if (!product) throw new Error(`Product not found: ${item.product_id}`);
+        if (product.round_id !== data.round_id) {
+          throw new Error(`Product ${product.name} does not belong to this round`);
+        }
+        if (!product.is_active) {
+          throw new Error(`Product ${product.name} is no longer available`);
+        }
+
         const updated = await tx.$executeRaw`
           UPDATE products
           SET stock = CASE WHEN stock IS NOT NULL THEN stock - ${item.quantity} ELSE stock END
           WHERE id = ${item.product_id}::uuid AND (stock IS NULL OR stock >= ${item.quantity})
         `;
         if (updated === 0) {
-          throw new Error(`Insufficient stock for ${item.product_name}`);
+          throw new Error(`Insufficient stock for ${product.name}`);
         }
+
+        const subtotal = product.price * item.quantity;
+        itemsTotal += subtotal;
+        resolvedItems.push({
+          product_id: product.id,
+          product_name: product.name,
+          unit_price: product.price,
+          quantity: item.quantity,
+          subtotal,
+        });
       }
 
       // 4. Calculate shipping fee (宅配 = empty pickup_location)
@@ -58,7 +86,6 @@ export async function createWithItems(
         isDelivery && round.shipping_fee ? round.shipping_fee : null;
 
       // 5. Calculate total
-      const itemsTotal = items.reduce((sum, i) => sum + i.subtotal, 0);
       const totalAmount = itemsTotal + (shippingFee ?? 0);
 
       // 6. Create order + items
@@ -72,13 +99,7 @@ export async function createWithItems(
           note: data.note || null,
           submission_key: submissionKey,
           order_items: {
-            create: items.map((i) => ({
-              product_id: i.product_id,
-              product_name: i.product_name,
-              unit_price: i.unit_price,
-              quantity: i.quantity,
-              subtotal: i.subtotal,
-            })),
+            create: resolvedItems,
           },
         },
         include: { order_items: true },

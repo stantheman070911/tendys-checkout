@@ -2,6 +2,7 @@ import { validateOrderNumber } from "./validate-order-code";
 import { sendLineMessage } from "./push";
 import { prisma } from "../db/prisma";
 import { STATUS_LABELS } from "@/constants";
+import type { OrderStatus } from "@/types";
 
 // ─── Response strings ────────────────────────────────────────
 
@@ -9,7 +10,7 @@ const MSG_LINKED_SUCCESS = (orderNumber: string) =>
   `收到！訂單 ${orderNumber} 已綁定成功 ✅\n出貨時我們會在這裡通知你！`;
 
 const MSG_ALREADY_LINKED = (orderNumber: string, status: string) =>
-  `你的訂單 ${orderNumber} 已經綁定了！\n目前狀態：${STATUS_LABELS[status] ?? status}`;
+  `你的訂單 ${orderNumber} 已經綁定了！\n目前狀態：${STATUS_LABELS[status as OrderStatus] ?? status}`;
 
 const MSG_ORDER_NOT_FOUND =
   "找不到這筆訂單，請確認你貼的是完整的訂單編號（例如：ORD-20260318-001）。";

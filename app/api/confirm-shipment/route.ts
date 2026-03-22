@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
             order.order_items
           );
           return {
+            success: true,
             orderId: order.id,
             orderNumber: order.order_number,
             notifications,

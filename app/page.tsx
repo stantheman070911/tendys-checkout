@@ -2,11 +2,20 @@ export const dynamic = "force-dynamic";
 
 import { getOpenRound } from "@/lib/db/rounds";
 import { listActiveByRound } from "@/lib/db/products";
+import { prisma } from "@/lib/db/prisma";
 import { StorefrontClient } from "@/components/StorefrontClient";
 import type { Round, ProductWithProgress } from "@/types";
 
-export default async function Home() {
-  const round = await getOpenRound();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ round?: string }>;
+}) {
+  const { round: roundId } = await searchParams;
+
+  const round = roundId
+    ? await prisma.round.findUnique({ where: { id: roundId } })
+    : await getOpenRound();
 
   if (!round) {
     return (

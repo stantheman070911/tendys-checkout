@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
     // Verify signature
     const signature = request.headers.get("x-line-signature") ?? "";
     if (!verifyLineSignature(rawBody, signature)) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      console.warn("Invalid LINE webhook signature");
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
     const body = JSON.parse(rawBody) as { events?: LineEvent[] };

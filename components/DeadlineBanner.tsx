@@ -46,15 +46,24 @@ export function DeadlineBanner({ deadline, isOpen, roundName }: DeadlineBannerPr
     minute: "2-digit",
   });
 
+  const isUrgent = hrs < 1;
+  const bannerColor = isUrgent
+    ? "bg-red-50 border-red-200 text-red-800"
+    : "bg-amber-50 border-amber-200 text-amber-800";
+
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-sm text-amber-800 text-center">
+    <div className={`${bannerColor} border rounded-xl p-2.5 text-sm text-center`}>
       {roundName && <span className="font-medium">{roundName}</span>}
       {roundName && "\u3000"}截止 {dateStr} {timeStr}
-      {hrs < 48 && (
+      {isUrgent ? (
         <span className="ml-2 text-red-600 font-bold">
+          剩 {mins} 分鐘
+        </span>
+      ) : hrs < 48 ? (
+        <span className="ml-2 text-orange-600 font-bold">
           剩 {hrs}h {mins}m
         </span>
-      )}
+      ) : null}
     </div>
   );
 }

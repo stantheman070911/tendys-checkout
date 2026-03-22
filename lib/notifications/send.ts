@@ -18,6 +18,7 @@ interface OrderForNotify {
   order_number: string;
   total_amount: number;
   shipping_fee?: number | null;
+  round_id?: string | null;
   line_user_id?: string | null;
   user?: { email?: string | null } | null;
 }
@@ -42,31 +43,36 @@ export async function sendPaymentConfirmedNotifications(
   // LINE — push to the specific user (skip if no line_user_id)
   const lineMsg = `\n訂單 ${order.order_number} 付款已確認\n${formatOrderItems(items)}\n金額: ${formatCurrency(order.total_amount)}`;
   let lineResult: NotifyResult;
+  let status: "success" | "skipped" | "failed" = "failed";
   if (order.line_user_id) {
     lineResult = await sendLinePush(order.line_user_id, lineMsg);
+    status = lineResult.success ? "success" : "failed";
   } else {
-    lineResult = { success: false, error: "No LINE user linked to this order" };
+    lineResult = { success: false, error: "No LINE user linked" };
+    status = "skipped";
   }
-  await logNotification(
-    order.id,
-    "line",
-    "payment_confirmed",
-    lineResult.success ? "success" : "failed",
-    lineResult.error
-  );
+  await logNotification({
+    orderId: order.id,
+    roundId: order.round_id,
+    channel: "line",
+    type: "payment_confirmed",
+    status,
+    errorMessage: status === "skipped" ? null : lineResult.error,
+  });
 
   // Email
   let emailResult: NotifyResult | null = null;
   const email = order.user?.email;
   if (email) {
     emailResult = await sendOrderConfirmationEmail(email, order, items);
-    await logNotification(
-      order.id,
-      "email",
-      "payment_confirmed",
-      emailResult.success ? "success" : "failed",
-      emailResult.error
-    );
+    await logNotification({
+      orderId: order.id,
+      roundId: order.round_id,
+      channel: "email",
+      type: "payment_confirmed",
+      status: emailResult.success ? "success" : "failed",
+      errorMessage: emailResult.error,
+    });
   }
 
   return { line: lineResult, email: emailResult };
@@ -81,31 +87,36 @@ export async function sendShipmentNotifications(
   // LINE — push to the specific user
   const lineMsg = `\n訂單 ${order.order_number} 已出貨\n${formatOrderItems(items)}`;
   let lineResult: NotifyResult;
+  let status: "success" | "skipped" | "failed" = "failed";
   if (order.line_user_id) {
     lineResult = await sendLinePush(order.line_user_id, lineMsg);
+    status = lineResult.success ? "success" : "failed";
   } else {
-    lineResult = { success: false, error: "No LINE user linked to this order" };
+    lineResult = { success: false, error: "No LINE user linked" };
+    status = "skipped";
   }
-  await logNotification(
-    order.id,
-    "line",
-    "shipment",
-    lineResult.success ? "success" : "failed",
-    lineResult.error
-  );
+  await logNotification({
+    orderId: order.id,
+    roundId: order.round_id,
+    channel: "line",
+    type: "shipment",
+    status,
+    errorMessage: status === "skipped" ? null : lineResult.error,
+  });
 
   // Email
   let emailResult: NotifyResult | null = null;
   const email = order.user?.email;
   if (email) {
     emailResult = await sendShipmentEmail(email, order, items);
-    await logNotification(
-      order.id,
-      "email",
-      "shipment",
-      emailResult.success ? "success" : "failed",
-      emailResult.error
-    );
+    await logNotification({
+      orderId: order.id,
+      roundId: order.round_id,
+      channel: "email",
+      type: "shipment",
+      status: emailResult.success ? "success" : "failed",
+      errorMessage: emailResult.error,
+    });
   }
 
   return { line: lineResult, email: emailResult };
@@ -122,18 +133,22 @@ export async function sendOrderCancelledNotifications(
   const reasonText = cancelReason ? `\n原因: ${cancelReason}` : "";
   const lineMsg = `\n訂單 ${order.order_number} 已取消${reasonText}\n${formatOrderItems(items)}`;
   let lineResult: NotifyResult;
+  let status: "success" | "skipped" | "failed" = "failed";
   if (order.line_user_id) {
     lineResult = await sendLinePush(order.line_user_id, lineMsg);
+    status = lineResult.success ? "success" : "failed";
   } else {
-    lineResult = { success: false, error: "No LINE user linked to this order" };
+    lineResult = { success: false, error: "No LINE user linked" };
+    status = "skipped";
   }
-  await logNotification(
-    order.id,
-    "line",
-    "order_cancelled",
-    lineResult.success ? "success" : "failed",
-    lineResult.error
-  );
+  await logNotification({
+    orderId: order.id,
+    roundId: order.round_id,
+    channel: "line",
+    type: "order_cancelled",
+    status,
+    errorMessage: status === "skipped" ? null : lineResult.error,
+  });
 
   // Email
   let emailResult: NotifyResult | null = null;
@@ -145,13 +160,14 @@ export async function sendOrderCancelledNotifications(
       items,
       cancelReason
     );
-    await logNotification(
-      order.id,
-      "email",
-      "order_cancelled",
-      emailResult.success ? "success" : "failed",
-      emailResult.error
-    );
+    await logNotification({
+      orderId: order.id,
+      roundId: order.round_id,
+      channel: "email",
+      type: "order_cancelled",
+      status: emailResult.success ? "success" : "failed",
+      errorMessage: emailResult.error,
+    });
   }
 
   return { line: lineResult, email: emailResult };
@@ -160,7 +176,9 @@ export async function sendOrderCancelledNotifications(
 // ─── Product Arrival ─────────────────────────────────────────
 
 export async function sendProductArrivalNotifications(
+  productId: string,
   productName: string,
+  roundId: string,
   customers: CustomerForArrival[]
 ): Promise<{
   line: NotifyResult;
@@ -173,18 +191,22 @@ export async function sendProductArrivalNotifications(
     .filter((id): id is string => !!id);
 
   let lineResult: NotifyResult;
+  let lineStatus: "success" | "skipped" | "failed" = "failed";
   if (lineUserIds.length > 0) {
     lineResult = await sendLineMulticast(lineUserIds, lineMsg);
+    lineStatus = lineResult.success ? "success" : "failed";
   } else {
     lineResult = { success: false, error: "No customers have linked LINE accounts" };
+    lineStatus = "skipped";
   }
-  await logNotification(
-    null,
-    "line",
-    "product_arrival",
-    lineResult.success ? "success" : "failed",
-    lineResult.error
-  );
+  await logNotification({
+    roundId,
+    productId,
+    channel: "line",
+    type: "product_arrival",
+    status: lineStatus,
+    errorMessage: lineStatus === "skipped" ? null : lineResult.error,
+  });
 
   // Per-customer email — send concurrently, never stop on single failure
   const customersWithEmail = customers.filter(
@@ -193,13 +215,14 @@ export async function sendProductArrivalNotifications(
   const settled = await Promise.allSettled(
     customersWithEmail.map(async (customer) => {
       const result = await sendProductArrivalEmail(customer.email, productName);
-      await logNotification(
-        null,
-        "email",
-        "product_arrival",
-        result.success ? "success" : "failed",
-        result.error
-      );
+      await logNotification({
+        roundId,
+        productId,
+        channel: "email",
+        type: "product_arrival",
+        status: result.success ? "success" : "failed",
+        errorMessage: result.error,
+      });
       return { email: customer.email, result };
     })
   );

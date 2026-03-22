@@ -38,10 +38,11 @@ export async function POST(request: NextRequest) {
     if (
       !payment_last5 ||
       typeof payment_last5 !== "string" ||
-      payment_last5.trim().length !== 5
+      payment_last5.trim().length !== 5 ||
+      !/^\d{5}$/.test(payment_last5.trim())
     ) {
       return NextResponse.json(
-        { error: "payment_last5 must be exactly 5 characters" },
+        { error: "payment_last5 must be exactly 5 digits" },
         { status: 400 }
       );
     }

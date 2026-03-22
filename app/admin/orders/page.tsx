@@ -104,6 +104,15 @@ export default function OrdersPage() {
   };
 
   const toggleSelect = (id: string) => {
+    const order = orders.find((o) => o.id === id);
+    if (!order || order.status !== "pending_confirm") {
+      toast({
+        title: "限制操作",
+        description: "只能批次確認「待確認」狀態的訂單",
+        variant: "destructive",
+      });
+      return;
+    }
     setBatchSel((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -144,10 +153,29 @@ export default function OrdersPage() {
       const { getSupabaseBrowser } = await import("@/lib/auth/supabase-browser");
       const supabase = getSupabaseBrowser();
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token ?? "";
-      window.open(`/api/export-csv?roundId=${round.id}&token=${encodeURIComponent(token)}`, "_blank");
+      const token = session?.access_token;
+      
+      if (!token) throw new Error("No token");
+
+      const res = await fetch(`/api/export-csv?roundId=${round.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (!res.ok) throw new Error("Export failed");
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orders_${round.id}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch {
-      window.open(`/api/export-csv?roundId=${round.id}`, "_blank");
+      toast({ title: "匯出失敗", variant: "destructive" });
     }
   };
 

@@ -5,6 +5,16 @@ import { PICKUP_OPTIONS } from "@/constants";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PHONE_RE = /^[\d\-+().\s]{7,20}$/;
+
+const MAX_LEN = {
+  nickname: 50,
+  recipient_name: 100,
+  phone: 20,
+  address: 200,
+  email: 254,
+  note: 500,
+} as const;
 
 const validPickupValues = new Set(PICKUP_OPTIONS.map((o) => o.value));
 
@@ -68,6 +78,12 @@ export async function POST(request: NextRequest) {
     if (!trimmedNickname) {
       return NextResponse.json({ error: "nickname is required" }, { status: 400 });
     }
+    if (trimmedNickname.length > MAX_LEN.nickname) {
+      return NextResponse.json(
+        { error: `nickname must be ≤ ${MAX_LEN.nickname} chars` },
+        { status: 400 }
+      );
+    }
 
     const trimmedRecipientName =
       typeof recipient_name === "string" ? recipient_name.trim() : "";
@@ -77,10 +93,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (trimmedRecipientName.length > MAX_LEN.recipient_name) {
+      return NextResponse.json(
+        { error: `recipient_name must be ≤ ${MAX_LEN.recipient_name} chars` },
+        { status: 400 }
+      );
+    }
 
     const trimmedPhone = typeof phone === "string" ? phone.trim() : "";
     if (!trimmedPhone) {
       return NextResponse.json({ error: "phone is required" }, { status: 400 });
+    }
+    if (!PHONE_RE.test(trimmedPhone)) {
+      return NextResponse.json(
+        { error: "phone format is invalid" },
+        { status: 400 }
+      );
     }
 
     // pickup_location: empty string = 宅配, or a named option
@@ -100,7 +128,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate each item
+    // Validate each item and check for duplicates
+    const seenProducts = new Set<string>();
     for (const item of items) {
       if (
         !item.product_id ||
@@ -112,26 +141,14 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (
-        !item.product_name ||
-        typeof item.product_name !== "string" ||
-        !item.product_name.trim()
-      ) {
+      if (seenProducts.has(item.product_id)) {
         return NextResponse.json(
-          { error: "Each item must have a product_name" },
+          { error: "Duplicate products in order items" },
           { status: 400 }
         );
       }
-      if (
-        typeof item.unit_price !== "number" ||
-        !Number.isInteger(item.unit_price) ||
-        item.unit_price <= 0
-      ) {
-        return NextResponse.json(
-          { error: "Each item must have a positive integer unit_price" },
-          { status: 400 }
-        );
-      }
+      seenProducts.add(item.product_id);
+
       if (
         typeof item.quantity !== "number" ||
         !Number.isInteger(item.quantity) ||
@@ -142,16 +159,41 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (
-        typeof item.subtotal !== "number" ||
-        !Number.isInteger(item.subtotal) ||
-        item.subtotal <= 0
-      ) {
-        return NextResponse.json(
-          { error: "Each item must have a positive integer subtotal" },
-          { status: 400 }
-        );
-      }
+    }
+
+    // ─── Optional/conditional field checks ────────────────────
+
+    const isDelivery = pickupValue === "";
+    const trimmedAddress = typeof address === "string" ? address.trim() : undefined;
+    
+    if (isDelivery && !trimmedAddress) {
+      return NextResponse.json(
+        { error: "address is required for delivery" },
+        { status: 400 }
+      );
+    }
+    
+    if (trimmedAddress && trimmedAddress.length > MAX_LEN.address) {
+      return NextResponse.json(
+        { error: `address must be ≤ ${MAX_LEN.address} chars` },
+        { status: 400 }
+      );
+    }
+
+    const trimmedEmail = typeof email === "string" ? email.trim() : undefined;
+    if (trimmedEmail && trimmedEmail.length > MAX_LEN.email) {
+      return NextResponse.json(
+        { error: `email must be ≤ ${MAX_LEN.email} chars` },
+        { status: 400 }
+      );
+    }
+
+    const trimmedNote = typeof note === "string" ? note.trim() || undefined : undefined;
+    if (trimmedNote && trimmedNote.length > MAX_LEN.note) {
+      return NextResponse.json(
+        { error: `note must be ≤ ${MAX_LEN.note} chars` },
+        { status: 400 }
+      );
     }
 
     // ─── Upsert user ────────────────────────────────────────
@@ -159,18 +201,15 @@ export async function POST(request: NextRequest) {
     const user = await upsertByNickname(trimmedNickname, {
       recipient_name: trimmedRecipientName,
       phone: trimmedPhone,
-      address: typeof address === "string" ? address.trim() : undefined,
-      email: typeof email === "string" ? email.trim() : undefined,
+      address: trimmedAddress,
+      email: trimmedEmail,
     });
 
     // ─── Create order ───────────────────────────────────────
 
     const orderItems = items.map((item) => ({
       product_id: item.product_id!.trim(),
-      product_name: item.product_name!.trim(),
-      unit_price: item.unit_price!,
       quantity: item.quantity!,
-      subtotal: item.subtotal!,
     }));
 
     const result = await createWithItems(
@@ -178,7 +217,7 @@ export async function POST(request: NextRequest) {
         round_id: round_id.trim(),
         user_id: user.id,
         pickup_location: pickupValue,
-        note: typeof note === "string" ? note.trim() || undefined : undefined,
+        note: trimmedNote,
       },
       orderItems,
       submission_key

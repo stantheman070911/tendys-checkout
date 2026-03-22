@@ -110,7 +110,15 @@ export function ProductAggregationTable({
 
   return (
     <div className="bg-white rounded-xl border p-4">
-      <div className="font-medium text-sm mb-3 text-gray-700">商品需求彙總</div>
+      <div className="flex justify-between items-center mb-3">
+        <div className="font-medium text-sm text-gray-700">商品需求彙總</div>
+        <button
+          onClick={() => window.print()}
+          className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 print:hidden flex items-center gap-1.5 font-medium transition-colors"
+        >
+          🖨️ 列印總表
+        </button>
+      </div>
       {rows.map((row) => {
         const isExpanded = expandedProd === row.productId;
         const isSent = arrivalSent.has(row.productId);

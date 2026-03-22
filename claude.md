@@ -137,7 +137,7 @@ Product        → id, round_id(FK), supplier_id(FK), name, price, unit, is_acti
 User           → id, nickname(UNIQUE), recipient_name, phone, address, email, created_at, updated_at
 Order          → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), line_user_id, created_at
 OrderItem      → id, order_id(FK), product_id(FK), product_name, unit_price, quantity, subtotal
-NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('payment_confirmed'|'shipment'|'product_arrival'|'order_cancelled'), status('success'|'failed'), error_message, created_at
+NotificationLog → id, order_id(FK|null), round_id(FK|null), product_id(FK|null), channel('line'|'email'), type('payment_confirmed'|'shipment'|'product_arrival'|'order_cancelled'), status('success'|'failed'|'skipped'), error_message, created_at
 ```
 
 ### Key Additions from v1
@@ -149,7 +149,7 @@ NotificationLog → id, order_id(FK|null), channel('line'|'email'), type('paymen
 - **`orders.cancel_reason`**: Text, nullable. Written when admin cancels an order (optional reason).
 - **`notification_logs.type`**: Four values: `payment_confirmed`, `shipment`, `product_arrival`, `order_cancelled`.
 - **`orders.line_user_id`**: Text, nullable. Set when user pastes order number into LINE OA via webhook. Used for 1-on-1 push notifications. Per-order (not per-user) — each order must be linked individually.
-- **`notification_logs.order_id`**: Now nullable — product arrival notifications aren't tied to a single order.
+- **`notification_logs` Context**: The `order_id` is nullable. Added `round_id` and `product_id` for accurate notification analytics, and a `skipped` status for tracking gracefully skipped notifications (e.g., missing `line_user_id`).
 
 ### Order Status Flow
 

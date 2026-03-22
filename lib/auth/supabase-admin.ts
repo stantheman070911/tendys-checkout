@@ -34,7 +34,15 @@ export async function verifyAdminSession(request: Request): Promise<boolean> {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.auth.getUser(token);
 
-    return !error && !!data.user;
+    if (error || !data.user || !data.user.email) return false;
+
+    const allowedEmailsStr = process.env.ADMIN_EMAILS || "";
+    const allowedEmails = allowedEmailsStr
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    return allowedEmails.includes(data.user.email.toLowerCase());
   } catch {
     return false;
   }

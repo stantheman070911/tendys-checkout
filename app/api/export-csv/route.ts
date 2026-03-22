@@ -2,23 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession, getSupabaseAdmin } from "@/lib/auth/supabase-admin";
 import { listByRound } from "@/lib/db/orders";
 import { STATUS_LABELS } from "@/constants";
+import type { OrderStatus } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
-    // Support both header auth and token query param (for window.open downloads)
-    const tokenParam = request.nextUrl.searchParams.get("token");
-    let isAdmin = false;
-    if (tokenParam) {
-      try {
-        const supabase = getSupabaseAdmin();
-        const { data, error } = await supabase.auth.getUser(tokenParam);
-        isAdmin = !error && !!data.user;
-      } catch {
-        isAdmin = false;
-      }
-    } else {
-      isAdmin = await verifyAdminSession(request);
-    }
+    const isAdmin = await verifyAdminSession(request);
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -73,7 +61,7 @@ export async function GET(request: NextRequest) {
         String(itemsSubtotal),
         order.shipping_fee != null ? String(order.shipping_fee) : "",
         String(order.total_amount),
-        STATUS_LABELS[order.status] ?? order.status,
+        STATUS_LABELS[order.status as OrderStatus] ?? order.status,
         order.payment_amount != null ? String(order.payment_amount) : "",
         order.payment_last5 ?? "",
         order.payment_reported_at

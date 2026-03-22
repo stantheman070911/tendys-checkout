@@ -312,6 +312,8 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                   <label className="block text-xs text-gray-500 mb-1">電話 *</label>
                   <Input
                     type="tel"
+                    inputMode="tel"
+                    maxLength={20}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="0912-345-678"

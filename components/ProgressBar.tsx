@@ -14,7 +14,7 @@ export function ProgressBar({ currentQty, goalQty, unit = "份" }: ProgressBarPr
     <div className="mt-1.5">
       <div className="flex justify-between text-xs mb-0.5">
         <span className={reached ? "text-green-600 font-medium" : "text-orange-500"}>
-          {reached ? "達標" : `目標 ${goalQty}${unit}`}
+          {reached ? "🎉 達標" : `目標 ${goalQty}${unit}`}
         </span>
         <span className="text-gray-400">
           {currentQty}/{goalQty} ({pct}%)

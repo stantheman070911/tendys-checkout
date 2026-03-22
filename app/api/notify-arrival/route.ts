@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await sendProductArrivalNotifications(
+      product.id,
       product.name,
+      roundId.trim(),
       customers
     );
 

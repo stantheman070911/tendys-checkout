@@ -1,3 +1,5 @@
+import type { OrderStatus } from "@/types";
+
 export const ORDER_STATUS = {
   PENDING_PAYMENT: "pending_payment",
   PENDING_CONFIRM: "pending_confirm",
@@ -6,7 +8,7 @@ export const ORDER_STATUS = {
   CANCELLED: "cancelled",
 } as const;
 
-export const STATUS_LABELS: Record<string, string> = {
+export const STATUS_LABELS: Record<OrderStatus, string> = {
   pending_payment: "待付款",
   pending_confirm: "待確認",
   confirmed: "已確認",
@@ -14,7 +16,7 @@ export const STATUS_LABELS: Record<string, string> = {
   cancelled: "已取消",
 };
 
-export const STATUS_COLORS: Record<string, string> = {
+export const STATUS_COLORS: Record<OrderStatus, string> = {
   pending_payment: "bg-yellow-100 text-yellow-800",
   pending_confirm: "bg-blue-100 text-blue-800",
   confirmed: "bg-green-100 text-green-800",

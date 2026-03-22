@@ -1,6 +1,7 @@
 import { Resend } from "resend";
+import type { NotifyResult } from "@/lib/line/push";
 
-export type NotifyResult = { success: boolean; error?: string };
+export type { NotifyResult };
 
 let resendClient: Resend | null = null;
 

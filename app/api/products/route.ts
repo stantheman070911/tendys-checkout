@@ -180,11 +180,31 @@ export async function PUT(request: NextRequest) {
       data.unit = v;
     }
     if (typeof fields.round_id === "string") data.round_id = fields.round_id.trim();
-    if (fields.supplier_id !== undefined) data.supplier_id = fields.supplier_id;
+    if (fields.supplier_id !== undefined) {
+      if (fields.supplier_id !== null && (typeof fields.supplier_id !== "string" || !fields.supplier_id.trim())) {
+        return NextResponse.json({ error: "supplier_id must be a non-empty string or null" }, { status: 400 });
+      }
+      data.supplier_id = fields.supplier_id ? fields.supplier_id.trim() : null;
+    }
     if (typeof fields.is_active === "boolean") data.is_active = fields.is_active;
-    if (fields.stock !== undefined) data.stock = fields.stock;
-    if (fields.goal_qty !== undefined) data.goal_qty = fields.goal_qty;
-    if (fields.image_url !== undefined) data.image_url = fields.image_url;
+    if (fields.stock !== undefined) {
+      if (fields.stock !== null && (typeof fields.stock !== "number" || !Number.isInteger(fields.stock) || fields.stock < 0)) {
+        return NextResponse.json({ error: "stock must be a non-negative integer or null" }, { status: 400 });
+      }
+      data.stock = fields.stock;
+    }
+    if (fields.goal_qty !== undefined) {
+      if (fields.goal_qty !== null && (typeof fields.goal_qty !== "number" || !Number.isInteger(fields.goal_qty) || fields.goal_qty <= 0)) {
+        return NextResponse.json({ error: "goal_qty must be a positive integer or null" }, { status: 400 });
+      }
+      data.goal_qty = fields.goal_qty;
+    }
+    if (fields.image_url !== undefined) {
+      if (fields.image_url !== null && (typeof fields.image_url !== "string" || !fields.image_url.trim())) {
+        return NextResponse.json({ error: "image_url must be a non-empty string or null" }, { status: 400 });
+      }
+      data.image_url = fields.image_url ? fields.image_url.trim() : null;
+    }
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
