@@ -370,6 +370,22 @@ Post-remediation review caught three regressions and one spec drift from the fir
 - `npm run build` — pass (30 routes, 0 errors)
 - `npx vitest run` — 23 tests pass (7 test files)
 
+## Audit Closeout — Pass 3 (2026-03-23)
+
+Post-remediation re-audit found one remaining concurrency gap and stale doc counts. Fixed in this pass.
+
+### What Was Fixed
+
+- **P1 — POST /api/rounds concurrent conflict as 500**: `create()` did not catch `P2002` from the partial unique index. Concurrent `POST /api/rounds` requests fell through to the generic catch → 500. Fixed: `create()` now wraps the transaction in `try/catch`, catches `P2002`, and returns `{ error }` (same pattern as `update()`). Route maps `{ error }` to `400`.
+- **Doc drift**: `phase-6-readiness-audit.md` had stale test counts (4/6 instead of 7 for rounds tests, 23 instead of 24 total). Corrected.
+
+### Verification
+
+- `npx tsc --noEmit` — pass
+- `npm run lint` — pass
+- `npm run build` — pass (30 routes, 0 errors)
+- `npx vitest run` — 24 tests pass (7 test files)
+
 ---
 
 ## Verification (run before presenting work)
