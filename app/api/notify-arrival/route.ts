@@ -35,24 +35,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const customers = await getCustomersForArrivalNotification(
+    const recipients = await getCustomersForArrivalNotification(
       productId.trim(),
       roundId.trim()
     );
 
-    if (customers.length === 0) {
-      return NextResponse.json({ customersNotified: 0 });
+    if (recipients.customerCount === 0) {
+      return NextResponse.json({
+        customersNotified: 0,
+        line: { success: true },
+        emailResults: [],
+      });
     }
 
     const result = await sendProductArrivalNotifications(
       product.id,
       product.name,
       roundId.trim(),
-      customers
+      recipients
     );
 
     return NextResponse.json({
-      customersNotified: customers.length,
+      customersNotified: recipients.customerCount,
       line: result.line,
       emailResults: result.emailResults,
     });

@@ -29,9 +29,9 @@ interface ItemForNotify {
   subtotal: number;
 }
 
-interface CustomerForArrival {
-  email?: string | null;
-  line_user_id?: string | null;
+interface ArrivalRecipients {
+  lineUserIds: string[];
+  emails: string[];
 }
 
 // ─── Payment Confirmed ──────────────────────────────────────
@@ -179,21 +179,18 @@ export async function sendProductArrivalNotifications(
   productId: string,
   productName: string,
   roundId: string,
-  customers: CustomerForArrival[]
+  recipients: ArrivalRecipients
 ): Promise<{
   line: NotifyResult;
   emailResults: Array<{ email: string; result: NotifyResult }>;
 }> {
-  // LINE — multicast to all customers with linked LINE accounts
+  // LINE — multicast to all unique linked LINE accounts
   const lineMsg = `\n【${productName}】已到達理貨中心，我們會盡快安排出貨！`;
-  const lineUserIds = customers
-    .map((c) => c.line_user_id)
-    .filter((id): id is string => !!id);
 
   let lineResult: NotifyResult;
   let lineStatus: "success" | "skipped" | "failed" = "failed";
-  if (lineUserIds.length > 0) {
-    lineResult = await sendLineMulticast(lineUserIds, lineMsg);
+  if (recipients.lineUserIds.length > 0) {
+    lineResult = await sendLineMulticast(recipients.lineUserIds, lineMsg);
     lineStatus = lineResult.success ? "success" : "failed";
   } else {
     lineResult = { success: false, error: "No customers have linked LINE accounts" };
@@ -208,13 +205,10 @@ export async function sendProductArrivalNotifications(
     errorMessage: lineStatus === "skipped" ? null : lineResult.error,
   });
 
-  // Per-customer email — send concurrently, never stop on single failure
-  const customersWithEmail = customers.filter(
-    (c): c is CustomerForArrival & { email: string } => !!c.email
-  );
+  // Per-email — send concurrently, never stop on single failure
   const settled = await Promise.allSettled(
-    customersWithEmail.map(async (customer) => {
-      const result = await sendProductArrivalEmail(customer.email, productName);
+    recipients.emails.map(async (email) => {
+      const result = await sendProductArrivalEmail(email, productName);
       await logNotification({
         roundId,
         productId,
@@ -223,7 +217,7 @@ export async function sendProductArrivalNotifications(
         status: result.success ? "success" : "failed",
         errorMessage: result.error,
       });
-      return { email: customer.email, result };
+      return { email, result };
     })
   );
   const emailResults: Array<{ email: string; result: NotifyResult }> = [];

@@ -15,6 +15,14 @@ interface CreateOrderItem {
   quantity: number;
 }
 
+// Thrown inside $transaction to trigger rollback while carrying a user-facing message
+class OrderValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OrderValidationError";
+  }
+}
+
 export async function createWithItems(
   data: CreateOrderData,
   items: CreateOrderItem[],
@@ -34,10 +42,10 @@ export async function createWithItems(
         where: { id: data.round_id },
       });
       if (!round || !round.is_open) {
-        return { error: "Round is not open" };
+        throw new OrderValidationError("Round is not open");
       }
       if (round.deadline && new Date() > new Date(round.deadline)) {
-        return { error: "This round has closed" };
+        throw new OrderValidationError("This round has closed");
       }
 
       // 2.5 Load canonical products for authoritative pricing/validation
@@ -46,19 +54,26 @@ export async function createWithItems(
       });
       const productMap = new Map(canonicalProducts.map((p) => [p.id, p]));
 
-      // 3. Process items: validate, atomic stock, compute DB-driven subtotal
+      // 3a. Validate ALL products before any stock mutation
+      for (const item of items) {
+        const product = productMap.get(item.product_id);
+        if (!product) {
+          throw new OrderValidationError(`Product not found: ${item.product_id}`);
+        }
+        if (product.round_id !== data.round_id) {
+          throw new OrderValidationError(`Product ${product.name} does not belong to this round`);
+        }
+        if (!product.is_active) {
+          throw new OrderValidationError(`Product ${product.name} is no longer available`);
+        }
+      }
+
+      // 3b. Atomic stock decrements + resolve line items
       const resolvedItems = [];
       let itemsTotal = 0;
 
       for (const item of items) {
-        const product = productMap.get(item.product_id);
-        if (!product) throw new Error(`Product not found: ${item.product_id}`);
-        if (product.round_id !== data.round_id) {
-          throw new Error(`Product ${product.name} does not belong to this round`);
-        }
-        if (!product.is_active) {
-          throw new Error(`Product ${product.name} is no longer available`);
-        }
+        const product = productMap.get(item.product_id)!;
 
         const updated = await tx.$executeRaw`
           UPDATE products
@@ -66,7 +81,7 @@ export async function createWithItems(
           WHERE id = ${item.product_id}::uuid AND (stock IS NULL OR stock >= ${item.quantity})
         `;
         if (updated === 0) {
-          throw new Error(`Insufficient stock for ${product.name}`);
+          throw new OrderValidationError(`Insufficient stock for ${product.name}`);
         }
 
         const subtotal = product.price * item.quantity;
@@ -108,6 +123,10 @@ export async function createWithItems(
       return { order, deduplicated: false };
     });
   } catch (err) {
+    // Validation errors → { error } return (transaction already rolled back)
+    if (err instanceof OrderValidationError) {
+      return { error: err.message };
+    }
     // Safety net: submission_key unique violation (concurrent request)
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -115,10 +134,6 @@ export async function createWithItems(
     ) {
       const existing = await findBySubmissionKey(submissionKey);
       if (existing) return { order: existing, deduplicated: true };
-    }
-    // Stock error — return as error message
-    if (err instanceof Error && err.message.startsWith("Insufficient stock")) {
-      return { error: err.message };
     }
     throw err;
   }
@@ -194,7 +209,11 @@ export async function getOrdersByProduct(productId: string, roundId: string) {
 export async function getCustomersForArrivalNotification(
   productId: string,
   roundId: string
-): Promise<Array<{ email: string | null; line_user_id: string | null }>> {
+): Promise<{
+  customerCount: number;
+  lineUserIds: string[];
+  emails: string[];
+}> {
   const items = await prisma.orderItem.findMany({
     where: {
       product_id: productId,
@@ -205,18 +224,28 @@ export async function getCustomersForArrivalNotification(
     },
   });
 
-  const seen = new Set<string>();
-  const customers: Array<{ email: string | null; line_user_id: string | null }> = [];
+  // Dedupe delivery endpoints by value (per-order LINE linking means different
+  // orders from the same user may have different link states)
+  const lineUserIdSet = new Set<string>();
+  const emailSet = new Set<string>();
+  // Count unique customers by user_id (fall back to order.id for guest orders)
+  const customerIdSet = new Set<string>();
+
   for (const item of items) {
-    const userId = item.order.user_id;
-    if (!userId || seen.has(userId)) continue;
-    seen.add(userId);
-    customers.push({
-      email: item.order.user?.email ?? null,
-      line_user_id: item.order.line_user_id ?? null,
-    });
+    customerIdSet.add(item.order.user_id ?? item.order.id);
+
+    const lineUserId = item.order.line_user_id;
+    if (lineUserId) lineUserIdSet.add(lineUserId);
+
+    const email = item.order.user?.email;
+    if (email) emailSet.add(email.toLowerCase());
   }
-  return customers;
+
+  return {
+    customerCount: customerIdSet.size,
+    lineUserIds: Array.from(lineUserIdSet),
+    emails: Array.from(emailSet),
+  };
 }
 
 // ─── Status Mutations ────────────────────────────────────────

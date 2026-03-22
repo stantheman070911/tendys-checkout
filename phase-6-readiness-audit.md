@@ -1,0 +1,166 @@
+# Phase 6 Readiness Audit
+
+Audit date: 2026-03-23
+
+## Verification Snapshot
+
+- `npx tsc --noEmit` — pass
+- `npm run lint` — pass
+- `npm run build` — pass (30 routes, 0 errors)
+- `npx vitest run` — 23 tests pass (7 test files)
+
+---
+
+## Phase Status (Post-Remediation)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 0: Scaffolding | **Complete** | Config, directories, shadcn/ui components |
+| 1: Database | **Complete** | 7 models, migration SQL, RLS, triggers, views |
+| 2: Library | **Complete** | Pure TS, never-throw notifications, atomic stock ops |
+| 3: API Routes | **Complete** | 19 routes, validation, auth, error responses |
+| 3.5: LINE Push | **Complete** | Push/multicast, webhook, order linking, timing-safe HMAC |
+| 4: User Pages | **Complete** | Storefront, order detail, lookup, mobile-responsive |
+| 5: Admin Core | **Complete** | Login, dashboard, orders, products, rounds |
+| 6: Shipments & Suppliers | **Stubs only** | Backend ready, UI not yet implemented |
+
+---
+
+## Issues Fixed In This Pass
+
+### 1. Single-open-round enforcement
+
+**Problem:** `POST /api/rounds` and `PUT /api/rounds` allowed multiple simultaneous open rounds, which would cause the storefront's `getOpenRound()` to return an arbitrary one.
+
+**Fix:** `create()` in `lib/db/rounds.ts` now auto-closes existing open rounds before creating a new one. `update()` rejects setting `is_open: true` if another round is already open (returns `{ error }` → 400 response). 4 focused tests added in `lib/db/rounds.test.ts`.
+
+**Follow-up fix (pass 2):** `create()` close + insert wrapped in `prisma.$transaction` to prevent leaving no open round on insert failure. Added `migration_004_single_open_round.sql` with a partial unique index (`WHERE is_open = true`) for DB-level enforcement. `update()` now catches unique-index violations from concurrent requests and returns `{ error }`. `whatwearebuilding.md` updated to reflect single-open-round model.
+
+### 2. `createWithItems` transaction safety
+
+**Problem (original):** Product-not-found, cross-round, and inactive-product errors threw from inside the Prisma transaction, bubbling to `submit-order` as generic 500s.
+
+**First fix:** Converted throws to `return { error }` pattern.
+
+**Regression (pass 2):** `return { error }` inside `$transaction` commits instead of rolling back. If stock was already decremented for earlier items and a later item fails, the committed transaction leaves stock reduced with no order created.
+
+**Final fix:** All validation errors now throw `OrderValidationError` inside the transaction (triggering rollback), caught outside and converted to `{ error }` return. Processing split into two phases: (1) validate all products against existence/round/active before any mutation, (2) atomic stock decrements. API contract unchanged.
+
+### 3. Arrival notification dedup + customer counting
+
+**Problem (original):** `getCustomersForArrivalNotification()` deduped by `user_id`, picking the first order's `line_user_id`. If a user had 2 orders and only linked LINE to the second, the null from the first order won — no LINE notification sent.
+
+**First fix:** Changed dedup strategy: collect all unique `line_user_id` values and emails separately.
+
+**Regression (pass 2):** `customersNotified` counted unique delivery endpoints (LINE IDs + emails union), not unique customers. One customer with both LINE and email counted as 2; shared inboxes collapsed multiple customers into 1.
+
+**Final fix:** `getCustomersForArrivalNotification()` now returns `customerCount` (unique `user_id`, falling back to `order.id` for guest orders) alongside `lineUserIds` and `emails`. `notify-arrival` route uses `customerCount` for `customersNotified`.
+
+### 4. `notify-arrival` inconsistent response shape
+
+**Problem:** Zero-customer case returned `{ customersNotified: 0 }` without `line` or `emailResults` fields. Admin consumers (ProductAggregationTable) expected both fields to exist.
+
+**Fix:** Zero-customer response now returns `{ customersNotified: 0, line: { success: true }, emailResults: [] }`.
+
+### 5. Product demand table missed zero-demand products
+
+**Problem:** Dashboard product aggregation table only showed products with existing orders. Products with zero orders were invisible — problematic for supplier-facing demand views.
+
+**Fix:** After aggregating from orderItems, the component now iterates over all products and inserts missing ones with `qty: 0, revenue: 0`.
+
+### 6. `prisma/seed.ts` singleton violation
+
+**Problem:** Seed file created its own `new PrismaClient()` instance, violating the documented singleton rule.
+
+**Fix:** Replaced with import from `lib/db/prisma`. Removed the `finally` disconnect block since the singleton manages its own lifecycle.
+
+---
+
+## Documentation Updates
+
+### CLAUDE.md directory listing
+
+Added ~15 missing file entries:
+- `app/admin/layout.tsx`, `app/admin/orders/[id]/print/page.tsx`
+- `components/admin/` (OrderCard, POSForm, ProductAggregationTable, ProductForm)
+- `hooks/` (use-toast, use-admin-session, use-admin-fetch)
+- `lib/auth/supabase-browser.ts`
+- `app/api/orders/route.ts`, `app/api/notification-logs/route.ts`
+
+### Roadmap checkpoint naming
+
+Renamed `Checkpoint 5b` → `Checkpoint 6` (line 552 of `roadmap.md`).
+
+---
+
+## Phase 6 Readiness Assessment
+
+### Backend: 100% Ready
+
+| API Route | Purpose | Status |
+|-----------|---------|--------|
+| `POST /api/confirm-shipment` | Single + batch shipment confirm | Exists, tested |
+| `GET/POST/PUT/DELETE /api/suppliers` | Supplier CRUD | Exists, tested |
+| `GET /api/orders-by-product` | Customer list per product | Exists, tested |
+| `POST /api/notify-arrival` | Product arrival notifications | Exists, fixed in this pass |
+
+### Types: 100% Ready
+
+Phase 6 type stubs in `types/index.ts`:
+- `ShipmentGroup` — grouped by pickup label
+- `ShipmentConfirmResult` — confirm result with notification status
+- `SupplierCardData` — supplier card display
+- `SupplierFormValues` — supplier form input
+
+### Helpers: 100% Ready
+
+- `lib/admin/order-search.ts` → `groupOrdersByPickup()`, `matchesOrderSearch()`
+- `lib/admin/paths.ts` → `buildAdminPath()`
+- `hooks/use-admin-fetch.ts` → authenticated fetch wrapper
+- `hooks/use-admin-session.ts` → session guard
+
+### Pattern References
+
+| Phase 6 Feature | Follow Pattern From |
+|-----------------|-------------------|
+| Shipments page data/filter/batch | `app/admin/orders/page.tsx` |
+| ShipmentCard component | `components/admin/OrderCard.tsx` (simplified) |
+| Suppliers page CRUD | `app/admin/products/page.tsx` |
+| SupplierForm dialog | `components/admin/ProductForm.tsx` |
+| Product → customer drill-down | `components/admin/ProductAggregationTable.tsx` |
+| 通知到貨 button | `components/admin/ProductAggregationTable.tsx` |
+
+### Blockers: None
+
+---
+
+## Remaining Recommendations
+
+| Priority | Item | Rationale |
+|----------|------|-----------|
+| High | Dependency vulnerability remediation (`npm audit`) | Deferred from prior passes |
+| Medium | LINE webhook ambiguity handling | Multiple order numbers → first-match-wins; should reject ambiguous input |
+| Medium | Integration test coverage | Unit tests exist but no route-to-notification integration tests |
+| Low | Historical notification attribution gap | Pre-migration_003 `product_arrival` logs lack `round_id`/`product_id` |
+| Low | Document capability URL pattern for `/api/cancel-order` | User cancel relies on UUID unpredictability, not auth |
+
+---
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `lib/db/orders.ts` | Issue 2: OrderValidationError + two-phase validation; Issue 3: arrival dedup + customerCount |
+| `lib/db/rounds.ts` | Issue 1: atomic $transaction for create(), DB conflict catch for update() |
+| `lib/notifications/send.ts` | Issue 3: new `ArrivalRecipients` type, rewritten arrival function |
+| `app/api/rounds/route.ts` | Issue 1: handle error return from `update()` |
+| `app/api/notify-arrival/route.ts` | Issue 3 & 4: customerCount-based reporting + consistent response |
+| `components/admin/ProductAggregationTable.tsx` | Issue 5: include zero-demand products |
+| `prisma/seed.ts` | Issue 6: use shared PrismaClient |
+| `prisma/migration.sql` | Added partial unique index `idx_rounds_single_open` |
+| `prisma/migration_004_single_open_round.sql` (new) | Incremental migration for single-open-round index |
+| `whatwearebuilding.md` | Replaced multi-open-round UX with single-open-round rule |
+| `CLAUDE.md` | Added ~15 missing directory entries |
+| `roadmap.md` | Renamed Checkpoint 5b → Checkpoint 6 |
+| `lib/db/rounds.test.ts` (new) | 4 tests for single-open-round |
+| `lib/db/arrival-dedup.test.ts` (new) | 4+ tests for arrival dedup + customerCount |

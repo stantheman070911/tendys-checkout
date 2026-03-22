@@ -69,8 +69,22 @@ export function ProductAggregationTable({
       });
     }
 
+    // Include zero-demand products so suppliers see the full product list
+    for (const product of products) {
+      if (!aggMap.has(product.id)) {
+        aggMap.set(product.id, {
+          productId: product.id,
+          name: product.name,
+          supplierName: product.supplier_name ?? null,
+          unit: product.unit,
+          qty: 0,
+          revenue: 0,
+        });
+      }
+    }
+
     return Array.from(aggMap.values());
-  }, [orderItems, productById]);
+  }, [orderItems, productById, products]);
 
   const loadCustomers = async (productId: string): Promise<OrderByProduct[]> => {
     const existingCustomers = customersByProduct[productId];

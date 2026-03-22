@@ -132,8 +132,11 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const round = await update(id.trim(), data as Parameters<typeof update>[1]);
-    return NextResponse.json({ round });
+    const result = await update(id.trim(), data as Parameters<typeof update>[1]);
+    if (result && typeof result === "object" && "error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json({ round: result });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

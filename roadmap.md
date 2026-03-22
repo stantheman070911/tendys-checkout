@@ -519,6 +519,14 @@ npm run build        # must pass
 - [x] **Test depth**: confirm → notify coverage is still unit-level; there is no integration-level regression test yet.
 - [x] **Dependency debt**: Existing `npm audit` issues are deferred to a separate dependency pass.
 
+### Post-Remediation Pass 2 (2026-03-23 Session 4)
+
+- [x] **P0 — Transaction rollback fix**: `createWithItems()` `return { error }` inside `$transaction` committed instead of rolling back — stock leak regression. Fixed with `OrderValidationError` thrown inside transaction + two-phase validation (validate all products before any stock mutation).
+- [x] **P1 — Atomic single-open-round**: `rounds.create()` close + insert wrapped in `$transaction`. Added `migration_004_single_open_round.sql` (partial unique index). `update()` catches `P2002` concurrent conflicts.
+- [x] **P2 — Customer count semantics**: `customersNotified` now counts unique customers (`user_id` / `order.id` fallback), not delivery endpoints. `getCustomersForArrivalNotification()` returns `customerCount` alongside `lineUserIds` and `emails`.
+- [x] **Spec drift**: `whatwearebuilding.md` multi-open-round storefront switching replaced with single-open-round DB-enforced rule.
+- [x] **Tests**: 23 tests pass (was 19). Extended rounds.test.ts (6 tests) and arrival-dedup.test.ts (6 tests).
+
 ---
 
 ## Phase 6: Admin Pages — Shipments & Suppliers
@@ -549,7 +557,7 @@ npm run build        # must pass
   - Dashboard pending shipment count links to `/admin/shipments`
   - Supplier page and dashboard share the product-expand-customer-list pattern
 
-### Checkpoint 5b
+### Checkpoint 6
 
 ```bash
 npx tsc --noEmit     # must pass

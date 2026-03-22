@@ -59,9 +59,11 @@ app/                          → Next.js pages and API routes only
   gtfo/page.tsx               # Troll page for /admin snoopers ("get the fuck out")
   admin/                      # ⚠️ NOT accessible via /admin (redirects to /gtfo)
                               # Real URL: /bitchassnigga (via next.config.ts rewrites)
+    layout.tsx                # Admin shell: nav tabs, auth guard, POS button, logout
     page.tsx                  # Admin login
     dashboard/page.tsx        # Stats + item aggregation + notification log
     orders/page.tsx           # Order list, filter, single/batch confirm, CSV export
+    orders/[id]/print/page.tsx # Order packing slip print view (@media print)
     shipments/page.tsx        # 待出貨 management, single/batch ship confirm
     products/page.tsx         # Product CRUD, goal_qty, image_url, stock, supplier link
     rounds/page.tsx           # Round management (open/close, deadline, shipping fee)
@@ -80,7 +82,9 @@ app/                          → Next.js pages and API routes only
     rounds/route.ts           # Round CRUD (includes shipping_fee)
     products/route.ts         # Product CRUD (includes supplier_id)
     suppliers/route.ts        # Supplier CRUD
+    orders/route.ts           # Admin: list orders by round (with optional status filter)
     orders-by-product/route.ts # Group orders by product → customer list
+    notification-logs/route.ts # Admin: notification audit log
     users/lookup/route.ts     # Nickname auto-fill (GET ?nickname=)
     lookup/route.ts           # Order search by nickname or order number
     line/webhook/route.ts     # LINE webhook: signature verify → message handler → order linking
@@ -104,6 +108,7 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
     send.ts                   # Orchestrator: send LINE push + email, log results
   auth/
     supabase-admin.ts         # Supabase Auth helpers (admin login/session check)
+    supabase-browser.ts       # Supabase browser client singleton (admin UI)
   admin/
     paths.ts                  # Shared admin path builder (real base path, no hardcoded /admin links)
     notification-summary.ts   # Notification log grouping helpers for dashboard/admin feedback
@@ -121,6 +126,15 @@ components/
   PaymentReportForm.tsx       # Two-step payment report (amount + last5 → confirm → submit)
   CancelOrderButton.tsx       # Cancel order with Dialog confirmation
   ShippingFeeNote.tsx         # "宅配到以上地址運費 $XXX" display
+  admin/
+    OrderCard.tsx             # Admin order card (expandable, per-status actions)
+    POSForm.tsx               # POS inline order creation form
+    ProductAggregationTable.tsx # Dashboard product demand + customer drill-down + 通知到貨
+    ProductForm.tsx           # Product create/edit dialog
+hooks/
+  use-toast.ts                # shadcn/ui toast hook
+  use-admin-session.ts        # Admin Supabase session + allowlist check
+  use-admin-fetch.ts          # Authenticated admin fetch wrapper
 types/
   index.ts                    # Shared TS interfaces
 constants/
@@ -130,6 +144,7 @@ prisma/
   migration.sql               # Initial migration (all tables, triggers, RLS, views)
   migration_002_line_push.sql # Add line_user_id column to orders
   migration_003_notification_log_context.sql # Add notification_logs round/product context + skipped status
+  migration_004_single_open_round.sql # Partial unique index: at most one open round
   seed.ts                     # Dev seed data
 ```
 
@@ -197,6 +212,9 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 - **Shipping fee calculation**: `submit-order` route checks `pickup_location`: if null/empty (宅配), adds `round.shipping_fee` to total and snapshots it in `orders.shipping_fee`.
 - **LINE order linking**: User pastes `ORD-YYYYMMDD-NNN` in LINE OA → webhook writes `line_user_id` on that order. Per-order (not per-user). Idempotent — re-pasting same order by same user is a no-op. One order = one LINE account.
 - **LINE message extraction**: The webhook parser accepts raw order numbers and prefixed text containing an order number (for example `綁定 ORD-20260318-001`). If multiple order numbers appear, the first match currently wins; ambiguity rejection is deferred.
+- **Single-open-round invariant**: At most one round can have `is_open = true`, enforced by a partial unique index (`idx_rounds_single_open`). `create()` atomically closes existing open rounds in a transaction. `update()` does a friendly precheck and catches `P2002` from concurrent conflicts.
+- **Order creation two-phase validation**: `createWithItems()` validates all products (existence, round ownership, `is_active`) before any stock mutation. All errors throw `OrderValidationError` inside the `$transaction` to trigger rollback, caught outside and converted to `{ error }` for the API contract.
+- **Arrival notification customer counting**: `getCustomersForArrivalNotification()` returns `customerCount` (unique `user_id`, falling back to `order.id` for guests) alongside `lineUserIds` and `emails`. The `customersNotified` field in notify-arrival response reflects unique customers, not delivery endpoints.
 
 ### RLS Policies (critical — get these right)
 
@@ -334,6 +352,24 @@ Phase 1–5 is now considered complete for merge after the audit/remediation pas
 - Add an integration-level confirm → notify regression test.
 - Run a separate dependency remediation pass for current `npm audit` issues.
 
+## Audit Closeout — Pass 2 (2026-03-23)
+
+Post-remediation review caught three regressions and one spec drift from the first audit pass. All fixed in this pass.
+
+### What Was Fixed
+
+- **P0 — Transaction rollback regression**: `return { error }` inside `$transaction` commits instead of rolling back. Stock decremented for earlier items was lost when a later item failed validation. Fixed by throwing `OrderValidationError` inside the transaction (triggers rollback), caught outside and converted to `{ error }`. Also split processing into validate-all-first, then decrement.
+- **P1 — Non-atomic single-open-round**: `create()` ran close + insert as separate calls; failed insert left no open round. Fixed by wrapping in `prisma.$transaction`. Added `migration_004_single_open_round.sql` with partial unique index. `update()` now catches `P2002` for concurrent conflicts.
+- **P2 — Customer count semantics**: `customersNotified` counted delivery endpoints (LINE IDs + emails union), not customers. One customer with both channels counted as 2. Fixed by tracking unique `user_id` (fallback `order.id`) and returning `customerCount`.
+- **Spec drift**: `whatwearebuilding.md` line 469 documented multi-open-round storefront switching, conflicting with the accepted single-open-round model. Updated to reflect DB-enforced single-open-round.
+
+### Verification
+
+- `npx tsc --noEmit` — pass
+- `npm run lint` — pass
+- `npm run build` — pass (30 routes, 0 errors)
+- `npx vitest run` — 23 tests pass (7 test files)
+
 ---
 
 ## Verification (run before presenting work)
@@ -384,4 +420,17 @@ Keep max 15 entries. When full, drop oldest.
 
 #### Entries
 
-_(none yet)_
+### [2026-03-23] return { error } inside $transaction commits instead of rolling back
+**Mistake:** Converted `throw` to `return { error }` inside Prisma interactive transaction. Prisma commits on return, only rolls back on throw. Stock decremented for earlier items was permanently lost when a later item failed.
+**Fix:** Introduced `OrderValidationError` thrown inside transaction (triggers rollback), caught outside and converted to `{ error }` return.
+**Rule:** Never `return` from a Prisma `$transaction` callback to signal failure. Always `throw` to trigger rollback.
+
+### [2026-03-23] Non-atomic close + create for single-open-round
+**Mistake:** `rounds.create()` called `updateMany` then `create` as separate operations. If `create` failed, existing rounds were already closed — no open round left.
+**Fix:** Wrapped both operations in `prisma.$transaction`. Added partial unique index for DB-level enforcement.
+**Rule:** Multi-step invariant enforcement must be transactional. Add DB constraints as safety net.
+
+### [2026-03-23] customersNotified counted endpoints, not customers
+**Mistake:** Union of LINE user IDs and emails counted delivery endpoints. One customer with both LINE and email was counted as 2.
+**Fix:** Added `customerCount` based on unique `user_id` (fallback `order.id` for guests).
+**Rule:** When counting "customers notified", dedupe by customer identity, not by delivery channel.

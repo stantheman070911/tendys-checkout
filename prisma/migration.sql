@@ -13,6 +13,9 @@ create table public.rounds (
   created_at timestamptz default now()
 );
 
+-- At most one open round at any time (partial unique index)
+create unique index idx_rounds_single_open on rounds (is_open) where is_open = true;
+
 -- 1. Suppliers 供應商表
 create table public.suppliers (
   id uuid default gen_random_uuid() primary key,
