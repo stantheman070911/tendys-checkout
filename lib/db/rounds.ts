@@ -16,15 +16,26 @@ export async function create(data: {
   name: string;
   deadline?: Date | string | null;
   shipping_fee?: number | null;
-}) {
-  // Atomic: close existing open rounds + create new one in a single transaction
-  return prisma.$transaction(async (tx) => {
-    await tx.round.updateMany({
-      where: { is_open: true },
-      data: { is_open: false },
+}): Promise<{ error: string } | Awaited<ReturnType<typeof prisma.round.create>>> {
+  try {
+    // Atomic: close existing open rounds + create new one in a single transaction
+    return await prisma.$transaction(async (tx) => {
+      await tx.round.updateMany({
+        where: { is_open: true },
+        data: { is_open: false },
+      });
+      return tx.round.create({ data });
     });
-    return tx.round.create({ data });
-  });
+  } catch (err) {
+    // Catch DB unique-index conflict from concurrent creates
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      return { error: "已有另一個團正在開團中（並行衝突），請重新整理頁面" };
+    }
+    throw err;
+  }
 }
 
 export async function close(id: string) {

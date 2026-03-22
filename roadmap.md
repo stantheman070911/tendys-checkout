@@ -527,6 +527,12 @@ npm run build        # must pass
 - [x] **Spec drift**: `whatwearebuilding.md` multi-open-round storefront switching replaced with single-open-round DB-enforced rule.
 - [x] **Tests**: 23 tests pass (was 19). Extended rounds.test.ts (6 tests) and arrival-dedup.test.ts (6 tests).
 
+### Post-Remediation Pass 3 (2026-03-23 Session 5)
+
+- [x] **P1 — POST /api/rounds concurrent conflict exposed as 500**: `create()` in `lib/db/rounds.ts` did not catch `P2002` from the partial unique index, so concurrent `POST /api/rounds` requests fell through to the generic 500 catch. Fixed: `create()` now catches `P2002` and returns `{ error }` (same pattern as `update()`). `POST` route maps `{ error }` to `400`.
+- [x] **Doc drift**: `phase-6-readiness-audit.md` test counts corrected (verification snapshot: 24 tests; issue 1 fix: 7 focused tests; files-modified table: 7 tests).
+- [x] **Tests**: 24 tests pass (was 23). Added `create()` P2002 catch test in `rounds.test.ts` (now 7 tests).
+
 ---
 
 ## Phase 6: Admin Pages — Shipments & Suppliers

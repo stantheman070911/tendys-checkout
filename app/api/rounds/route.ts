@@ -68,13 +68,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const round = await create({
+    const result = await create({
       name: trimmedName,
       deadline: deadline ?? undefined,
       shipping_fee: shipping_fee ?? undefined,
     });
 
-    return NextResponse.json({ round }, { status: 201 });
+    if (result && typeof result === "object" && "error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    return NextResponse.json({ round: result }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

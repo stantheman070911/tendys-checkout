@@ -58,6 +58,20 @@ describe("single-open-round enforcement", () => {
     await expect(create({ name: "Bad Round" })).rejects.toThrow("insert failed");
   });
 
+  it("create() catches P2002 from concurrent creates and returns { error }", async () => {
+    const p2002 = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+      code: "P2002",
+      clientVersion: "0.0.0",
+    });
+    prismaMock.$transaction.mockRejectedValue(p2002);
+
+    const result = await create({ name: "Concurrent Round" });
+
+    expect(result).toEqual({
+      error: expect.stringContaining("並行衝突"),
+    });
+  });
+
   it("update() rejects opening a round when another is already open", async () => {
     prismaMock.round.findFirst.mockResolvedValue({
       id: "other-round",

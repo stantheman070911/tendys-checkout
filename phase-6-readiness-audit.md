@@ -7,7 +7,7 @@ Audit date: 2026-03-23
 - `npx tsc --noEmit` — pass
 - `npm run lint` — pass
 - `npm run build` — pass (30 routes, 0 errors)
-- `npx vitest run` — 23 tests pass (7 test files)
+- `npx vitest run` — 24 tests pass (7 test files)
 
 ---
 
@@ -32,7 +32,7 @@ Audit date: 2026-03-23
 
 **Problem:** `POST /api/rounds` and `PUT /api/rounds` allowed multiple simultaneous open rounds, which would cause the storefront's `getOpenRound()` to return an arbitrary one.
 
-**Fix:** `create()` in `lib/db/rounds.ts` now auto-closes existing open rounds before creating a new one. `update()` rejects setting `is_open: true` if another round is already open (returns `{ error }` → 400 response). 4 focused tests added in `lib/db/rounds.test.ts`.
+**Fix:** `create()` in `lib/db/rounds.ts` now auto-closes existing open rounds before creating a new one. `update()` rejects setting `is_open: true` if another round is already open (returns `{ error }` → 400 response). 7 focused tests added in `lib/db/rounds.test.ts`.
 
 **Follow-up fix (pass 2):** `create()` close + insert wrapped in `prisma.$transaction` to prevent leaving no open round on insert failure. Added `migration_004_single_open_round.sql` with a partial unique index (`WHERE is_open = true`) for DB-level enforcement. `update()` now catches unique-index violations from concurrent requests and returns `{ error }`. `whatwearebuilding.md` updated to reflect single-open-round model.
 
@@ -162,5 +162,5 @@ Phase 6 type stubs in `types/index.ts`:
 | `whatwearebuilding.md` | Replaced multi-open-round UX with single-open-round rule |
 | `CLAUDE.md` | Added ~15 missing directory entries |
 | `roadmap.md` | Renamed Checkpoint 5b → Checkpoint 6 |
-| `lib/db/rounds.test.ts` (new) | 4 tests for single-open-round |
+| `lib/db/rounds.test.ts` (new) | 7 tests for single-open-round |
 | `lib/db/arrival-dedup.test.ts` (new) | 4+ tests for arrival dedup + customerCount |
