@@ -39,6 +39,39 @@ export async function listActiveByRound(roundId: string) {
   `;
 }
 
+export async function listAllByRound(roundId: string) {
+  return prisma.$queryRaw<
+    Array<{
+      id: string;
+      round_id: string | null;
+      supplier_id: string | null;
+      name: string;
+      price: number;
+      unit: string;
+      is_active: boolean;
+      stock: number | null;
+      goal_qty: number | null;
+      image_url: string | null;
+      created_at: Date;
+      supplier_name: string | null;
+      current_qty: number;
+      progress_pct: number | null;
+    }>
+  >`
+    SELECT
+      p.id, p.round_id, p.supplier_id, p.name, p.price, p.unit,
+      p.is_active, p.stock, p.goal_qty, p.image_url, p.created_at,
+      s.name AS supplier_name,
+      COALESCE(pp.current_qty, 0)::int AS current_qty,
+      pp.progress_pct::float AS progress_pct
+    FROM products p
+    LEFT JOIN product_progress pp ON pp.product_id = p.id
+    LEFT JOIN suppliers s ON s.id = p.supplier_id
+    WHERE p.round_id = ${roundId}::uuid
+    ORDER BY p.created_at ASC
+  `;
+}
+
 export async function decrementStock(
   productId: string,
   qty: number,

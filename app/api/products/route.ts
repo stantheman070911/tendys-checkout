@@ -2,16 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import {
   listActiveByRound,
+  listAllByRound,
   create,
   update,
 } from "@/lib/db/products";
 
-// Public — storefront needs product list
+// Public — storefront needs product list. Admin with ?all=true gets inactive products too.
 export async function GET(request: NextRequest) {
   try {
     const roundId = request.nextUrl.searchParams.get("roundId");
     if (!roundId || !roundId.trim()) {
       return NextResponse.json({ error: "roundId is required" }, { status: 400 });
+    }
+
+    const all = request.nextUrl.searchParams.get("all") === "true";
+    if (all) {
+      const isAdmin = await verifyAdminSession(request);
+      if (!isAdmin) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const products = await listAllByRound(roundId.trim());
+      return NextResponse.json({ products });
     }
 
     const products = await listActiveByRound(roundId.trim());

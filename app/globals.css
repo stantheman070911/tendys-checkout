@@ -45,3 +45,30 @@
     font-size: 16px; /* prevents iOS zoom on focus */
   }
 }
+
+/* Print styles for admin packing slips and 理貨清單 */
+@media print {
+  header,
+  nav,
+  .fixed,
+  button,
+  input,
+  select,
+  [role="dialog"] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    font-size: 12px;
+  }
+
+  .bg-white {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+
+  .rounded-xl {
+    border-radius: 4px !important;
+  }
+}

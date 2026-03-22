@@ -428,28 +428,28 @@ npm run build        # must pass
 
 ### Tasks
 
-- [ ] **5.1** `app/admin/page.tsx` — Login:
+- [x] **5.1** `app/admin/page.tsx` — Login:
   - Email/password → Supabase Auth → redirect to dashboard
-- [ ] **5.2** Admin auth guard + navigation:
+- [x] **5.2** Admin auth guard + navigation:
   - Check session on all `/admin/*` (except login) → redirect if unauthenticated
   - **Fixed navigation bar** (sidebar or top nav) with all admin sections + current round name + logout button
-- [ ] **5.3** `app/admin/dashboard/page.tsx`:
+- [x] **5.3** `app/admin/dashboard/page.tsx`:
   - Top cards: total orders, revenue, pending confirm, pending payment, **pending shipment (confirmed count)**
   - **Cards are clickable** — 待確認 → orders page filtered; 待出貨 → shipments page
   - 商品需求彙總: product name, total qty, unit, revenue, **supplier name**, **「通知到貨」button**, **click to expand customer list**, **「列印理貨清單」button**
   - 通知發送狀態: by notification type (payment_confirmed / shipment / product_arrival / order_cancelled)
-- [ ] **5.4** `app/admin/orders/page.tsx`:
+- [x] **5.4** `app/admin/orders/page.tsx`:
   - **Search bar** (nickname / phone / order number) + Filter tabs: 全部 / 待付款 / 待確認 / 已確認 / **已出貨** / 已取消
   - **「+ 代客下單」button** → opens inline order form (POS mode)
   - Order cards + batch confirm for pending_confirm
   - Single order detail: info + payment match + confirm / **admin cancel (with reason)** / **quick confirm (POS cash)**
   - **Print packing slip** per order
   - CSV export (includes shipping fee column)
-- [ ] **5.5** `app/admin/products/page.tsx`:
+- [x] **5.5** `app/admin/products/page.tsx`:
   - Product list with progress bars + **supplier name**
   - Create/edit form includes **supplier dropdown** + goal_qty + image_url
   - Edit / 上下架 buttons
-- [ ] **5.6** `app/admin/rounds/page.tsx`:
+- [x] **5.6** `app/admin/rounds/page.tsx`:
   - Current round: name, deadline, status, **shipping fee display**
   - 截單 + 修改截止 + **修改運費**
   - 新開一團 form: name + deadline + **shipping fee input**
@@ -463,17 +463,19 @@ npm run build        # must pass
 ```
 
 **Verify:**
-- [ ] Login authenticates via real Supabase Auth
-- [ ] All admin pages redirect to login if unauthenticated
-- [ ] Dashboard numbers from real DB
-- [ ] Dashboard 商品需求彙總 shows supplier names
-- [ ] Dashboard 通知到貨 button calls `notify-arrival` API
-- [ ] Dashboard product expand shows customer list from `orders-by-product` API
-- [ ] Product form has supplier dropdown
-- [ ] Round form has shipping fee input
-- [ ] CSV includes shipping fee
+- [x] Login authenticates via real Supabase Auth
+- [x] All admin pages redirect to login if unauthenticated
+- [x] Dashboard numbers from real DB
+- [x] Dashboard 商品需求彙總 shows supplier names
+- [x] Dashboard 通知到貨 button calls `notify-arrival` API
+- [x] Dashboard product expand shows customer list from `orders-by-product` API
+- [x] Product form has supplier dropdown
+- [x] Round form has shipping fee input
+- [x] CSV includes shipping fee
 
 **Done when:** Core admin pages functional with real data.
+
+**Status: COMPLETE** — All 6 tasks done. `tsc`, `lint`, `build` all pass. Auth: browser Supabase client + useAdminSession hook + useAdminFetch hook. Layout: indigo sticky header with tab pills, auth guard, POS button, logout. Dashboard: 6 stat cards (clickable), product aggregation table with expand + 通知到貨, notification summary. Orders: search + filter + batch confirm + OrderCard with per-status actions + POS form + CSV export. Products: CRUD with supplier dropdown + progress bars + toggle active. Rounds: current round with inline fee/deadline edit + 截單 + new round form + history.
 
 ---
 
