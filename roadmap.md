@@ -533,6 +533,27 @@ npm run build        # must pass
 - [x] **Doc drift**: `phase-6-readiness-audit.md` test counts corrected (verification snapshot: 24 tests; issue 1 fix: 7 focused tests; files-modified table: 7 tests).
 - [x] **Tests**: 24 tests pass (was 23). Added `create()` P2002 catch test in `rounds.test.ts` (now 7 tests).
 
+### Phase 6 Implementation (2026-03-24 Session 6)
+
+- [x] **Shipments page** (`app/admin/shipments/page.tsx`): Full implementation — fetch open round + confirmed orders, group by pickup method via `groupOrdersByPickup()`, search via `matchesOrderSearch()`, collapsible sections, single-confirm via `ShipmentCard` component, batch confirm with sticky bottom bar, "列印全部" print view, product filter from query param, persistent notification results panel.
+- [x] **ShipmentCard component** (`components/admin/ShipmentCard.tsx`): Per-order card with checkbox, recipient info, items table, single confirm button ("確認寄出" / "確認取貨"), `onConfirmed` callback feeding page-level results panel.
+- [x] **Suppliers page** (`app/admin/suppliers/page.tsx`): Full implementation — supplier list with expand/collapse, CRUD via `SupplierForm` dialog, delete-with-confirmation (blocked if products linked), per-supplier product list with progress bars, per-product customer drill-down via `orders-by-product` API, per-product "通知到貨" with LINE/email result feedback.
+- [x] **SupplierForm component** (`components/admin/SupplierForm.tsx`): Dialog-based create/edit form (name, contact_name, phone, email, note).
+- [x] **ProductAggregationTable enhancements**: Added per-product "列印理貨清單" print action and "通知到貨" button (same pattern as suppliers page).
+- [x] **Dashboard cross-links**: Verified — 商品需求彙總 "前往出貨" links to shipments with product filter, pending shipment count links to shipments page, product-expand-customer-list pattern shared.
+
+### Phase 6 Audit Fixes (2026-03-24 Session 7)
+
+- [x] **P1 — Single-confirm results lost**: `ShipmentCard` now calls `onConfirmed({ orderNumber, line, email })` so single confirms populate the persistent results panel (previously only batch confirms did).
+- [x] **P1 — Skipped-as-failed misreport**: Replaced boolean notification status with tri-state `"success" | "failed" | "skipped"`. LINE skip (`"No LINE user linked"`) now renders as `—` instead of `✗`. Email skip (`null`) likewise.
+- [x] **P2 — Shared helper extraction**: Extracted `mapNotifyStatus()` and `renderNotifyIcon()` into `lib/admin/shipment-status.ts`. Both `shipments/page.tsx` and `ShipmentCard.tsx` import from the shared helper — no inline duplicates.
+- [x] **P2 — Verification order fix**: Updated CLAUDE.md to document `npm run build` before `npx tsc --noEmit` (Next.js generates `.next/types/validator.ts` during build).
+- [x] **Tests**: Added `lib/admin/shipment-status.test.ts` with 11 focused tests covering all tri-state mapping paths (success, failed, skipped for both channels, missing fields, undefined payload, failed-vs-skipped differentiation, icon rendering). Total: 35 tests across 8 files.
+
+**Explicit caveats carried forward:**
+- Phase 6 admin flows rely on manual verification + helper-level unit coverage, not component/integration tests.
+- Historical analytics gap and LINE ambiguity handling remain deferred from Phase 1–5.
+
 ---
 
 ## Phase 6: Admin Pages — Shipments & Suppliers
@@ -541,7 +562,7 @@ npm run build        # must pass
 
 ### Tasks
 
-- [ ] **6.1** `app/admin/shipments/page.tsx` — 待出貨管理:
+- [x] **6.1** `app/admin/shipments/page.tsx` — 待出貨管理:
   - List all `confirmed` orders (not yet shipped)
   - **Group by pickup method**: 宅配 section, 面交點A section, 面交點B section (collapsible)
   - Each shows: order number, recipient, phone, address/pickup, items, total
@@ -551,14 +572,14 @@ npm run build        # must pass
   - On confirm: calls `confirm-shipment` API → status → shipped → notifications sent
   - Success feedback: show notification results (LINE ✓/✗, Email ✓/✗)
   - **「列印全部」button** → print all pending shipment packing slips (@media print)
-- [ ] **6.2** `app/admin/suppliers/page.tsx` — 供應商管理:
+- [x] **6.2** `app/admin/suppliers/page.tsx` — 供應商管理:
   - Supplier list: name, contact, phone, email, product count
   - Create / edit / delete (delete blocked if has products)
   - Click supplier → shows their linked products with progress + order quantities
   - **Per-product customer detail**: click product name → expand customer list (nickname, name, phone, qty, order number)
   - **「通知到貨」button per product**: sends arrival notification to all customers who ordered that product
   - Notification result feedback: "已通知 N 位客戶 (LINE: X成功, Email: Y成功)"
-- [ ] **6.3** Wire up dashboard ↔ supplier/shipment cross-links:
+- [x] **6.3** Wire up dashboard ↔ supplier/shipment cross-links:
   - Dashboard 商品需求彙總 "通知到貨" uses same API as supplier page
   - Dashboard pending shipment count links to `/admin/shipments`
   - Supplier page and dashboard share the product-expand-customer-list pattern
@@ -566,24 +587,27 @@ npm run build        # must pass
 ### Checkpoint 6
 
 ```bash
-npx tsc --noEmit     # must pass
-npm run lint         # must pass
-npm run build        # must pass
+npm run build            # must pass (also generates .next/types for tsc)
+npx tsc --noEmit        # must pass (requires prior build)
+npm run lint             # must pass
+npx vitest run           # must pass
 ```
 
 **Verify:**
-- [ ] 待出貨 page only shows `confirmed` orders (not pending_payment, not already shipped)
-- [ ] 待出貨 page groups orders by pickup method (宅配 / 面交點A / 面交點B)
-- [ ] Single + batch shipment confirm works
-- [ ] Shipment confirmation sends both LINE + Email notifications
-- [ ] shipped_at timestamp is written
-- [ ] Supplier CRUD works (create, edit, delete-if-no-products)
-- [ ] Customer list per product shows correct data
-- [ ] 通知到貨 sends to all relevant customers, not just one
-- [ ] Notification results displayed to admin after sending
-- [ ] Supplier page usable on tablet
+- [x] 待出貨 page only shows `confirmed` orders (not pending_payment, not already shipped)
+- [x] 待出貨 page groups orders by pickup method (宅配 / 面交點A / 面交點B)
+- [x] Single + batch shipment confirm works
+- [x] Shipment confirmation sends both LINE + Email notifications
+- [x] shipped_at timestamp is written
+- [x] Supplier CRUD works (create, edit, delete-if-no-products)
+- [x] Customer list per product shows correct data
+- [x] 通知到貨 sends to all relevant customers, not just one
+- [x] Notification results displayed to admin after sending
+- [x] Supplier page usable on tablet
 
 **Done when:** Admin can manage full lifecycle: confirm payment → notify arrival → confirm shipment → all with notifications.
+
+**Status: COMPLETE** — All 3 tasks done. `build`, `tsc` (post-build), `lint`, `vitest` all pass (35 tests, 8 files). Committed as `fa47e7f` and pushed to `main`.
 
 ---
 
