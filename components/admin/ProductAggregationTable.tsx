@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { buildAdminPath } from "@/lib/admin/paths";
 import type { OrderByProduct, ProductWithProgress } from "@/types";
 
 interface ProductAggregationTableProps {
@@ -296,6 +297,19 @@ export function ProductAggregationTable({
                   {row.unit}
                 </span>
                 <span className="text-xs text-gray-400">${row.revenue}</span>
+                <button
+                  onClick={() =>
+                    window.open(
+                      buildAdminPath(
+                        `/shipments?productId=${row.productId}&productName=${encodeURIComponent(row.name)}`
+                      ),
+                      "_self"
+                    )
+                  }
+                  className="text-xs px-2 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100"
+                >
+                  📦 前往出貨
+                </button>
                 <button
                   onClick={() => void printAllocationList(row)}
                   className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
