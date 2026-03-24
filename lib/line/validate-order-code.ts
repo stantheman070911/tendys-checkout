@@ -3,7 +3,7 @@ import { prisma } from "../db/prisma";
 
 // ─── Types ───────────────────────────────────────────────────
 
-export type ValidationError = "NOT_FOUND" | "ALREADY_LINKED";
+export type ValidationError = "INVALID_ORDER_ACCESS" | "ALREADY_LINKED";
 
 export interface ValidationSuccess {
   valid: true;
@@ -34,14 +34,18 @@ export type ValidationResult = ValidationSuccess | ValidationFailure;
  */
 export async function validateOrderNumber(
   orderNumber: string,
+  accessCode: string,
   lineUserId: string,
 ): Promise<ValidationResult> {
-  const order = await prisma.order.findUnique({
-    where: { order_number: orderNumber },
+  const order = await prisma.order.findFirst({
+    where: {
+      order_number: orderNumber,
+      access_code: accessCode,
+    },
   });
 
   if (!order) {
-    return { valid: false, error: "NOT_FOUND" };
+    return { valid: false, error: "INVALID_ORDER_ACCESS" };
   }
 
   // Already linked to a different LINE user

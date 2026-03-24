@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { generateAccessCode } from "@/lib/utils";
 
 // ─── Order Creation ──────────────────────────────────────────
 
@@ -114,6 +115,7 @@ export async function createWithItems(
       // 6. Create order + items
       const order = await tx.order.create({
         data: {
+          access_code: generateAccessCode(),
           user_id: data.user_id,
           round_id: data.round_id,
           total_amount: totalAmount,
@@ -163,13 +165,16 @@ export async function getOrderWithItems(orderId: string) {
   });
 }
 
-export async function findByNicknameOrOrderNumber(query: string) {
-  return prisma.order.findMany({
+export async function findOrderByNumberAndAccessCode(
+  orderNumber: string,
+  accessCode: string,
+) {
+  return prisma.order.findFirst({
     where: {
-      OR: [{ order_number: query }, { user: { nickname: query } }],
+      order_number: orderNumber,
+      access_code: accessCode,
     },
-    include: { order_items: true, user: true },
-    orderBy: { created_at: "desc" },
+    include: { order_items: true, user: true, round: true },
   });
 }
 

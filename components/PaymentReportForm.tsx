@@ -6,15 +6,15 @@ import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 interface PaymentReportFormProps {
-  orderId: string;
+  orderNumber: string;
+  accessCode: string;
   orderTotal: number;
-  userPhone: string;
 }
 
 export function PaymentReportForm({
-  orderId,
+  orderNumber,
+  accessCode,
   orderTotal,
-  userPhone,
 }: PaymentReportFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -45,10 +45,10 @@ export function PaymentReportForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          order_id: orderId,
+          order_number: orderNumber,
+          access_code: accessCode,
           payment_amount: parseInt(amount, 10),
           payment_last5: last5.trim(),
-          phone_last4: userPhone.replace(/\D/g, "").slice(-4),
         }),
       });
 

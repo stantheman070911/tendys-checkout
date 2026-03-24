@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { reportPayment, getOrderWithItems } from "@/lib/db/orders";
+import { reportPayment, findOrderByNumberAndAccessCode } from "@/lib/db/orders";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { normalizeAccessCode } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(
+      `report-payment:${clientIp}`,
+      5,
+      60_000,
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        },
+      );
+    }
+
     let body: unknown;
     try {
       body = await request.json();
@@ -10,46 +28,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { order_id, payment_amount, payment_last5, phone_last4 } = body as {
-      order_id?: string;
+    const { order_number, access_code, payment_amount, payment_last5 } =
+      body as {
+      order_number?: string;
+      access_code?: string;
       payment_amount?: number;
       payment_last5?: string;
-      phone_last4?: string;
     };
 
-    // Validate order_id
-    if (!order_id || typeof order_id !== "string" || !order_id.trim()) {
-      return NextResponse.json(
-        { error: "order_id is required" },
-        { status: 400 },
-      );
-    }
-
-    // Validate phone_last4 (ownership verification)
     if (
-      !phone_last4 ||
-      typeof phone_last4 !== "string" ||
-      !/^\d{4}$/.test(phone_last4)
+      !order_number ||
+      typeof order_number !== "string" ||
+      !order_number.trim()
     ) {
       return NextResponse.json(
-        { error: "phone_last4 must be exactly 4 digits" },
+        { error: "order_number is required" },
         { status: 400 },
       );
     }
 
-    // Verify phone_last4 matches the order's user
-    const existingOrder = await getOrderWithItems(order_id.trim());
+    if (
+      !access_code ||
+      typeof access_code !== "string" ||
+      normalizeAccessCode(access_code).length !== 12
+    ) {
+      return NextResponse.json(
+        { error: "access_code must be exactly 12 letters or digits" },
+        { status: 400 },
+      );
+    }
+
+    const existingOrder = await findOrderByNumberAndAccessCode(
+      order_number.trim().toUpperCase(),
+      normalizeAccessCode(access_code),
+    );
     if (!existingOrder) {
       return NextResponse.json(
         { error: "Order not found" },
         { status: 404 },
-      );
-    }
-    const userPhone = existingOrder.user?.phone?.replace(/\D/g, "") ?? "";
-    if (userPhone.slice(-4) !== phone_last4) {
-      return NextResponse.json(
-        { error: "Phone verification failed" },
-        { status: 403 },
       );
     }
 
@@ -80,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     const order = await reportPayment(
-      order_id.trim(),
+      existingOrder.id,
       payment_amount,
       payment_last5.trim(),
     );

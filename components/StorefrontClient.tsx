@@ -43,7 +43,6 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submissionKey, setSubmissionKey] = useState<string | null>(null);
-  const [nickFound, setNickFound] = useState(false);
 
   // Form state
   const [nickname, setNickname] = useState("");
@@ -106,32 +105,6 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     });
   }, []);
 
-  // Nickname auto-fill
-  async function handleNicknameBlur() {
-    const trimmed = nickname.trim();
-    if (!trimmed) return;
-    try {
-      const res = await fetch(
-        `/api/users/lookup?nickname=${encodeURIComponent(trimmed)}`,
-      );
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.user) {
-        if (data.user.recipient_name)
-          setRecipientName(data.user.recipient_name);
-        if (data.user.phone) setPhone(data.user.phone);
-        if (data.user.address) setAddress(data.user.address);
-        if (data.user.email) setEmail(data.user.email);
-        setNickFound(true);
-        toast({ title: "已自動帶入上次資料" });
-      } else {
-        setNickFound(false);
-      }
-    } catch {
-      // Silent fail — auto-fill is convenience only
-    }
-  }
-
   // Checkout open
   function handleCheckout() {
     setCheckoutOpen(true);
@@ -192,7 +165,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         return;
       }
 
-      router.push(`/order/${data.order.id}`);
+      router.push(
+        `/order/${encodeURIComponent(data.order.order_number)}?code=${encodeURIComponent(data.order.access_code)}`,
+      );
     } catch {
       toast({ title: "網路錯誤，請重試", variant: "destructive" });
       setSubmitting(false);
@@ -293,24 +268,15 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                   <label className="block text-xs text-gray-500 mb-1">
                     LINE 暱稱 *
                   </label>
-                  <div className="relative">
-                    <Input
-                      value={nickname}
-                      onChange={(e) => {
-                        setNickname(e.target.value);
-                        setNickFound(false);
-                      }}
-                      onBlur={handleNicknameBlur}
-                      placeholder="你在群組的暱稱"
-                      className={`pr-24 transition ${nickFound ? "border-green-400 bg-green-50" : ""}`}
-                      required
-                    />
-                    {nickFound && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded-full">
-                        已自動帶入
-                      </span>
-                    )}
-                  </div>
+                  <Input
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    placeholder="你在群組的暱稱"
+                    required
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    為保護個資，系統不再自動帶入舊的收貨資料。
+                  </p>
                 </div>
 
                 <div>

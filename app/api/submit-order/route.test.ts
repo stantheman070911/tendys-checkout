@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ──────────────────────────────────────────────────────
 
+const authMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/auth/supabase-admin", () => ({
+  verifyAdminSession: authMock,
+}));
+
 const usersMock = vi.hoisted(() => ({
+  createUser: vi.fn(),
+  findByNickname: vi.fn(),
   upsertByNickname: vi.fn(),
 }));
 vi.mock("@/lib/db/users", () => usersMock);
@@ -43,11 +50,17 @@ function validBody(overrides: Record<string, unknown> = {}) {
 describe("POST /api/submit-order", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    usersMock.upsertByNickname.mockResolvedValue({ id: "user-1" });
+    authMock.mockResolvedValue(false);
+    usersMock.findByNickname.mockResolvedValue(null);
+    usersMock.createUser.mockResolvedValue({ id: "user-1" });
   });
 
   it("returns 201 on valid order", async () => {
-    const fakeOrder = { id: "o1", order_number: "ORD-20260324-001" };
+    const fakeOrder = {
+      id: "o1",
+      order_number: "ORD-20260324-001",
+      access_code: "ABCD1234EFGH",
+    };
     ordersMock.createWithItems.mockResolvedValue({ order: fakeOrder });
 
     const res = await POST(makeRequest(validBody()));
@@ -57,7 +70,7 @@ describe("POST /api/submit-order", () => {
   });
 
   it("returns 200 on submission_key dedup", async () => {
-    const fakeOrder = { id: "o1" };
+    const fakeOrder = { id: "o1", order_number: "ORD-20260324-001", access_code: "ABCD1234EFGH" };
     ordersMock.createWithItems.mockResolvedValue({
       order: fakeOrder,
       deduplicated: true,
@@ -136,7 +149,11 @@ describe("POST /api/submit-order", () => {
   });
 
   it("returns 201 for valid 面交 order without address", async () => {
-    const fakeOrder = { id: "o2" };
+    const fakeOrder = {
+      id: "o2",
+      order_number: "ORD-20260324-002",
+      access_code: "ZXCV1234BNMQ",
+    };
     ordersMock.createWithItems.mockResolvedValue({ order: fakeOrder });
 
     const res = await POST(
@@ -145,5 +162,39 @@ describe("POST /api/submit-order", () => {
       ),
     );
     expect(res.status).toBe(201);
+  });
+
+  it("returns 409 when a public nickname exists with different saved details", async () => {
+    usersMock.findByNickname.mockResolvedValue({
+      id: "user-1",
+      nickname: "TestUser",
+      recipient_name: "Other Name",
+      phone: "0912345678",
+      address: "台北市",
+      email: "old@example.com",
+    });
+
+    const res = await POST(makeRequest(validBody()));
+    expect(res.status).toBe(409);
+  });
+
+  it("allows admin POS to overwrite an existing nickname profile", async () => {
+    authMock.mockResolvedValue(true);
+    usersMock.findByNickname.mockResolvedValue({
+      id: "user-1",
+      nickname: "TestUser",
+    });
+    usersMock.upsertByNickname.mockResolvedValue({ id: "user-1" });
+    ordersMock.createWithItems.mockResolvedValue({
+      order: {
+        id: "o3",
+        order_number: "ORD-20260324-003",
+        access_code: "QWER1234TYUI",
+      },
+    });
+
+    const res = await POST(makeRequest(validBody()));
+    expect(res.status).toBe(201);
+    expect(usersMock.upsertByNickname).toHaveBeenCalled();
   });
 });

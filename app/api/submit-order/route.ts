@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertByNickname } from "@/lib/db/users";
+import { verifyAdminSession } from "@/lib/auth/supabase-admin";
+import { createUser, findByNickname, upsertByNickname } from "@/lib/db/users";
 import { createWithItems } from "@/lib/db/orders";
 import { PICKUP_OPTIONS } from "@/constants";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -18,8 +20,35 @@ const MAX_LEN = {
 
 const validPickupValues = new Set(PICKUP_OPTIONS.map((o) => o.value));
 
+function normalizePhone(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? "").trim();
+}
+
+function normalizeEmail(value: string | null | undefined): string {
+  return normalizeText(value).toLowerCase();
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const isAdmin = await verifyAdminSession(request);
+    if (!isAdmin) {
+      const clientIp = getClientIp(request);
+      const rateLimit = checkRateLimit(`submit-order:${clientIp}`, 5, 60_000);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          { error: "Too many requests" },
+          {
+            status: 429,
+            headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+          },
+        );
+      }
+    }
+
     let body: unknown;
     try {
       body = await request.json();
@@ -212,12 +241,36 @@ export async function POST(request: NextRequest) {
 
     // ─── Upsert user ────────────────────────────────────────
 
-    const user = await upsertByNickname(trimmedNickname, {
+    const existingUser = await findByNickname(trimmedNickname);
+    const userData = {
       recipient_name: trimmedRecipientName,
       phone: trimmedPhone,
       address: trimmedAddress,
       email: trimmedEmail,
-    });
+    };
+
+    const user = existingUser
+      ? isAdmin
+        ? await upsertByNickname(trimmedNickname, userData)
+        : (() => {
+            const hasConflict =
+              normalizePhone(existingUser.phone) !== normalizePhone(trimmedPhone) ||
+              normalizeText(existingUser.recipient_name) !==
+                normalizeText(trimmedRecipientName) ||
+              normalizeText(existingUser.address) !==
+                normalizeText(trimmedAddress) ||
+              normalizeEmail(existingUser.email) !== normalizeEmail(trimmedEmail);
+
+            if (hasConflict) {
+              throw new Error("NICKNAME_CONFLICT");
+            }
+
+            return existingUser;
+          })()
+      : await createUser({
+          nickname: trimmedNickname,
+          ...userData,
+        });
 
     // ─── Create order ───────────────────────────────────────
 
@@ -245,7 +298,16 @@ export async function POST(request: NextRequest) {
       { order: result.order },
       { status: result.deduplicated ? 200 : 201 },
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "NICKNAME_CONFLICT") {
+      return NextResponse.json(
+        {
+          error:
+            "This nickname already exists with different saved details. Use a different nickname or contact the organizer.",
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

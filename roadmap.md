@@ -139,6 +139,7 @@ npm run build                 # must pass
 - [x] **2.1** `lib/db/prisma.ts` — globalThis singleton PrismaClient
 - [x] **2.2** `lib/db/users.ts`:
   - `findByNickname(nickname)`
+  - `createUser(data)`
   - `upsertByNickname(nickname, data)`
 - [x] **2.3** `lib/db/products.ts`:
   - `listActiveByRound(roundId)` — with progress data + supplier name
@@ -163,7 +164,7 @@ npm run build                 # must pass
   - `batchConfirmShipment(orderIds)`
   - `cancelOrder(orderId, isAdmin?, cancelReason?)` — user: only pending_payment; admin: any status with reason. Restore stock (except shipped). Transaction.
   - `quickConfirm(orderId, paymentAmount)` — POS shortcut: pending_payment → confirmed, auto-fill payment fields + confirmed_at
-  - `findByNicknameOrOrderNumber(query)` — for lookup
+  - `findOrderByNumberAndAccessCode(orderNumber, accessCode)` — for public lookup/order access
   - `listByRound(roundId, statusFilter?)`
   - `listConfirmedByRound(roundId)` — for 待出貨 page
   - `getOrderWithItems(orderId)`
@@ -231,12 +232,12 @@ npm run build        # must pass
   - Call `createWithItems()` (handles stock + dedup + shipping fee)
   - Return order data or error
 - [x] **3.2** `app/api/report-payment/route.ts` — POST
-  - Validate: orderId, amount, last5 (len 5)
-  - Check status = `pending_payment`
+  - Validate: `order_number`, `access_code`, amount, last5 (len 5)
+  - Resolve order by `order_number + access_code`, check status = `pending_payment`
   - Call `reportPayment()`
 - [x] **3.3** `app/api/cancel-order/route.ts` — POST
-  - Two modes: user cancel (no auth, pending_payment only) and admin cancel (auth required, any status, optional cancel_reason)
-  - User: check status = `pending_payment` → cancel + restore stock
+  - Two modes: user cancel (`order_number + access_code`, pending_payment only) and admin cancel (auth required, any status, optional cancel_reason)
+  - User: resolve by `order_number + access_code`, check status = `pending_payment` → cancel + restore stock
   - Admin: any status → cancel + restore stock (except shipped) + send cancellation notification
 - [x] **3.4** `app/api/confirm-order/route.ts` — POST (admin)
   - Verify admin → confirm → send payment_confirmed notifications → return results
@@ -300,7 +301,7 @@ npm run build        # must pass
 
 ## Phase 3.5: LINE Push Notification Migration
 
-> **Goal:** Replace broadcast notifications with 1-on-1 push. Users link orders to their LINE account by pasting the order number into the LINE Official Account.
+> **Goal:** Replace broadcast notifications with 1-on-1 push. Users link orders to their LINE account by pasting the order number + access code into the LINE Official Account.
 
 ### Tasks
 
@@ -312,9 +313,9 @@ npm run build        # must pass
   - `sendLineReply(replyToken, message)` — reply to webhook event (free)
   - `sendLineMessage(lineUserId, text, replyToken?)` — tries reply first, falls back to push
 - [x] **3.5.4** Create `lib/line/webhook.ts` — HMAC-SHA256 signature verification
-- [x] **3.5.5** Create `lib/line/validate-order-code.ts` — validates order number format (`ORD-YYYYMMDD-NNN`), links `line_user_id` to order (idempotent, per-order)
+- [x] **3.5.5** Create `lib/line/validate-order-code.ts` — validates `order_number + access_code`, links `line_user_id` to order (idempotent, per-order)
 - [x] **3.5.6** Create `lib/line/message-handler.ts` — handles incoming LINE messages:
-  - Order number pattern → validate + link → reply confirmation
+  - Order number + access code pattern → validate + link → reply confirmation
   - Existing linked user → show order status
   - Unknown text → show instructions
 - [x] **3.5.7** Create `app/api/line/webhook/route.ts` — LINE webhook endpoint:
@@ -342,7 +343,7 @@ npm run build        # must pass
 - [x] `lib/line/push.ts` uses raw fetch (no `@line/bot-sdk`)
 - [x] All push functions are never-throw
 - [x] Webhook verifies HMAC-SHA256 signature
-- [x] Order linking is idempotent (re-pasting same order = no-op)
+- [x] Order linking is idempotent (re-sending same order number + access code = no-op)
 - [x] One order = one LINE account (ALREADY_LINKED error for different user)
 - [x] `send.ts` imports from `@/lib/line/push`, not `line-notify`
 - [x] Product arrival uses multicast (not individual pushes)
@@ -371,23 +372,24 @@ npm run build        # must pass
   - Fetch open round (with shipping_fee) + products with progress via Prisma
   - Product grid (1 col mobile, 2 col tablet+) with ProductCard
   - DeadlineBanner, SharePanel, CartBar
-  - Checkout form with: nickname auto-fill (via `/api/users/lookup`), recipient fields, pickup select (Radix sentinel workaround), ShippingFeeNote, order summary
-  - Submit: generates submission_key once per session, disables button, calls API, redirects to `/order/[id]`
+  - Checkout form with: nickname input (no public auto-fill), recipient fields, pickup select (Radix sentinel workaround), ShippingFeeNote, order summary
+  - Submit: generates submission_key once per session, disables button, calls API, redirects to `/order/[order_number]?code=...`
   - Round closed → 已截單 + all controls disabled
 - [x] **4.3** `app/order/[id]/page.tsx` — Order Confirmation + Payment Report:
-  - Server component (force-dynamic), fetches order via `getOrderWithItems()`
+  - Server component (force-dynamic), fetches order via `findOrderByNumberAndAccessCode()`
   - `pending_payment`: bank details + `PaymentReportForm` + `CancelOrderButton` + share CTA + **「繼續選購」link**
   - `pending_confirm`: waiting status + payment info summary + share CTA
   - `confirmed`: confirmed state + "等待出貨"
   - `shipped`: shipped state with shipped_at timestamp
   - `cancelled`: cancelled state + cancel_reason (if any)
+  - Shows and preserves the order access code; public summary masks phone instead of exposing full phone
   - Payment report: two-step flow with amount vs order total comparison before submit
   - Cancel: Dialog confirmation → API → router.refresh()
 - [x] **4.4** `app/lookup/page.tsx` — Order Lookup:
-  - Search by nickname or order number via `/api/lookup`
-  - Results with OrderStatusBadge, items summary, total (shipping shown separately)
-  - **Each result clickable → links to `/order/[id]` detail page**
-  - Empty/initial states handled
+  - Search by order number + access code via `/api/lookup`
+  - Result with OrderStatusBadge, items summary, total (shipping shown separately)
+  - **Result clickable → links to `/order/[order_number]?code=...` detail page**
+  - Empty/initial states handled; no public history listing
 
 ### Checkpoint 4
 
@@ -406,8 +408,8 @@ npm run build        # must pass
 - [x] Submit button disables after click + stays disabled
 - [x] submission_key generated once per session (on first checkout click)
 - [x] Share panel only when product under goal
-- [x] Lookup works with both nickname and order number
-- [x] Lookup results link to `/order/[id]` detail page
+- [x] Public lookup requires order number + access code
+- [x] Lookup result links to `/order/[order_number]?code=...` detail page
 - [x] Order detail page handles all 5 statuses (cancelled shows reason if present)
 - [x] Payment report has confirmation step before submit
 - [x] CartBar shows shipping fee hint
@@ -497,7 +499,7 @@ npm run build        # must pass
 
 - [x] **Audit artifact**: Added `phase-1-5-audit.md` with a phase-by-phase validation record and discrepancy log.
 - [x] **Schema/type/source-of-truth alignment**: Reconciled `prisma/schema.prisma`, `prisma/migration.sql`, `types/index.ts`, and added `prisma/migration_003_notification_log_context.sql` for `notification_logs.round_id`, `notification_logs.product_id`, and `status = 'skipped'`.
-- [x] **LINE flow fix**: Order detail now instructs users to paste the raw order number; LINE parsing accepts raw or prefixed text; pending-payment share CTA restored.
+- [x] **LINE flow fix**: Order detail now instructs users to paste `order_number + access_code`; LINE parsing accepts raw or prefixed order text but only binds when a valid access code is present; pending-payment share CTA restored.
 - [x] **Admin routing hardening**: Replaced hardcoded `/admin/...` navigational paths with shared `ADMIN_BASE` helpers so obfuscation remains correct.
 - [x] **Batch idempotency**: `batchConfirm()` / `batchConfirmShipment()` now use transition guards and only notify from rows mutated in the current call.
 - [x] **Dashboard completion gap**: Product-demand detail now includes order number and supports per-product packing-list printing. Product lookups are cached instead of repeatedly scanning arrays.
@@ -553,6 +555,17 @@ npm run build        # must pass
 **Explicit caveats carried forward:**
 - Phase 6 admin flows rely on manual verification + helper-level unit coverage, not component/integration tests.
 - Historical analytics gap and LINE ambiguity handling remain deferred from Phase 1–5.
+
+### CTO Security Hardening (2026-03-24 Session 8)
+
+- [x] **P0 — Direct anon Supabase access closed**: Added `prisma/migration_006_public_access_security.sql` to backfill `orders.access_code`, make it `NOT NULL`/`UNIQUE`/length-checked, and remove permissive anon RLS policies from `users`, `orders`, and `order_items`.
+- [x] **P0 — Public order access rebuilt around access codes**: Public `/api/lookup`, `/order/[id]`, `/api/report-payment`, and `/api/cancel-order` now require `order_number + access_code`. Internal order UUIDs are no longer exposed on public lookup responses.
+- [x] **P0 — Public PII autofill removed**: Storefront nickname auto-fill was removed. `/api/users/lookup` is now admin-only for POS use.
+- [x] **P0 — Nickname collision takeover blocked**: Public submit-order now rejects reuse of an existing nickname when submitted recipient/phone/address/email do not match the saved profile. Admin POS keeps authenticated overwrite behavior.
+- [x] **P1 — Abuse cost raised**: Added lightweight rate limiting for `submit-order`, `lookup`, `report-payment`, and `cancel-order`.
+- [x] **P1 — LINE bind ownership proof added**: LINE order linking now requires both order number and access code; failure messages were generalized to reduce enumeration value.
+- [x] **Live verification**: Migration 006 was verified against Supabase. Anonymous direct reads/writes to `users`, `orders`, and `order_items` are blocked. Public reads on `rounds` and `products` still work.
+- [x] **Verification**: `npx vitest run` (99 tests / 21 files), `npm run lint`, `npm run build`, and `npx tsc --noEmit` all pass.
 
 ---
 
@@ -619,13 +632,14 @@ npx vitest run           # must pass
 
 - [ ] **7.1** Full flow smoke test (manual, against real Supabase):
   - Create supplier → create round (with shipping fee) → add products (linked to supplier, with goals)
-  - Place test orders: one 宅配 (verify shipping added), one 面交 (verify no shipping)
+  - Place test orders: one 宅配 (verify shipping added), one 面交 (verify no shipping), confirm each receives an `order_number + access_code`
   - Verify progress bars update
-  - Report payments → admin confirm → verify LINE + Email sent (type: payment_confirmed)
+  - Report payments via `order_number + access_code` → admin confirm → verify LINE + Email sent (type: payment_confirmed)
+  - Bind LINE with `order_number + access_code` → verify push notifications route to the linked LINE account
   - Admin clicks 通知到貨 for a product → verify relevant customers notified (type: product_arrival)
   - Admin confirms shipment (single + batch) → verify LINE + Email (type: shipment)
   - Cancel an order → verify stock restored
-  - Lookup by nickname → verify history with all statuses
+  - Lookup by `order_number + access_code` → verify order detail access works and no cross-order history leaks
   - Export CSV → verify shipping fee column + Chinese encoding
   - Close round → verify 已截單
 - [x] **7.2** Edge cases (92 tests / 19 files):

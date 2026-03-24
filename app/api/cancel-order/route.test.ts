@@ -10,6 +10,7 @@ vi.mock("@/lib/auth/supabase-admin", () => ({
 const ordersMock = vi.hoisted(() => ({
   cancelOrder: vi.fn(),
   getOrderWithItems: vi.fn(),
+  findOrderByNumberAndAccessCode: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -44,9 +45,8 @@ describe("POST /api/cancel-order", () => {
 
   it("user cancel pending_payment → 200, no notification", async () => {
     authMock.mockResolvedValue(false);
-    ordersMock.getOrderWithItems.mockResolvedValue({
+    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
       ...fakeOrder,
-      user: { phone: "0912345678" },
     });
     ordersMock.cancelOrder.mockResolvedValue({
       changed: true,
@@ -54,22 +54,25 @@ describe("POST /api/cancel-order", () => {
       order_items: fakeOrder.order_items,
     });
 
-    const res = await POST(makeRequest({ orderId: "o1", phone_last4: "5678" }));
+    const res = await POST(
+      makeRequest({ order_number: "ORD-20260324-001", access_code: "ABCD1234EFGH" }),
+    );
     expect(res.status).toBe(200);
     expect(notifyMock.sendOrderCancelledNotifications).not.toHaveBeenCalled();
   });
 
   it("user cancel non-pending_payment → 400", async () => {
     authMock.mockResolvedValue(false);
-    ordersMock.getOrderWithItems.mockResolvedValue({
+    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
       ...fakeOrder,
-      user: { phone: "0912345678" },
     });
     ordersMock.cancelOrder.mockResolvedValue({
       error: "Only pending_payment orders can be cancelled by user",
     });
 
-    const res = await POST(makeRequest({ orderId: "o1", phone_last4: "5678" }));
+    const res = await POST(
+      makeRequest({ order_number: "ORD-20260324-001", access_code: "ABCD1234EFGH" }),
+    );
     expect(res.status).toBe(400);
   });
 
@@ -108,15 +111,17 @@ describe("POST /api/cancel-order", () => {
 
   it("order not found → 404", async () => {
     authMock.mockResolvedValue(false);
-    ordersMock.getOrderWithItems.mockResolvedValue(null);
+    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue(null);
 
-    const res = await POST(makeRequest({ orderId: "nonexistent", phone_last4: "1234" }));
+    const res = await POST(
+      makeRequest({ order_number: "ORD-404", access_code: "ABCD1234EFGH" }),
+    );
     expect(res.status).toBe(404);
   });
 
-  it("missing orderId → 400", async () => {
+  it("missing public order_number → 400", async () => {
     authMock.mockResolvedValue(false);
-    const res = await POST(makeRequest({}));
+    const res = await POST(makeRequest({ access_code: "ABCD1234EFGH" }));
     expect(res.status).toBe(400);
   });
 });

@@ -34,6 +34,21 @@ export function generateSubmissionKey(): string {
   return crypto.randomUUID();
 }
 
+export function generateAccessCode(): string {
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
+}
+
+export function normalizeAccessCode(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+export function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 4) return phone;
+  return `***-***-${digits.slice(-4)}`;
+}
+
 export function calcOrderTotal(
   items: Array<{ subtotal: number }>,
   shippingFee?: number | null,

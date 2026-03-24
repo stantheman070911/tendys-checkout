@@ -1,19 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findByNicknameOrOrderNumber } from "@/lib/db/orders";
+import { findOrderByNumberAndAccessCode } from "@/lib/db/orders";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { normalizeAccessCode } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   try {
-    const q = request.nextUrl.searchParams.get("q")?.trim();
-
-    if (!q) {
-      return NextResponse.json({ error: "q is required" }, { status: 400 });
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`lookup:${clientIp}`, 10, 60_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        },
+      );
     }
 
-    const orders = await findByNicknameOrOrderNumber(q);
+    const orderNumber = request.nextUrl.searchParams.get("orderNumber")?.trim();
+    const accessCode = request.nextUrl.searchParams.get("accessCode")?.trim();
 
-    // Strip PII — only return fields needed by the lookup page
-    const safeOrders = orders.map((order) => ({
-      id: order.id,
+    if (!orderNumber) {
+      return NextResponse.json(
+        { error: "orderNumber is required" },
+        { status: 400 },
+      );
+    }
+    if (!accessCode || normalizeAccessCode(accessCode).length !== 12) {
+      return NextResponse.json(
+        { error: "accessCode must be exactly 12 letters or digits" },
+        { status: 400 },
+      );
+    }
+
+    const order = await findOrderByNumberAndAccessCode(
+      orderNumber.toUpperCase(),
+      normalizeAccessCode(accessCode),
+    );
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const safeOrder = {
       order_number: order.order_number,
       status: order.status,
       total_amount: order.total_amount,
@@ -25,10 +54,9 @@ export async function GET(request: NextRequest) {
         quantity: item.quantity,
         subtotal: item.subtotal,
       })),
-      user: order.user ? { nickname: order.user.nickname } : null,
-    }));
+    };
 
-    return NextResponse.json({ orders: safeOrders });
+    return NextResponse.json({ order: safeOrder });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

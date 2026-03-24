@@ -14,11 +14,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 interface CancelOrderButtonProps {
-  orderId: string;
-  userPhone: string;
+  orderNumber: string;
+  accessCode: string;
 }
 
-export function CancelOrderButton({ orderId, userPhone }: CancelOrderButtonProps) {
+export function CancelOrderButton({
+  orderNumber,
+  accessCode,
+}: CancelOrderButtonProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -31,8 +34,8 @@ export function CancelOrderButton({ orderId, userPhone }: CancelOrderButtonProps
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId,
-          phone_last4: userPhone.replace(/\D/g, "").slice(-4),
+          order_number: orderNumber,
+          access_code: accessCode,
         }),
       });
 

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { findByNickname } from "@/lib/db/users";
 
 export async function GET(request: NextRequest) {
   try {
+    const isAdmin = await verifyAdminSession(request);
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const nickname = request.nextUrl.searchParams.get("nickname")?.trim();
 
     if (!nickname) {

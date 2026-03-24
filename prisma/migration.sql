@@ -59,6 +59,7 @@ create table public.users (
 create table public.orders (
   id uuid default gen_random_uuid() primary key,
   order_number text unique not null,
+  access_code text unique not null check (length(access_code) = 12),
   user_id uuid references public.users(id) on delete set null,
   round_id uuid references public.rounds(id) on delete set null,
   total_amount integer not null default 0,
@@ -192,31 +193,23 @@ create policy "Products admin" on public.products for all
   using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 
--- Users: anyone read/create/update
+-- Users: admin only (public access goes through server routes)
 alter table public.users enable row level security;
-create policy "Users select" on public.users for select using (true);
-create policy "Users insert" on public.users for insert with check (true);
-create policy "Users update" on public.users for update using (true) with check (true);
-
--- Orders: read/create anyone, anon update only payment report, admin update all
-alter table public.orders enable row level security;
-create policy "Orders select" on public.orders for select using (true);
-create policy "Orders insert" on public.orders for insert with check (true);
-create policy "Orders anon payment report" on public.orders for update
-  using (status = 'pending_payment')
-  with check (
-    status = 'pending_confirm'
-    and payment_amount is not null
-    and payment_last5 is not null
-  );
-create policy "Orders admin update" on public.orders for update
+create policy "Users admin" on public.users for all
   using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 
--- Order items: read/create anyone
+-- Orders: admin only (public access goes through server routes)
+alter table public.orders enable row level security;
+create policy "Orders admin" on public.orders for all
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
+
+-- Order items: admin only (public access goes through server routes)
 alter table public.order_items enable row level security;
-create policy "Order items select" on public.order_items for select using (true);
-create policy "Order items insert" on public.order_items for insert with check (true);
+create policy "Order items admin" on public.order_items for all
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 -- Notification logs: admin only
 alter table public.notification_logs enable row level security;

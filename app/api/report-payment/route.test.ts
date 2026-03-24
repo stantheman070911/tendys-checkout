@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ordersMock = vi.hoisted(() => ({
   reportPayment: vi.fn(),
-  getOrderWithItems: vi.fn(),
+  findOrderByNumberAndAccessCode: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -27,18 +27,17 @@ describe("POST /api/report-payment", () => {
 
   it("returns 200 on valid payment report", async () => {
     const fakeOrder = { id: "o1", status: "pending_confirm" };
-    ordersMock.getOrderWithItems.mockResolvedValue({
+    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
       id: "o1",
-      user: { phone: "0912345678" },
     });
     ordersMock.reportPayment.mockResolvedValue(fakeOrder);
 
     const res = await POST(
       makeRequest({
-        order_id: "o1",
+        order_number: "ORD-001",
+        access_code: "ABCD1234EFGH",
         payment_amount: 500,
         payment_last5: "12345",
-        phone_last4: "5678",
       }),
     );
     expect(res.status).toBe(200);
@@ -47,46 +46,62 @@ describe("POST /api/report-payment", () => {
   });
 
   it("returns 404 when order not found or wrong status", async () => {
-    ordersMock.getOrderWithItems.mockResolvedValue({
-      id: "nonexistent",
-      user: { phone: "0912345678" },
-    });
-    ordersMock.reportPayment.mockResolvedValue(null);
+    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue(null);
 
     const res = await POST(
       makeRequest({
-        order_id: "nonexistent",
+        order_number: "ORD-404",
+        access_code: "ABCD1234EFGH",
         payment_amount: 500,
         payment_last5: "12345",
-        phone_last4: "5678",
       }),
     );
     expect(res.status).toBe(404);
   });
 
   it("returns 400 for invalid payment_last5", async () => {
+    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
+      id: "o1",
+    });
     const invalidValues = ["1234", "abcde", "123456"];
     for (const payment_last5 of invalidValues) {
       const res = await POST(
-        makeRequest({ order_id: "o1", payment_amount: 500, payment_last5 }),
+        makeRequest({
+          order_number: "ORD-001",
+          access_code: "ABCD1234EFGH",
+          payment_amount: 500,
+          payment_last5,
+        }),
       );
       expect(res.status).toBe(400);
     }
   });
 
   it("returns 400 for invalid payment_amount", async () => {
+    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
+      id: "o1",
+    });
     const invalidValues = [0, -1, 1.5];
     for (const payment_amount of invalidValues) {
       const res = await POST(
-        makeRequest({ order_id: "o1", payment_amount, payment_last5: "12345" }),
+        makeRequest({
+          order_number: "ORD-001",
+          access_code: "ABCD1234EFGH",
+          payment_amount,
+          payment_last5: "12345",
+        }),
       );
       expect(res.status).toBe(400);
     }
   });
 
-  it("returns 400 for missing order_id", async () => {
+  it("returns 400 for missing order_number", async () => {
     const res = await POST(
-      makeRequest({ payment_amount: 500, payment_last5: "12345" }),
+      makeRequest({
+        access_code: "ABCD1234EFGH",
+        payment_amount: 500,
+        payment_last5: "12345",
+      }),
     );
     expect(res.status).toBe(400);
   });

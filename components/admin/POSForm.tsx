@@ -70,25 +70,22 @@ export function POSForm({
     if (!nickname.trim() || autoFilled) return;
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(
+        const data = await adminFetch<{ user: { recipient_name?: string | null; phone?: string | null; address?: string | null; email?: string | null } | null }>(
           `/api/users/lookup?nickname=${encodeURIComponent(nickname.trim())}`,
         );
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user) {
-            setRecipientName(data.user.recipient_name ?? "");
-            setPhone(data.user.phone ?? "");
-            setAddress(data.user.address ?? "");
-            setEmail(data.user.email ?? "");
-            setAutoFilled(true);
-          }
+        if (data.user) {
+          setRecipientName(data.user.recipient_name ?? "");
+          setPhone(data.user.phone ?? "");
+          setAddress(data.user.address ?? "");
+          setEmail(data.user.email ?? "");
+          setAutoFilled(true);
         }
       } catch {
         // silent
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [nickname, autoFilled]);
+  }, [nickname, autoFilled, adminFetch]);
 
   const activeProducts = products.filter((p) => p.is_active);
 
@@ -150,9 +147,10 @@ export function POSForm({
       }));
 
       // Create order
-      const orderRes = await fetch("/api/submit-order", {
+      const orderData = await adminFetch<{ order?: { id: string } }>(
+        "/api/submit-order",
+        {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           round_id: roundId,
           nickname: nickname.trim(),
@@ -165,17 +163,8 @@ export function POSForm({
           submission_key: submissionKey,
           note: note.trim() || undefined,
         }),
-      });
-
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) {
-        toast({
-          title: orderData.error || "建立訂單失敗",
-          variant: "destructive",
-        });
-        setSubmitting(false);
-        return;
-      }
+        },
+      );
 
       // Quick confirm if requested
       if (quickConfirm && orderData.order?.id) {

@@ -19,3 +19,28 @@ export async function upsertByNickname(
     create: { nickname, ...data },
   });
 }
+
+export async function createUser(data: {
+  nickname: string;
+  recipient_name?: string;
+  phone?: string;
+  address?: string;
+  email?: string;
+}) {
+  return prisma.user.create({ data });
+}
+
+export async function updateUser(
+  id: string,
+  data: {
+    recipient_name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  },
+) {
+  return prisma.user.update({
+    where: { id },
+    data,
+  });
+}

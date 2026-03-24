@@ -2,23 +2,39 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderWithItems } from "@/lib/db/orders";
+import { findOrderByNumberAndAccessCode } from "@/lib/db/orders";
 import { listActiveByRound } from "@/lib/db/products";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { PaymentReportForm } from "@/components/PaymentReportForm";
 import { CancelOrderButton } from "@/components/CancelOrderButton";
 import { SharePanel } from "@/components/SharePanel";
-import { formatCurrency, buildShareUrl } from "@/lib/utils";
+import {
+  formatCurrency,
+  buildShareUrl,
+  maskPhone,
+  normalizeAccessCode,
+} from "@/lib/utils";
 import { BANK_INFO } from "@/constants";
 import type { OrderStatus } from "@/types";
 
 export default async function OrderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ code?: string }>;
 }) {
   const { id } = await params;
-  const order = await getOrderWithItems(id);
+  const { code } = await searchParams;
+  const accessCode =
+    typeof code === "string" ? normalizeAccessCode(code) : "";
+
+  if (!id || accessCode.length !== 12) return notFound();
+
+  const order = await findOrderByNumberAndAccessCode(
+    decodeURIComponent(id).toUpperCase(),
+    accessCode,
+  );
 
   if (!order) return notFound();
 
@@ -173,23 +189,36 @@ export default async function OrderPage({
               <span className="text-lg mr-1.5">💬</span> 接收 LINE 出貨通知
             </h3>
             <p className="text-green-700 text-xs mb-3 text-balance leading-relaxed">
-              把下方訂單編號直接貼到官方 LINE，即可綁定這筆訂單的個人通知。
+              將下方訂單編號和查詢碼一起貼到官方 LINE，才會綁定這筆訂單。
             </p>
-            <div className="bg-white rounded-lg p-3 text-center border font-mono text-green-800 font-bold tracking-widest text-sm shadow-inner select-all mb-3 cursor-text">
-              {order.order_number}
+            <div className="bg-white rounded-lg p-3 border text-green-800 font-mono font-bold text-sm shadow-inner space-y-2 mb-3">
+              <div className="text-center select-all cursor-text">
+                {order.order_number}
+              </div>
+              <div className="border-t pt-2 text-center select-all cursor-text">
+                查詢碼：{order.access_code}
+              </div>
             </div>
             <div className="text-center text-xs text-green-600 mb-2">
-              (長按複製上方訂單編號)
+              傳送格式：{order.order_number} {order.access_code}
             </div>
           </div>
         )}
 
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+          <div className="font-bold mb-1">請保存查詢碼</div>
+          <div className="font-mono tracking-widest">{order.access_code}</div>
+          <p className="mt-2 text-xs text-amber-700">
+            之後查訂單、回報匯款、取消訂單，以及 LINE 綁定都需要這組查詢碼。
+          </p>
+        </div>
+
         {/* Payment report form */}
         {status === "pending_payment" && (
           <PaymentReportForm
-            orderId={order.id}
+            orderNumber={order.order_number}
+            accessCode={order.access_code}
             orderTotal={order.total_amount}
-            userPhone={order.user?.phone ?? ""}
           />
         )}
 
@@ -199,11 +228,8 @@ export default async function OrderPage({
             <div>
               <div className="font-bold">{order.order_number}</div>
               <div className="text-gray-500 text-sm">
-                {order.user?.nickname}
-                {order.user?.recipient_name
-                  ? ` (${order.user.recipient_name})`
-                  : ""}
-                {order.user?.phone ? ` · ${order.user.phone}` : ""}
+                {order.user?.recipient_name ?? "收貨人未提供"}
+                {order.user?.phone ? ` · ${maskPhone(order.user.phone)}` : ""}
               </div>
             </div>
             <div className="border-t pt-3 space-y-1 text-sm">
@@ -253,7 +279,10 @@ export default async function OrderPage({
                 </a>
               )}
               <div className="flex-1">
-                <CancelOrderButton orderId={order.id} userPhone={order.user?.phone ?? ""} />
+                <CancelOrderButton
+                  orderNumber={order.order_number}
+                  accessCode={order.access_code}
+                />
               </div>
             </div>
           </div>
