@@ -17,18 +17,18 @@ import { CartBar } from "@/components/CartBar";
 import { SharePanel } from "@/components/SharePanel";
 import { ShippingFeeNote } from "@/components/ShippingFeeNote";
 import {
+  DELIVERY_SELECT_SENTINEL,
+  getRoundPickupOptions,
+} from "@/lib/pickup-options";
+import {
   formatCurrency,
   calcOrderTotal,
   generateSubmissionKey,
   getPublicOrderAccessSessionKey,
   getPhoneLast3,
 } from "@/lib/utils";
-import { PICKUP_OPTIONS } from "@/constants";
 import { useToast } from "@/hooks/use-toast";
 import type { Round, ProductWithProgress, CartItem } from "@/types";
-
-// Radix Select doesn't support empty string values — use sentinel
-const DELIVERY_VALUE = "__delivery__";
 
 interface StorefrontClientProps {
   round: Round;
@@ -52,11 +52,14 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
-  const [pickupLocation, setPickupLocation] = useState(DELIVERY_VALUE);
+  const [pickupLocation, setPickupLocation] = useState(
+    DELIVERY_SELECT_SENTINEL,
+  );
   const [note, setNote] = useState("");
 
   // Derived
-  const isDelivery = pickupLocation === DELIVERY_VALUE;
+  const pickupOptions = getRoundPickupOptions(round);
+  const isDelivery = pickupLocation === DELIVERY_SELECT_SENTINEL;
   const shippingFee =
     isDelivery && round.shipping_fee ? round.shipping_fee : null;
   const cartItems = Array.from(cart.values());
@@ -226,7 +229,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                     : "依團務設定運費"}
                 </span>
                 <span className="lux-pill">
-                  指定面交點免運
+                  面交點：{round.pickup_option_a} / {round.pickup_option_b}
                 </span>
                 {roundClosed && (
                   <span className="lux-pill border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] text-[rgb(140,67,56)]">
@@ -410,10 +413,10 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PICKUP_OPTIONS.map((opt) => (
+                        {pickupOptions.map((opt) => (
                           <SelectItem
-                            key={opt.value || DELIVERY_VALUE}
-                            value={opt.value || DELIVERY_VALUE}
+                            key={opt.value || DELIVERY_SELECT_SENTINEL}
+                            value={opt.value || DELIVERY_SELECT_SENTINEL}
                           >
                             {opt.label}
                           </SelectItem>

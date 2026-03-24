@@ -170,6 +170,15 @@ describe("POST /api/submit-order", () => {
     expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for a non-string pickup_location", async () => {
+    const res = await POST(
+      makeRequest(validBody({ pickup_location: 123 })),
+    );
+
+    expect(res.status).toBe(400);
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
+  });
+
   it("returns 400 for delivery without address", async () => {
     const res = await POST(
       makeRequest(validBody({ pickup_location: "", address: undefined })),

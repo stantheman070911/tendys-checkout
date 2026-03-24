@@ -49,6 +49,8 @@ export default async function Home({
     is_open: round.is_open,
     deadline: round.deadline ? new Date(round.deadline).toISOString() : null,
     shipping_fee: round.shipping_fee,
+    pickup_option_a: round.pickup_option_a,
+    pickup_option_b: round.pickup_option_b,
     created_at: new Date(round.created_at).toISOString(),
   };
 

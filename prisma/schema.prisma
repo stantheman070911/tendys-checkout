@@ -16,6 +16,8 @@ model Round {
   is_open      Boolean   @default(true)
   deadline     DateTime? @db.Timestamptz(6)
   shipping_fee Int?
+  pickup_option_a String @default("面交點 A")
+  pickup_option_b String @default("面交點 B")
   created_at   DateTime  @default(now()) @db.Timestamptz(6)
 
   products          Product[]

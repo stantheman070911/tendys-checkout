@@ -28,6 +28,8 @@ function makeRound(overrides: Record<string, unknown> = {}) {
     is_open: true,
     deadline: null,
     shipping_fee: 100,
+    pickup_option_a: "面交點 A",
+    pickup_option_b: "面交點 B",
     ...overrides,
   };
 }
@@ -98,7 +100,12 @@ describe("createWithItems — shipping fee snapshot", () => {
   });
 
   it("pickup order ignores round shipping_fee", async () => {
-    txMock.round.findUnique.mockResolvedValue(makeRound({ shipping_fee: 100 }));
+    txMock.round.findUnique.mockResolvedValue(
+      makeRound({
+        shipping_fee: 100,
+        pickup_option_a: "台北面交點",
+      }),
+    );
     txMock.product.findMany.mockResolvedValue([makeProduct()]);
 
     const pickupData = { ...BASE_DATA, pickup_location: "台北面交點" };

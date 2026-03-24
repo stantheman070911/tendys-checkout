@@ -42,6 +42,8 @@ function makeRound(overrides: Record<string, unknown> = {}) {
     is_open: true,
     deadline: null,
     shipping_fee: 100,
+    pickup_option_a: "面交點 A",
+    pickup_option_b: "面交點 B",
     ...overrides,
   };
 }
@@ -219,5 +221,19 @@ describe("createCheckoutOrder", () => {
       kind: "schema_drift_access_code",
       error: expect.stringContaining("migration_007_remove_access_code.sql"),
     });
+  });
+
+  it("returns validation_error when pickup_location is not allowed by the round", async () => {
+    txMock.user.findUnique.mockResolvedValueOnce(makeUser());
+
+    const result = await createCheckoutOrder(
+      makeInput({ pickup_location: "台中面交點" }),
+    );
+
+    expect(result).toEqual({
+      kind: "validation_error",
+      error: "Invalid pickup_location for this round",
+    });
+    expect(txMock.order.create).not.toHaveBeenCalled();
   });
 });

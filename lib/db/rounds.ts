@@ -16,6 +16,8 @@ export async function create(data: {
   name: string;
   deadline?: Date | string | null;
   shipping_fee?: number | null;
+  pickup_option_a?: string;
+  pickup_option_b?: string;
 }): Promise<
   { error: string } | Awaited<ReturnType<typeof prisma.round.create>>
 > {
@@ -68,6 +70,8 @@ export async function update(
     is_open: boolean;
     deadline: Date | string | null;
     shipping_fee: number | null;
+    pickup_option_a: string;
+    pickup_option_b: string;
   }>,
 ): Promise<{ error: string } | ReturnType<typeof prisma.round.update>> {
   // Enforce single-open-round: friendly precheck before DB write

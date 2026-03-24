@@ -10,8 +10,16 @@ create table public.rounds (
   is_open boolean not null default true,
   deadline timestamptz,
   shipping_fee integer,
+  pickup_option_a text not null default '面交點 A'
+    check (char_length(btrim(pickup_option_a)) > 0),
+  pickup_option_b text not null default '面交點 B'
+    check (char_length(btrim(pickup_option_b)) > 0),
   created_at timestamptz default now()
 );
+
+alter table public.rounds
+  add constraint rounds_pickup_options_distinct
+  check (btrim(pickup_option_a) <> btrim(pickup_option_b));
 
 -- At most one open round at any time (partial unique index)
 create unique index idx_rounds_single_open on rounds (is_open) where is_open = true;

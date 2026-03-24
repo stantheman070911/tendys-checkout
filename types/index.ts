@@ -24,6 +24,8 @@ export interface Round {
   is_open: boolean;
   deadline: string | null;
   shipping_fee: number | null;
+  pickup_option_a: string;
+  pickup_option_b: string;
   created_at: string;
 }
 

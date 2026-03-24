@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { isValidRoundPickupLocation } from "@/lib/pickup-options";
 import { normalizePhoneDigits } from "@/lib/utils";
 
 type TxClient = Omit<
@@ -318,6 +319,9 @@ async function createOrderInTx(
   }
   if (round.deadline && new Date() > new Date(round.deadline)) {
     throw new OrderValidationError("This round has closed");
+  }
+  if (!isValidRoundPickupLocation(round, data.pickup_location)) {
+    throw new OrderValidationError("Invalid pickup_location for this round");
   }
 
   const canonicalProducts = await tx.product.findMany({

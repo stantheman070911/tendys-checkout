@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { createCheckoutOrder } from "@/lib/db/orders";
-import { PICKUP_OPTIONS } from "@/constants";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const UUID_RE =
@@ -16,8 +15,6 @@ const MAX_LEN = {
   email: 254,
   note: 500,
 } as const;
-
-const validPickupValues = new Set(PICKUP_OPTIONS.map((o) => o.value));
 
 export async function POST(request: NextRequest) {
   try {
@@ -141,14 +138,17 @@ export async function POST(request: NextRequest) {
     }
 
     // pickup_location: empty string = 宅配, or a named option
-    const pickupValue =
-      typeof pickup_location === "string" ? pickup_location : "";
-    if (!validPickupValues.has(pickupValue)) {
+    if (
+      pickup_location !== undefined &&
+      typeof pickup_location !== "string"
+    ) {
       return NextResponse.json(
-        { error: "Invalid pickup_location" },
+        { error: "pickup_location must be a string" },
         { status: 400 },
       );
     }
+    const pickupValue =
+      typeof pickup_location === "string" ? pickup_location.trim() : "";
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(

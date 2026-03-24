@@ -3,6 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DEFAULT_PICKUP_OPTION_A,
+  DEFAULT_PICKUP_OPTION_B,
+  validatePickupOptionLabels,
+} from "@/lib/pickup-options";
 import { formatCurrency } from "@/lib/utils";
 import type { Round } from "@/types";
 
@@ -18,12 +23,21 @@ export default function RoundsPage() {
   const [feeInput, setFeeInput] = useState("");
   const [editingDeadline, setEditingDeadline] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState("");
+  const [editingPickupOptions, setEditingPickupOptions] = useState(false);
+  const [pickupOptionAInput, setPickupOptionAInput] = useState("");
+  const [pickupOptionBInput, setPickupOptionBInput] = useState("");
 
   // New round form
   const [showNewForm, setShowNewForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
   const [newFee, setNewFee] = useState("");
+  const [newPickupOptionA, setNewPickupOptionA] = useState(
+    DEFAULT_PICKUP_OPTION_A,
+  );
+  const [newPickupOptionB, setNewPickupOptionB] = useState(
+    DEFAULT_PICKUP_OPTION_B,
+  );
   const [creating, setCreating] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -90,9 +104,49 @@ export default function RoundsPage() {
     setEditingDeadline(false);
   };
 
+  const savePickupOptions = () => {
+    if (!currentRound) return;
+    const pickupOptions = validatePickupOptionLabels(
+      pickupOptionAInput,
+      pickupOptionBInput,
+    );
+    if (!pickupOptions.ok) {
+      toast({ title: pickupOptions.error, variant: "destructive" });
+      return;
+    }
+    updateRound(
+      currentRound.id,
+      {
+        pickup_option_a: pickupOptions.pickup_option_a,
+        pickup_option_b: pickupOptions.pickup_option_b,
+      },
+      "面交點已更新",
+    );
+    setEditingPickupOptions(false);
+  };
+
+  const resetNewRoundForm = () => {
+    setShowNewForm(false);
+    setNewName("");
+    setNewDeadline("");
+    setNewFee("");
+    setNewPickupOptionA(DEFAULT_PICKUP_OPTION_A);
+    setNewPickupOptionB(DEFAULT_PICKUP_OPTION_B);
+  };
+
   const createRound = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
+
+    const pickupOptions = validatePickupOptionLabels(
+      newPickupOptionA,
+      newPickupOptionB,
+    );
+    if (!pickupOptions.ok) {
+      toast({ title: pickupOptions.error, variant: "destructive" });
+      return;
+    }
+
     setCreating(true);
     try {
       await adminFetch("/api/rounds", {
@@ -101,13 +155,12 @@ export default function RoundsPage() {
           name: newName.trim(),
           deadline: newDeadline ? new Date(newDeadline).toISOString() : null,
           shipping_fee: newFee ? parseInt(newFee) : null,
+          pickup_option_a: pickupOptions.pickup_option_a,
+          pickup_option_b: pickupOptions.pickup_option_b,
         }),
       });
       toast({ title: "新團已建立" });
-      setShowNewForm(false);
-      setNewName("");
-      setNewDeadline("");
-      setNewFee("");
+      resetNewRoundForm();
       fetchData();
     } catch {
       toast({ title: "建立失敗", variant: "destructive" });
@@ -141,7 +194,7 @@ export default function RoundsPage() {
             開團管理
           </h1>
           <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-            調整本輪截止時間、宅配運費，或建立下一輪團購。
+            調整本輪截止時間、宅配運費、面交點，或建立下一輪團購。
           </p>
         </div>
       </section>
@@ -237,6 +290,60 @@ export default function RoundsPage() {
                   </div>
                 )}
               </div>
+
+              <div className="mt-3">
+                <div className="text-xs text-[rgb(74,96,136)]">面交點：</div>
+                {editingPickupOptions ? (
+                  <div className="mt-2 space-y-2">
+                    <input
+                      value={pickupOptionAInput}
+                      onChange={(e) => setPickupOptionAInput(e.target.value)}
+                      placeholder="面交點 A"
+                      className="lux-input"
+                      autoFocus
+                    />
+                    <input
+                      value={pickupOptionBInput}
+                      onChange={(e) => setPickupOptionBInput(e.target.value)}
+                      placeholder="面交點 B"
+                      className="lux-input"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={savePickupOptions}
+                        className="rounded-full bg-[rgb(74,96,136)] px-3 py-1.5 text-xs font-semibold text-white"
+                      >
+                        儲存
+                      </button>
+                      <button
+                        onClick={() => setEditingPickupOptions(false)}
+                        className="text-xs text-[hsl(var(--muted-foreground))]"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.9)] px-3 py-1 text-xs font-semibold text-[hsl(var(--ink))]">
+                      A · {currentRound.pickup_option_a}
+                    </span>
+                    <span className="rounded-full border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.9)] px-3 py-1 text-xs font-semibold text-[hsl(var(--ink))]">
+                      B · {currentRound.pickup_option_b}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setPickupOptionAInput(currentRound.pickup_option_a);
+                        setPickupOptionBInput(currentRound.pickup_option_b);
+                        setEditingPickupOptions(true);
+                      }}
+                      className="text-xs text-[hsl(var(--muted-foreground))] underline"
+                    >
+                      修改
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <span className="rounded-full border border-[rgba(95,126,92,0.2)] bg-[rgba(228,239,223,0.82)] px-3 py-1 text-xs font-semibold text-[rgb(65,98,61)]">
               開團中
@@ -312,10 +419,34 @@ export default function RoundsPage() {
               />
             </div>
           </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                面交點 A
+              </label>
+              <input
+                value={newPickupOptionA}
+                onChange={(e) => setNewPickupOptionA(e.target.value)}
+                placeholder="面交點 A"
+                className="lux-input"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                面交點 B
+              </label>
+              <input
+                value={newPickupOptionB}
+                onChange={(e) => setNewPickupOptionB(e.target.value)}
+                placeholder="面交點 B"
+                className="lux-input"
+              />
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setShowNewForm(false)}
+              onClick={resetNewRoundForm}
               className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
             >
               取消
@@ -331,7 +462,11 @@ export default function RoundsPage() {
         </form>
       ) : (
         <button
-          onClick={() => setShowNewForm(true)}
+          onClick={() => {
+            setShowNewForm(true);
+            setNewPickupOptionA(DEFAULT_PICKUP_OPTION_A);
+            setNewPickupOptionB(DEFAULT_PICKUP_OPTION_B);
+          }}
           className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] py-4 font-semibold text-[hsl(var(--mist))]"
         >
           新開一團

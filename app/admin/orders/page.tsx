@@ -329,9 +329,8 @@ export default function OrdersPage() {
       <POSForm
         open={showPOS}
         onClose={() => setShowPOS(false)}
-        roundId={round.id}
+        round={round}
         products={products}
-        shippingFee={round.shipping_fee}
         adminFetch={adminFetch}
         onSuccess={fetchData}
       />

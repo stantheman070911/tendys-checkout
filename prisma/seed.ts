@@ -38,6 +38,8 @@ async function main() {
       name: SEED_ROUND_NAME,
       is_open: true,
       shipping_fee: 60,
+      pickup_option_a: "台北車站面交",
+      pickup_option_b: "板橋車站面交",
       deadline: new Date("2026-04-01T23:59:59+08:00"),
     },
   });

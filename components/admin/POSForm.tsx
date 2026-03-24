@@ -8,16 +8,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { PICKUP_OPTIONS } from "@/constants";
+import { getRoundPickupOptions } from "@/lib/pickup-options";
 import { formatCurrency, generateSubmissionKey } from "@/lib/utils";
-import type { ProductWithProgress } from "@/types";
+import type { ProductWithProgress, Round } from "@/types";
 
 interface POSFormProps {
   open: boolean;
   onClose: () => void;
-  roundId: string;
+  round: Round;
   products: ProductWithProgress[];
-  shippingFee: number | null;
   adminFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
   onSuccess: () => void;
 }
@@ -32,9 +31,8 @@ interface CartEntry {
 export function POSForm({
   open,
   onClose,
-  roundId,
+  round,
   products,
-  shippingFee,
   adminFetch,
   onSuccess,
 }: POSFormProps) {
@@ -70,9 +68,14 @@ export function POSForm({
     if (!nickname.trim() || autoFilled) return;
     const timer = setTimeout(async () => {
       try {
-        const data = await adminFetch<{ user: { recipient_name?: string | null; phone?: string | null; address?: string | null; email?: string | null } | null }>(
-          `/api/users/lookup?nickname=${encodeURIComponent(nickname.trim())}`,
-        );
+        const data = await adminFetch<{
+          user: {
+            recipient_name?: string | null;
+            phone?: string | null;
+            address?: string | null;
+            email?: string | null;
+          } | null;
+        }>(`/api/users/lookup?nickname=${encodeURIComponent(nickname.trim())}`);
         if (data.user) {
           setRecipientName(data.user.recipient_name ?? "");
           setPhone(data.user.phone ?? "");
@@ -88,6 +91,7 @@ export function POSForm({
   }, [nickname, autoFilled, adminFetch]);
 
   const activeProducts = products.filter((p) => p.is_active);
+  const pickupOptions = getRoundPickupOptions(round);
 
   const updateQty = (productId: string, delta: number) => {
     setCart((prev) => {
@@ -122,7 +126,7 @@ export function POSForm({
     0,
   );
   const isDelivery = pickup === "";
-  const appliedFee = isDelivery && shippingFee ? shippingFee : 0;
+  const appliedFee = isDelivery && round.shipping_fee ? round.shipping_fee : 0;
   const total = itemsTotal + appliedFee;
 
   const canSubmit =
@@ -150,19 +154,19 @@ export function POSForm({
       const orderData = await adminFetch<{ order?: { id: string } }>(
         "/api/submit-order",
         {
-        method: "POST",
-        body: JSON.stringify({
-          round_id: roundId,
-          nickname: nickname.trim(),
-          recipient_name: recipientName.trim(),
-          phone: phone.trim(),
-          address: address.trim() || undefined,
-          email: email.trim() || undefined,
-          pickup_location: pickup,
-          items,
-          submission_key: submissionKey,
-          note: note.trim() || undefined,
-        }),
+          method: "POST",
+          body: JSON.stringify({
+            round_id: round.id,
+            nickname: nickname.trim(),
+            recipient_name: recipientName.trim(),
+            phone: phone.trim(),
+            address: address.trim() || undefined,
+            email: email.trim() || undefined,
+            pickup_location: pickup,
+            items,
+            submission_key: submissionKey,
+            note: note.trim() || undefined,
+          }),
         },
       );
 
@@ -295,7 +299,7 @@ export function POSForm({
               取貨方式
             </div>
             <div className="flex gap-2 flex-wrap">
-              {PICKUP_OPTIONS.map((opt) => (
+              {pickupOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setPickup(opt.value)}

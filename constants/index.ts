@@ -31,12 +31,6 @@ export const NOTIFICATION_TYPES = {
   ORDER_CANCELLED: "order_cancelled",
 } as const;
 
-export const PICKUP_OPTIONS = [
-  { value: "", label: "宅配到以上地址" },
-  { value: "面交點 A", label: "面交點 A" },
-  { value: "面交點 B", label: "面交點 B" },
-];
-
 export const ADMIN_BASE = "/bitchassnigga";
 
 export const BANK_INFO = {
