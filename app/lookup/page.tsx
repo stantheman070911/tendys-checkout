@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import type { Order, OrderItem, User, OrderStatus } from "@/types";
 
 interface OrderResult extends Order {
@@ -12,6 +13,7 @@ interface OrderResult extends Order {
 }
 
 export default function LookupPage() {
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<OrderResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -24,17 +26,17 @@ export default function LookupPage() {
 
     setSearching(true);
     try {
-      const res = await fetch(
-        `/api/lookup?q=${encodeURIComponent(trimmed)}`
-      );
+      const res = await fetch(`/api/lookup?q=${encodeURIComponent(trimmed)}`);
       if (res.ok) {
         const data = await res.json();
         setResults(data.orders ?? []);
       } else {
         setResults([]);
+        toast({ title: "查詢失敗", variant: "destructive" });
       }
     } catch {
       setResults([]);
+      toast({ title: "網路錯誤，請稍後再試", variant: "destructive" });
     }
     setSearched(true);
     setSearching(false);
@@ -73,9 +75,7 @@ export default function LookupPage() {
         </form>
 
         {searched && results.length === 0 && (
-          <div className="text-center py-10 text-gray-400">
-            找不到相關訂單
-          </div>
+          <div className="text-center py-10 text-gray-400">找不到相關訂單</div>
         )}
 
         {results.length > 0 && (
@@ -95,9 +95,7 @@ export default function LookupPage() {
                         {order.user?.nickname}
                       </span>
                     </div>
-                    <OrderStatusBadge
-                      status={order.status as OrderStatus}
-                    />
+                    <OrderStatusBadge status={order.status as OrderStatus} />
                   </div>
                   <div className="text-xs text-gray-400">
                     {order.order_items
@@ -106,10 +104,14 @@ export default function LookupPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>
-                      小計 {formatCurrency(order.total_amount - (order.shipping_fee ?? 0))}
+                      小計{" "}
+                      {formatCurrency(
+                        order.total_amount - (order.shipping_fee ?? 0),
+                      )}
                       {order.shipping_fee ? (
                         <span className="text-gray-400">
-                          {" "}+{formatCurrency(order.shipping_fee)}運
+                          {" "}
+                          +{formatCurrency(order.shipping_fee)}運
                         </span>
                       ) : null}
                     </span>

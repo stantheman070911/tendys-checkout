@@ -71,7 +71,7 @@ export function POSForm({
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/users/lookup?nickname=${encodeURIComponent(nickname.trim())}`
+          `/api/users/lookup?nickname=${encodeURIComponent(nickname.trim())}`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -101,7 +101,7 @@ export function POSForm({
         const prod = products.find((p) => p.id === productId);
         if (prod?.stock != null && newQty > prod.stock) return prev;
         return prev.map((c) =>
-          c.product_id === productId ? { ...c, quantity: newQty } : c
+          c.product_id === productId ? { ...c, quantity: newQty } : c,
         );
       }
       if (delta <= 0) return prev;
@@ -122,14 +122,18 @@ export function POSForm({
 
   const itemsTotal = cart.reduce(
     (sum, c) => sum + c.unit_price * c.quantity,
-    0
+    0,
   );
   const isDelivery = pickup === "";
   const appliedFee = isDelivery && shippingFee ? shippingFee : 0;
   const total = itemsTotal + appliedFee;
 
   const canSubmit =
-    cart.length > 0 && nickname.trim() && recipientName.trim() && phone.trim();
+    cart.length > 0 &&
+    nickname.trim() &&
+    recipientName.trim() &&
+    phone.trim() &&
+    (!isDelivery || address.trim());
 
   const handleSubmit = async (quickConfirm: boolean) => {
     if (!canSubmit) return;

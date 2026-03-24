@@ -18,14 +18,14 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<ProductWithProgress | null>(
-    null
+    null,
   );
 
   const fetchData = useCallback(async () => {
     setError(null);
     try {
       const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true"
+        "/api/rounds?all=true",
       );
       const openRound = roundsData.rounds.find((r) => r.is_open);
       if (!openRound) {
@@ -36,7 +36,7 @@ export default function ProductsPage() {
 
       const [productsData, suppliersData] = await Promise.all([
         adminFetch<{ products: ProductWithProgress[] }>(
-          `/api/products?roundId=${openRound.id}&all=true`
+          `/api/products?roundId=${openRound.id}&all=true`,
         ),
         adminFetch<{ suppliers: Supplier[] }>("/api/suppliers"),
       ]);
@@ -54,7 +54,10 @@ export default function ProductsPage() {
     fetchData();
   }, [fetchData]);
 
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
   const toggleActive = async (product: ProductWithProgress) => {
+    setTogglingId(product.id);
     try {
       await adminFetch("/api/products", {
         method: "PUT",
@@ -64,6 +67,8 @@ export default function ProductsPage() {
       fetchData();
     } catch {
       toast({ title: "操作失敗", variant: "destructive" });
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -126,10 +131,13 @@ export default function ProductsPage() {
               <div className="flex gap-2 items-center">
                 <button
                   onClick={() => toggleActive(p)}
+                  disabled={togglingId === p.id}
                   className={`text-xs px-2 py-0.5 rounded-full ${
-                    p.is_active
-                      ? "bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700 transition-colors"
-                      : "bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700 transition-colors"
+                    togglingId === p.id
+                      ? "opacity-50"
+                      : p.is_active
+                        ? "bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700 transition-colors"
+                        : "bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700 transition-colors"
                   }`}
                 >
                   {p.is_active ? "下架" : "上架"}

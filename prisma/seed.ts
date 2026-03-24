@@ -1,21 +1,48 @@
 import { prisma } from "../lib/db/prisma";
 
-async function main() {
-  console.log("Seeding dev data...");
+const SEED_ROUND_NAME = "3月生鮮團購";
+const SEED_SUPPLIER_NAMES = ["小農地瓜園", "健康養雞場"];
+const SEED_USER_NICKNAMES = ["Test User 1", "Test User 2", "Test User 3"];
 
-  // 1. Create a round with shipping fee
+async function main() {
+  // Clean up previous seed data (named fixtures only)
+  await prisma.orderItem.deleteMany({
+    where: { order: { round: { name: SEED_ROUND_NAME } } },
+  });
+  await prisma.notificationLog.deleteMany({
+    where: { round: { name: SEED_ROUND_NAME } },
+  });
+  await prisma.order.deleteMany({
+    where: { round: { name: SEED_ROUND_NAME } },
+  });
+  await prisma.product.deleteMany({
+    where: { round: { name: SEED_ROUND_NAME } },
+  });
+  await prisma.round.deleteMany({ where: { name: SEED_ROUND_NAME } });
+  await prisma.supplier.deleteMany({
+    where: { name: { in: SEED_SUPPLIER_NAMES } },
+  });
+  await prisma.user.deleteMany({
+    where: { nickname: { in: SEED_USER_NICKNAMES } },
+  });
+
+  // 1. Round with shipping fee
+  // Close any pre-existing open rounds to satisfy single-open-round constraint
+  await prisma.round.updateMany({
+    where: { is_open: true },
+    data: { is_open: false },
+  });
+
   const round = await prisma.round.create({
     data: {
-      name: "3月生鮮團購",
+      name: SEED_ROUND_NAME,
       is_open: true,
       shipping_fee: 60,
-      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      deadline: new Date("2026-04-01T23:59:59+08:00"),
     },
   });
 
-  console.log(`Created Round: ${round.name}`);
-
-  // 2. Create suppliers
+  // 2. Suppliers
   const supplier1 = await prisma.supplier.create({
     data: {
       name: "小農地瓜園",
@@ -33,9 +60,7 @@ async function main() {
     },
   });
 
-  console.log("Created Suppliers");
-
-  // 3. Create products
+  // 3. Products (5 total, linked to suppliers)
   await prisma.product.createMany({
     data: [
       {
@@ -83,32 +108,36 @@ async function main() {
         price: 120,
         unit: "顆",
         stock: 80,
-        goal_qty: null, // Unlimited
+        goal_qty: null,
       },
     ],
   });
 
-  console.log("Created Products");
-
-  // 4. Create test users
+  // 4. Test users (3 stable users for smoke testing)
   await prisma.user.createMany({
     data: [
       {
         nickname: "Test User 1",
-        recipient_name: "Test Name 1",
+        recipient_name: "王小明",
         phone: "0900-000-001",
         address: "台北市信義區測試路 1 號",
+        email: "test1@example.com",
       },
       {
         nickname: "Test User 2",
-        recipient_name: "Test Name 2",
+        recipient_name: "林美玲",
         phone: "0900-000-002",
+        address: "台中市西屯區測試路 2 號",
+      },
+      {
+        nickname: "Test User 3",
+        recipient_name: "陳大華",
+        phone: "0900-000-003",
+        address: "高雄市前鎮區測試路 3 號",
+        email: "test3@example.com",
       },
     ],
   });
-
-  console.log("Created Dev Users");
-  console.log("Seeding complete!");
 }
 
 main().catch((e) => {

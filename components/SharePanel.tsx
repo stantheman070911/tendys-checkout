@@ -17,14 +17,26 @@ export function SharePanel({ roundId, show }: SharePanelProps) {
   const url = buildShareUrl(roundId);
 
   function handleCopy() {
-    navigator.clipboard.writeText(url).then(() => {
-      toast({ title: "已複製連結" });
-    });
+    if (!navigator.clipboard) {
+      toast({ title: "複製失敗", variant: "destructive" });
+      return;
+    }
+    navigator.clipboard.writeText(url).then(
+      () => {
+        toast({ title: "已複製連結" });
+      },
+      () => {
+        toast({ title: "複製失敗", variant: "destructive" });
+      },
+    );
   }
 
   function handleLineShare() {
     const lineUrl = buildLineShareUrl(url, "快來團購！新鮮直送～");
-    window.open(lineUrl, "_blank");
+    const win = window.open(lineUrl, "_blank");
+    if (!win) {
+      toast({ title: "無法開啟 LINE，請手動複製連結分享", variant: "destructive" });
+    }
   }
 
   return (
@@ -33,7 +45,12 @@ export function SharePanel({ roundId, show }: SharePanelProps) {
         還有商品未達標，分享給更多人一起團購吧！
       </p>
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" className="h-11" onClick={handleCopy}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-11"
+          onClick={handleCopy}
+        >
           複製連結
         </Button>
         <Button

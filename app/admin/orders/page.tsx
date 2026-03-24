@@ -41,20 +41,18 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>(
-    searchParams.get("status") ?? "all"
+    searchParams.get("status") ?? "all",
   );
   const [search, setSearch] = useState("");
   const [batchSel, setBatchSel] = useState<Set<string>>(new Set());
   const [batchActing, setBatchActing] = useState(false);
-  const [showPOS, setShowPOS] = useState(
-    searchParams.get("showPOS") === "1"
-  );
+  const [showPOS, setShowPOS] = useState(searchParams.get("showPOS") === "1");
 
   const fetchData = useCallback(async () => {
     setError(null);
     try {
       const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true"
+        "/api/rounds?all=true",
       );
       const openRound = roundsData.rounds.find((r) => r.is_open);
       if (!openRound) {
@@ -65,10 +63,10 @@ export default function OrdersPage() {
 
       const [ordersData, productsData] = await Promise.all([
         adminFetch<{ orders: OrderWithRelations[] }>(
-          `/api/orders?roundId=${openRound.id}`
+          `/api/orders?roundId=${openRound.id}`,
         ),
         adminFetch<{ products: ProductWithProgress[] }>(
-          `/api/products?roundId=${openRound.id}&all=true`
+          `/api/products?roundId=${openRound.id}&all=true`,
         ),
       ]);
 
@@ -91,9 +89,7 @@ export default function OrdersPage() {
     return matchesOrderSearch(o, search);
   });
 
-  const pendingConfirm = orders.filter(
-    (o) => o.status === "pending_confirm"
-  );
+  const pendingConfirm = orders.filter((o) => o.status === "pending_confirm");
 
   const selectAllPending = () => {
     setBatchSel(new Set(pendingConfirm.map((o) => o.id)));
@@ -148,24 +144,30 @@ export default function OrdersPage() {
     }
   };
 
+  const [csvExporting, setCsvExporting] = useState(false);
+
   const handleCSVExport = async () => {
     if (!round) return;
+    setCsvExporting(true);
     try {
-      const { getSupabaseBrowser } = await import("@/lib/auth/supabase-browser");
+      const { getSupabaseBrowser } =
+        await import("@/lib/auth/supabase-browser");
       const supabase = getSupabaseBrowser();
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const token = session?.access_token;
-      
+
       if (!token) throw new Error("No token");
 
       const res = await fetch(`/api/export-csv?roundId=${round.id}`, {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
+
       if (!res.ok) throw new Error("Export failed");
-      
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -177,6 +179,8 @@ export default function OrdersPage() {
       document.body.removeChild(a);
     } catch {
       toast({ title: "匯出失敗", variant: "destructive" });
+    } finally {
+      setCsvExporting(false);
     }
   };
 
@@ -224,9 +228,10 @@ export default function OrdersPage() {
         )}
         <button
           onClick={handleCSVExport}
-          className="text-xs px-3 py-2.5 border rounded-xl text-gray-500 hover:text-indigo-600 whitespace-nowrap"
+          disabled={csvExporting}
+          className={`text-xs px-3 py-2.5 border rounded-xl whitespace-nowrap ${csvExporting ? "opacity-50 text-gray-400" : "text-gray-500 hover:text-indigo-600"}`}
         >
-          CSV
+          {csvExporting ? "匯出中..." : "CSV"}
         </button>
       </div>
 
@@ -237,9 +242,7 @@ export default function OrdersPage() {
             key={s}
             onClick={() => setFilter(s)}
             className={`text-xs px-3 py-1.5 rounded-full transition ${
-              filter === s
-                ? "bg-indigo-600 text-white"
-                : "bg-white border"
+              filter === s ? "bg-indigo-600 text-white" : "bg-white border"
             }`}
           >
             {s === "all" ? "全部" : STATUS_LABELS[s]}
