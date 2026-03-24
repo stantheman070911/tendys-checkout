@@ -42,7 +42,7 @@
   types/index.ts
   constants/index.ts
   app/page.tsx                      → "Coming soon" placeholder
-  app/order/[id]/page.tsx           → placeholder (async params for Next.js 16)
+  app/order/[orderNumber]/page.tsx  → placeholder (async params for Next.js 16)
   app/lookup/page.tsx               → placeholder
   app/admin/page.tsx                → placeholder
   app/admin/dashboard/page.tsx      → placeholder
@@ -375,7 +375,7 @@ npm run build        # must pass
   - Checkout form with: nickname input (no public auto-fill), recipient fields, pickup select (Radix sentinel workaround), ShippingFeeNote, order summary
   - Submit: generates submission_key once per session, disables button, calls API, redirects to `/order/[order_number]?code=...`
   - Round closed → 已截單 + all controls disabled
-- [x] **4.3** `app/order/[id]/page.tsx` — Order Confirmation + Payment Report:
+- [x] **4.3** `app/order/[orderNumber]/page.tsx` — Order Confirmation + Payment Report:
   - Server component (force-dynamic), fetches order via `findOrderByNumberAndAccessCode()`
   - `pending_payment`: bank details + `PaymentReportForm` + `CancelOrderButton` + share CTA + **「繼續選購」link**
   - `pending_confirm`: waiting status + payment info summary + share CTA
@@ -559,7 +559,7 @@ npm run build        # must pass
 ### CTO Security Hardening (2026-03-24 Session 8)
 
 - [x] **P0 — Direct anon Supabase access closed**: Added `prisma/migration_006_public_access_security.sql` to backfill `orders.access_code`, make it `NOT NULL`/`UNIQUE`/length-checked, and remove permissive anon RLS policies from `users`, `orders`, and `order_items`.
-- [x] **P0 — Public order access rebuilt around access codes**: Public `/api/lookup`, `/order/[id]`, `/api/report-payment`, and `/api/cancel-order` now require `order_number + access_code`. Internal order UUIDs are no longer exposed on public lookup responses.
+- [x] **P0 — Public order access rebuilt around access codes**: Public `/api/lookup`, `/order/[orderNumber]`, `/api/report-payment`, and `/api/cancel-order` now require `order_number + access_code`. Internal order UUIDs are no longer exposed on public lookup responses.
 - [x] **P0 — Public PII autofill removed**: Storefront nickname auto-fill was removed. `/api/users/lookup` is now admin-only for POS use.
 - [x] **P0 — Nickname collision takeover blocked**: Public submit-order now rejects reuse of an existing nickname when submitted recipient/phone/address/email do not match the saved profile. Admin POS keeps authenticated overwrite behavior.
 - [x] **P1 — Abuse cost raised**: Added lightweight rate limiting for `submit-order`, `lookup`, `report-payment`, and `cancel-order`.

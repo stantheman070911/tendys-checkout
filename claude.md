@@ -54,7 +54,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 ```
 app/                          → Next.js pages and API routes only
   page.tsx                    # User storefront (products + cart + checkout)
-  order/[id]/page.tsx         # Order detail via order number + ?code=ACCESS_CODE
+  order/[orderNumber]/page.tsx # Order detail via order number + ?code=ACCESS_CODE
   lookup/page.tsx             # Order lookup by order number + access code
   gtfo/page.tsx               # Troll page for /admin snoopers ("get the fuck out")
   admin/                      # ⚠️ NOT accessible via /admin (redirects to /gtfo)

@@ -21,18 +21,18 @@ export default async function OrderPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ orderNumber: string }>;
   searchParams: Promise<{ code?: string }>;
 }) {
-  const { id } = await params;
+  const { orderNumber } = await params;
   const { code } = await searchParams;
   const accessCode =
     typeof code === "string" ? normalizeAccessCode(code) : "";
 
-  if (!id || accessCode.length !== 12) return notFound();
+  if (!orderNumber || accessCode.length !== 12) return notFound();
 
   const order = await findOrderByNumberAndAccessCode(
-    decodeURIComponent(id).toUpperCase(),
+    decodeURIComponent(orderNumber).toUpperCase(),
     accessCode,
   );
 
