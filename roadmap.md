@@ -41,7 +41,7 @@
 ### Tasks
 
 - [ ] **7.1** Full flow smoke test (manual, against real Supabase):
-  - Create supplier → round (with shipping fee) → products (linked to supplier, with goals)
+  - Create supplier → round (with shipping fee + pickup point A/B labels) → products (linked to supplier, with goals)
   - Place test orders: 宅配 (verify shipping added), 面交 (verify no shipping)
   - Verify progress bars update
   - Report payments via `order_number + recipient_name + phone_last3` → admin confirm → verify notifications
@@ -49,7 +49,7 @@
   - Admin 通知到貨 → verify customers notified
   - Admin confirm shipment (single + batch) → verify notifications
   - Cancel order → verify stock restored
-  - Lookup by `recipient_name + phone_last3` → verify access works, no cross-order leaks
+  - Lookup by `recipient_name + phone_last3` → verify access works, no cross-order leaks, and unlocked detail shows expected address/phone
   - Export CSV → verify shipping fee column + Chinese encoding
   - Close round → verify 已截單
 - [x] **7.2** Edge case tests (99 tests / 21 files)
@@ -71,6 +71,17 @@
   - Preserved `submission_key` dedup while preventing failed order creation from leaving partial user rows behind
   - Added explicit `/api/submit-order` handling for stale `orders.access_code` schema drift, returning `503` with migration guidance instead of opaque `500`
   - Added focused route + DB tests for dedup, nickname conflicts, concurrent nickname reuse, and schema-drift detection
+- [x] **7.10** Public order redirect polish
+  - Replaced the post-checkout verification-form flash with a loading state while stored order access is being auto-consumed
+  - Preserved the existing `recipient_name + phone_last3` public auth rule; this was UX-only polish in `components/PublicOrderPage.tsx`
+- [x] **7.11** Configurable pickup points per round
+  - Added `pickup_option_a` + `pickup_option_b` to `Round` in Prisma, shared types, seed data, and Supabase SQL
+  - Added manual migration file `prisma/migration_008_round_pickup_options.sql` for live databases
+  - Updated admin round management to edit pickup labels, and updated storefront checkout + admin POS to read the active round’s labels instead of a hard-coded constant
+  - Updated order creation validation so `pickup_location` must match the round’s configured pickup labels
+- [x] **7.12** Public order detail polish
+  - Added one-click LINE binding copy and a direct official LINE OA button on the public order detail page
+  - Extended `/api/lookup/order` to return saved contact phone + shipping address after successful public verification, and surfaced both on the unlocked order detail view
 
 ### Checkpoint 7 (Final)
 

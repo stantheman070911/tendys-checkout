@@ -17,11 +17,19 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
   - `@fontsource/noto-serif-tc`
 - Cart-bar secondary copy contrast was raised in `components/CartBar.tsx` to avoid marginal readability on weaker screens.
 - The redesign was visual only. Business logic and public/admin flows were intentionally preserved.
-- Verified after redesign + font fix:
+- `/api/submit-order` now uses an atomic checkout path in `lib/db/orders.ts`: nickname resolution + user persistence + order creation happen in one transaction, and stale `orders.access_code` schema drift is surfaced as `503` instead of opaque `500`.
+- `components/PublicOrderPage.tsx` no longer flashes the manual verification form immediately after checkout redirect; it waits for the stored access auto-unlock attempt to finish first.
+- `Round` now owns configurable `pickup_option_a` + `pickup_option_b`. Shared helper: `lib/pickup-options.ts`. Storefront checkout, admin POS, rounds admin UI, and submit-order validation all read from the round, not a hard-coded constant.
+- Live databases need manual SQL `prisma/migration_008_round_pickup_options.sql` before deploying the round-configurable pickup feature.
+- Public order detail now includes:
+  - one-click copy of the LINE binding string
+  - a direct button to the official LINE OA
+  - saved contact phone + shipping address after successful public verification
+- Verified after redesign + subsequent checkout/order-detail follow-up:
   - `npx tsc --noEmit`
   - `npm run lint`
   - `npm run build`
-  - `npx vitest run`
+  - focused `npx vitest run ...` coverage for submit-order, round pickup config, and public lookup/order detail flows
 
 ### Primary Redesign Files
 
@@ -61,7 +69,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 
 ### Core Flow
 
-1. Admin creates round (開團) with deadline + shipping fee + products.
+1. Admin creates round (開團) with deadline + shipping fee + pickup labels + products.
 2. Shares URL in LINE group.
 3. User browses → adds to cart → enters nickname + recipient info + pickup option → submits (idempotent via `submission_key`).
 4. System shows bank details + share CTA if any product under goal.
@@ -120,6 +128,7 @@ lib/                            # Pure TypeScript — NO React/Next imports
   db/prisma.ts                  # globalThis singleton PrismaClient
   db/users.ts, orders.ts, products.ts, rounds.ts, suppliers.ts, notification-logs.ts
   rate-limit.ts
+  pickup-options.ts             # Round pickup option defaults + validation
   line/push.ts, webhook.ts, extract-order-number.ts, extract-order-binding.ts
   line/validate-order-code.ts, message-handler.ts
   notifications/email.ts, send.ts
@@ -135,11 +144,11 @@ components/
   admin/ProductForm.tsx, SupplierForm.tsx, ShipmentCard.tsx
 hooks/use-toast.ts, use-admin-session.ts, use-admin-fetch.ts
 types/index.ts
-constants/index.ts              # Status enums, pickup options, bank info keys
+constants/index.ts              # Status enums, bank info keys
 prisma/
   schema.prisma                 # 7 models
   migration.sql                 # Initial (tables, triggers, RLS, views)
-  migration_002–007             # Incremental (line_user_id, notif context, single-open-round, line index, RLS hardening, remove access_code)
+  migration_002–008             # Incremental (line_user_id, notif context, single-open-round, line index, RLS hardening, remove access_code, round pickup labels)
   seed.ts
 ```
 
@@ -148,7 +157,7 @@ prisma/
 ## Database Schema (7 models)
 
 ```
-Round          → id, name, is_open, deadline, shipping_fee, created_at
+Round          → id, name, is_open, deadline, shipping_fee, pickup_option_a, pickup_option_b, created_at
 Supplier       → id, name, contact_name, phone, email, note, created_at, updated_at
 Product        → id, round_id(FK), supplier_id(FK), name, price, unit, is_active, stock, goal_qty, image_url, created_at
 User           → id, nickname(UNIQUE), recipient_name, phone, address, email, created_at, updated_at
@@ -189,7 +198,9 @@ Cancel stock restore: yes except `shipped`.
 - **`submission_key`**: Client-generated UUID. Server deduplicates via unique constraint.
 - **`product_progress` view**: Aggregates order_items by product (excluding cancelled).
 - **Shipping fee**: `submit-order` snapshots `round.shipping_fee` on 宅配 orders. Never recalculate after creation.
+- **Pickup options**: `pickup_option_a` / `pickup_option_b` live on `Round`. `pickup_location` must be empty string (宅配) or match that round’s configured labels.
 - **Public access**: `/api/lookup` requires `recipient_name + phone_last3`. Single-order actions require `order_number + recipient_name + phone_last3`. No internal UUIDs on public routes.
+- **Public order detail payload**: After public verification succeeds, `/api/lookup/order` may return saved phone + address for that order’s user so the customer can verify delivery details.
 - **LINE linking**: Per-order (not per-user). Webhook verifies all three fields. Idempotent. One order = one LINE account.
 - **Single-open-round**: Partial unique index. `create()` atomically closes existing open rounds. `update()` catches `P2002`.
 - **Order creation**: Two-phase — validate all products first, then decrement stock. `OrderValidationError` thrown inside `$transaction` triggers rollback.
@@ -220,18 +231,21 @@ Public operations go through server-side API routes + Prisma, not direct anon ac
 7. **Shipping fee snapshot.** Stored on order at creation. Never recalculate from round.
 8. **Arrival notifications target by product**, not order.
 9. **Public routes use `recipient_name + phone_last3`** (+ `order_number` for single-order actions). No internal UUIDs.
+10. **Pickup options are round-scoped.** Never validate or render pickup labels from a global constant.
 
 ### API Route Contracts
 
 - Type with `NextRequest`/`NextResponse`. Return `{ error: string }` + correct HTTP status on failure.
 - Validate request bodies before DB access.
 - `submit-order`: round open → validate stock → calc shipping → decrement stock → insert (transaction). No overwriting existing nickname profiles with different details.
+- `submit-order`: validate `pickup_location` against the round’s configured pickup labels, not a static options array.
 - `confirm-order`/`batch-confirm`: update status → notify → log. Notification failure does NOT rollback.
 - `confirm-shipment`: status → `shipped` + `shipped_at` → notify → log.
 - `notify-arrival`: `productId + roundId` → customers with that product in non-cancelled orders → notify.
 - `cancel-order`: User mode (pending_payment, public auth) or admin mode (any status, with reason + notification). Restore stock except shipped.
 - `quick-confirm`: POS shortcut, `orderId` → confirmed + auto-fill payment fields.
 - `users/lookup`: **Admin-only**. Never expose to anonymous callers.
+- `lookup/order`: After successful public verification, returning the saved phone/address is acceptable; before verification, expose nothing.
 - `line/webhook`: Always returns 200. HMAC verify → `handleMessage()`.
 
 ### Git
@@ -261,6 +275,7 @@ Public operations go through server-side API routes + Prisma, not direct anon ac
 | 9 | RLS + Prisma | Browser Supabase = admin auth only. App logic runs server-side via Prisma |
 | 10 | submission_key | Must be UUID (`crypto.randomUUID()`), not string/timestamp |
 | 11 | Shipping fee | Snapshot on order creation. Round changes don't affect existing orders |
+| 12 | Round pickup labels | After schema change, run `npx prisma generate` and apply `prisma/migration_008_round_pickup_options.sql` to live Supabase before deploy |
 
 ---
 
@@ -317,6 +332,11 @@ All must pass. Fix failures before continuing.
 **Mistake:** `/api/submit-order` created or updated `users` before the order transaction. If order creation failed, checkout left partial user state behind. A stale database still requiring `orders.access_code` also surfaced as a generic `500`.
 **Fix:** Moved nickname resolution + user persistence into the same transaction as order creation in `lib/db/orders.ts`. `/api/submit-order` now maps known `P2011 access_code` drift to `503` and names `migration_007_remove_access_code.sql`.
 **Rule:** Public/admin checkout user writes must be atomic with order creation. When Prisma exposes schema drift through typed errors/meta, return an explicit operator-facing failure instead of a generic `500`.
+
+### [2026-03-24] Public order page flashed verification UI before auto-unlock
+**Mistake:** Immediately after checkout redirect to `/order/[orderNumber]`, the page briefly rendered the manual verification form before consuming the just-saved sessionStorage access payload.
+**Fix:** `components/PublicOrderPage.tsx` now holds the page in a loading state until the stored access attempt succeeds or fails.
+**Rule:** If a page auto-consumes stored public access state, do not render fallback verification UI until that attempt has resolved.
 
 ### [2026-03-24] Prisma include inference drift
 **Mistake:** Inferred Prisma return types worked at runtime but production build treated result as base `Order` without relations.
