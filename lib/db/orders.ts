@@ -2,6 +2,24 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { generateAccessCode } from "@/lib/utils";
 
+const orderWithItemsInclude = {
+  order_items: true,
+} as const satisfies Prisma.OrderInclude;
+
+const orderWithRelationsInclude = {
+  order_items: true,
+  user: true,
+  round: true,
+} as const satisfies Prisma.OrderInclude;
+
+type OrderWithItems = Prisma.OrderGetPayload<{
+  include: typeof orderWithItemsInclude;
+}>;
+
+type OrderWithRelations = Prisma.OrderGetPayload<{
+  include: typeof orderWithRelationsInclude;
+}>;
+
 // ─── Order Creation ──────────────────────────────────────────
 
 interface CreateOrderData {
@@ -151,30 +169,34 @@ export async function createWithItems(
 
 // ─── Query ───────────────────────────────────────────────────
 
-export async function findBySubmissionKey(key: string) {
+export async function findBySubmissionKey(
+  key: string,
+): Promise<OrderWithItems | null> {
   return prisma.order.findUnique({
     where: { submission_key: key },
-    include: { order_items: true },
+    include: orderWithItemsInclude,
   });
 }
 
-export async function getOrderWithItems(orderId: string) {
+export async function getOrderWithItems(
+  orderId: string,
+): Promise<OrderWithRelations | null> {
   return prisma.order.findUnique({
     where: { id: orderId },
-    include: { order_items: true, user: true, round: true },
+    include: orderWithRelationsInclude,
   });
 }
 
 export async function findOrderByNumberAndAccessCode(
   orderNumber: string,
   accessCode: string,
-) {
+): Promise<OrderWithRelations | null> {
   return prisma.order.findFirst({
     where: {
       order_number: orderNumber,
       access_code: accessCode,
     },
-    include: { order_items: true, user: true, round: true },
+    include: orderWithRelationsInclude,
   });
 }
 
