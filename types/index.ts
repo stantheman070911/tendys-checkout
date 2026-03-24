@@ -175,33 +175,3 @@ export type OrderWithItems = Order & {
   user: User | null;
 };
 
-export interface ShipmentGroup {
-  label: string; // "宅配" | pickup location name
-  orders: OrderWithItems[];
-}
-
-export interface ShipmentConfirmResult {
-  orderId: string;
-  success: boolean;
-  notifications: { line: boolean; email: boolean };
-}
-
-// ─── Phase 6: Suppliers Page Types ─────────────────────────
-
-export interface SupplierCardData {
-  id: string;
-  name: string;
-  contact_name: string | null;
-  phone: string | null;
-  email: string | null;
-  note: string | null;
-  productCount: number;
-}
-
-export interface SupplierFormValues {
-  name: string;
-  contact_name: string;
-  phone: string;
-  email: string;
-  note: string;
-}

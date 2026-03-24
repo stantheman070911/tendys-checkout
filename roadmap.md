@@ -548,7 +548,7 @@ npm run build        # must pass
 - [x] **P1 — Skipped-as-failed misreport**: Replaced boolean notification status with tri-state `"success" | "failed" | "skipped"`. LINE skip (`"No LINE user linked"`) now renders as `—` instead of `✗`. Email skip (`null`) likewise.
 - [x] **P2 — Shared helper extraction**: Extracted `mapNotifyStatus()` and `renderNotifyIcon()` into `lib/admin/shipment-status.ts`. Both `shipments/page.tsx` and `ShipmentCard.tsx` import from the shared helper — no inline duplicates.
 - [x] **P2 — Verification order fix**: Updated CLAUDE.md to document `npm run build` before `npx tsc --noEmit` (Next.js generates `.next/types/validator.ts` during build).
-- [x] **Tests**: Added `lib/admin/shipment-status.test.ts` with 11 focused tests covering all tri-state mapping paths (success, failed, skipped for both channels, missing fields, undefined payload, failed-vs-skipped differentiation, icon rendering). Total: 35 tests across 8 files.
+- [x] **Tests**: Added `lib/admin/shipment-status.test.ts` with 11 focused tests covering all tri-state mapping paths (success, failed, skipped for both channels, missing fields, undefined payload, failed-vs-skipped differentiation, icon rendering). Added `app/api/suppliers/route.test.ts` with 4 focused tests (null-clearing, blank-name rejection). Total: 39 tests across 9 files.
 
 **Explicit caveats carried forward:**
 - Phase 6 admin flows rely on manual verification + helper-level unit coverage, not component/integration tests.
@@ -607,7 +607,7 @@ npx vitest run           # must pass
 
 **Done when:** Admin can manage full lifecycle: confirm payment → notify arrival → confirm shipment → all with notifications.
 
-**Status: COMPLETE** — All 3 tasks done. `build`, `tsc` (post-build), `lint`, `vitest` all pass (35 tests, 8 files). Committed as `fa47e7f` and pushed to `main`.
+**Status: COMPLETE** — All 3 tasks done. `build`, `tsc` (post-build), `lint`, `vitest` all pass (39 tests, 9 files). Committed as `fa47e7f` and pushed to `main`.
 
 ---
 

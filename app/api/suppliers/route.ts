@@ -79,23 +79,33 @@ export async function PUT(request: NextRequest) {
     const { id, ...fields } = body as {
       id?: string;
       name?: string;
-      contact_name?: string;
-      phone?: string;
-      email?: string;
-      note?: string;
+      contact_name?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      note?: string | null;
     };
 
     if (!id || typeof id !== "string" || !id.trim()) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const data: Record<string, string | undefined> = {};
-    if (typeof fields.name === "string") data.name = fields.name.trim();
-    if (typeof fields.contact_name === "string")
+    const data: Record<string, string | null | undefined> = {};
+    if (typeof fields.name === "string") {
+      const trimmedName = fields.name.trim();
+      if (!trimmedName) {
+        return NextResponse.json({ error: "name cannot be blank" }, { status: 400 });
+      }
+      data.name = trimmedName;
+    }
+    if (fields.contact_name === null) data.contact_name = null;
+    else if (typeof fields.contact_name === "string")
       data.contact_name = fields.contact_name.trim();
-    if (typeof fields.phone === "string") data.phone = fields.phone.trim();
-    if (typeof fields.email === "string") data.email = fields.email.trim();
-    if (typeof fields.note === "string") data.note = fields.note.trim();
+    if (fields.phone === null) data.phone = null;
+    else if (typeof fields.phone === "string") data.phone = fields.phone.trim();
+    if (fields.email === null) data.email = null;
+    else if (typeof fields.email === "string") data.email = fields.email.trim();
+    if (fields.note === null) data.note = null;
+    else if (typeof fields.note === "string") data.note = fields.note.trim();
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
