@@ -144,11 +144,14 @@ export function PaymentReportForm({
           min="1"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={String(orderTotal)}
-          className="lux-input text-2xl font-semibold"
+          placeholder="輸入你的匯款金額"
+          className="lux-input text-2xl font-semibold placeholder:text-[hsl(var(--muted-foreground)/0.62)]"
           required
           autoFocus
         />
+        <p className="mt-1.5 text-xs text-[hsl(var(--muted-foreground)/0.82)]">
+          請輸入你實際匯出的金額，應付 {formatCurrency(orderTotal)}
+        </p>
       </div>
       <div>
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
@@ -158,10 +161,13 @@ export function PaymentReportForm({
           maxLength={5}
           value={last5}
           onChange={(e) => setLast5(e.target.value)}
-          placeholder="56789"
-          className="lux-input text-2xl font-semibold tracking-[0.35em]"
+          placeholder="輸入你的後五碼 e.g. 56789"
+          className="lux-input text-2xl font-semibold tracking-[0.35em] placeholder:text-[hsl(var(--muted-foreground)/0.62)]"
           required
         />
+        <p className="mt-1.5 text-xs text-[hsl(var(--muted-foreground)/0.82)]">
+          請輸入你匯款帳號的後五碼。
+        </p>
       </div>
       <button
         type="submit"
