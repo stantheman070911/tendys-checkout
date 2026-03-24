@@ -22,6 +22,8 @@ vi.mock("@/lib/db/orders", () => ordersMock);
 import { POST } from "./route";
 
 const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
+const VALID_ROUND_ID = "11111111-1111-4111-8111-111111111111";
+const VALID_PRODUCT_ID_1 = "22222222-2222-4222-8222-222222222222";
 
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/submit-order", {
@@ -34,13 +36,13 @@ function makeRequest(body: unknown) {
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
     submission_key: VALID_UUID,
-    round_id: "round-1",
+    round_id: VALID_ROUND_ID,
     nickname: "TestUser",
     recipient_name: "Test Name",
     phone: "0900-000-001",
     pickup_location: "",
     address: "台北市信義區測試路 1 號",
-    items: [{ product_id: "p1", quantity: 2 }],
+    items: [{ product_id: VALID_PRODUCT_ID_1, quantity: 2 }],
     ...overrides,
   };
 }
@@ -118,8 +120,8 @@ describe("POST /api/submit-order", () => {
       makeRequest(
         validBody({
           items: [
-            { product_id: "p1", quantity: 1 },
-            { product_id: "p1", quantity: 2 },
+            { product_id: VALID_PRODUCT_ID_1, quantity: 1 },
+            { product_id: VALID_PRODUCT_ID_1, quantity: 2 },
           ],
         }),
       ),
@@ -131,11 +133,29 @@ describe("POST /api/submit-order", () => {
 
   it("returns 400 for negative quantity", async () => {
     const res = await POST(
-      makeRequest(validBody({ items: [{ product_id: "p1", quantity: -1 }] })),
+      makeRequest(
+        validBody({ items: [{ product_id: VALID_PRODUCT_ID_1, quantity: -1 }] }),
+      ),
     );
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/quantity/);
+  });
+
+  it("returns 400 for invalid round_id", async () => {
+    const res = await POST(makeRequest(validBody({ round_id: "round-1" })));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/round_id/i);
+  });
+
+  it("returns 400 for invalid product_id", async () => {
+    const res = await POST(
+      makeRequest(validBody({ items: [{ product_id: "p1", quantity: 1 }] })),
+    );
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/product_id/i);
   });
 
   it("returns 400 for delivery without address", async () => {
@@ -193,5 +213,29 @@ describe("POST /api/submit-order", () => {
     const res = await POST(makeRequest(validBody()));
     expect(res.status).toBe(201);
     expect(usersMock.upsertByNickname).toHaveBeenCalled();
+  });
+
+  it("reuses a concurrently created public nickname when details match", async () => {
+    usersMock.createUser.mockRejectedValueOnce({ code: "P2002" });
+    usersMock.findByNickname
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "user-1",
+        nickname: "TestUser",
+        recipient_name: "Test Name",
+        phone: "0900-000-001",
+        address: "台北市信義區測試路 1 號",
+        email: null,
+      });
+    ordersMock.createWithItems.mockResolvedValue({
+      order: {
+        id: "o4",
+        order_number: "ORD-20260324-004",
+      },
+    });
+
+    const res = await POST(makeRequest(validBody({ email: undefined })));
+    expect(res.status).toBe(201);
+    expect(ordersMock.createWithItems).toHaveBeenCalled();
   });
 });

@@ -32,6 +32,38 @@ function normalizeEmail(value: string | null | undefined): string {
   return normalizeText(value).toLowerCase();
 }
 
+function isUniqueConstraintError(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
+
+function hasPublicProfileConflict(
+  existingUser: {
+    phone?: string | null;
+    recipient_name?: string | null;
+    address?: string | null;
+    email?: string | null;
+  },
+  nextUser: {
+    phone?: string | undefined;
+    recipient_name?: string | undefined;
+    address?: string | undefined;
+    email?: string | undefined;
+  },
+): boolean {
+  return (
+    normalizePhone(existingUser.phone) !== normalizePhone(nextUser.phone) ||
+    normalizeText(existingUser.recipient_name) !==
+      normalizeText(nextUser.recipient_name) ||
+    normalizeText(existingUser.address) !== normalizeText(nextUser.address) ||
+    normalizeEmail(existingUser.email) !== normalizeEmail(nextUser.email)
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const isAdmin = await verifyAdminSession(request);
@@ -99,9 +131,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!round_id || typeof round_id !== "string" || !round_id.trim()) {
+    const trimmedRoundId = typeof round_id === "string" ? round_id.trim() : "";
+    if (!trimmedRoundId) {
       return NextResponse.json(
         { error: "round_id is required" },
+        { status: 400 },
+      );
+    }
+    if (!UUID_RE.test(trimmedRoundId)) {
+      return NextResponse.json(
+        { error: "round_id must be a valid UUID" },
         { status: 400 },
       );
     }
@@ -166,23 +205,27 @@ export async function POST(request: NextRequest) {
     // Validate each item and check for duplicates
     const seenProducts = new Set<string>();
     for (const item of items) {
-      if (
-        !item.product_id ||
-        typeof item.product_id !== "string" ||
-        !item.product_id.trim()
-      ) {
+      const productId =
+        typeof item.product_id === "string" ? item.product_id.trim() : "";
+      if (!productId) {
         return NextResponse.json(
           { error: "Each item must have a product_id" },
           { status: 400 },
         );
       }
-      if (seenProducts.has(item.product_id)) {
+      if (!UUID_RE.test(productId)) {
+        return NextResponse.json(
+          { error: "Each item must have a valid product_id" },
+          { status: 400 },
+        );
+      }
+      if (seenProducts.has(productId)) {
         return NextResponse.json(
           { error: "Duplicate products in order items" },
           { status: 400 },
         );
       }
-      seenProducts.add(item.product_id);
+      seenProducts.add(productId);
 
       if (
         typeof item.quantity !== "number" ||
@@ -253,24 +296,37 @@ export async function POST(request: NextRequest) {
       ? isAdmin
         ? await upsertByNickname(trimmedNickname, userData)
         : (() => {
-            const hasConflict =
-              normalizePhone(existingUser.phone) !== normalizePhone(trimmedPhone) ||
-              normalizeText(existingUser.recipient_name) !==
-                normalizeText(trimmedRecipientName) ||
-              normalizeText(existingUser.address) !==
-                normalizeText(trimmedAddress) ||
-              normalizeEmail(existingUser.email) !== normalizeEmail(trimmedEmail);
-
-            if (hasConflict) {
+            if (hasPublicProfileConflict(existingUser, userData)) {
               throw new Error("NICKNAME_CONFLICT");
             }
 
             return existingUser;
           })()
-      : await createUser({
-          nickname: trimmedNickname,
-          ...userData,
-        });
+      : await (async () => {
+          try {
+            return await createUser({
+              nickname: trimmedNickname,
+              ...userData,
+            });
+          } catch (error) {
+            if (isUniqueConstraintError(error)) {
+              const concurrentUser = await findByNickname(trimmedNickname);
+              if (!concurrentUser) throw error;
+
+              if (isAdmin) {
+                return upsertByNickname(trimmedNickname, userData);
+              }
+
+              if (hasPublicProfileConflict(concurrentUser, userData)) {
+                throw new Error("NICKNAME_CONFLICT");
+              }
+
+              return concurrentUser;
+            }
+
+            throw error;
+          }
+        })();
 
     // ─── Create order ───────────────────────────────────────
 
@@ -281,7 +337,7 @@ export async function POST(request: NextRequest) {
 
     const result = await createWithItems(
       {
-        round_id: round_id.trim(),
+        round_id: trimmedRoundId,
         user_id: user.id,
         pickup_location: pickupValue,
         note: trimmedNote,
@@ -308,6 +364,7 @@ export async function POST(request: NextRequest) {
         { status: 409 },
       );
     }
+    console.error("POST /api/submit-order failed", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
