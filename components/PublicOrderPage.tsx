@@ -459,7 +459,9 @@ export function PublicOrderPage({
               {order.pickup_location ? (
                 <div className="lux-panel-muted p-3">面交地點：{order.pickup_location}</div>
               ) : (
-                <div className="lux-panel-muted p-3">宅配寄送中，請留意通知。</div>
+                <div className="lux-panel-muted p-3">
+                  回報匯款商家確認後將儘速安排出貨，屆時請留意通知。
+                </div>
               )}
               {order.note && <div className="lux-panel-muted p-3">備註：{order.note}</div>}
             </div>
