@@ -62,9 +62,6 @@ export function SharePanel({ roundId, show }: SharePanelProps) {
         </div>
       </div>
       <div className="pointer-events-none absolute -bottom-8 -right-6 h-28 w-28 rounded-full border border-[rgba(177,140,92,0.18)] bg-[rgba(255,255,255,0.24)]" />
-      <div className="pointer-events-none absolute bottom-6 right-8 text-[10px] uppercase tracking-[0.28em] text-[hsl(var(--bronze))]">
-        curated produce
-      </div>
     </div>
   );
 }
