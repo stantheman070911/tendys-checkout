@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import {
   cancelOrder,
-  findOrderByNumberAndAccessCode,
+  findPublicOrderByOrderNumberAndIdentity,
 } from "@/lib/db/orders";
 import { sendOrderCancelledNotifications } from "@/lib/notifications/send";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { normalizeAccessCode } from "@/lib/utils";
+import { normalizePhoneDigits } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,10 +17,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { orderId, order_number, access_code, cancel_reason } = body as {
+    const { orderId, order_number, recipient_name, phone_last3, cancel_reason } = body as {
       orderId?: string;
       order_number?: string;
-      access_code?: string;
+      recipient_name?: string;
+      phone_last3?: string;
       cancel_reason?: string;
     };
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     let resolvedOrderId = orderId?.trim();
 
-    // Non-admin callers must provide order_number + access_code
+    // Non-admin callers must provide order_number + public identity
     if (!isAdmin) {
       const clientIp = getClientIp(request);
       const rateLimit = checkRateLimit(`cancel-order:${clientIp}`, 5, 60_000);
@@ -43,30 +44,38 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (
-        !order_number ||
-        typeof order_number !== "string" ||
-        !order_number.trim()
-      ) {
+      const orderNumber =
+        typeof order_number === "string"
+          ? order_number.trim().toUpperCase()
+          : "";
+      if (!orderNumber) {
         return NextResponse.json(
           { error: "order_number is required" },
           { status: 400 },
         );
       }
-      if (
-        !access_code ||
-        typeof access_code !== "string" ||
-        normalizeAccessCode(access_code).length !== 12
-      ) {
+
+      const recipientName =
+        typeof recipient_name === "string" ? recipient_name.trim() : "";
+      if (!recipientName) {
         return NextResponse.json(
-          { error: "access_code must be exactly 12 letters or digits" },
+          { error: "recipient_name is required" },
           { status: 400 },
         );
       }
 
-      const order = await findOrderByNumberAndAccessCode(
-        order_number.trim().toUpperCase(),
-        normalizeAccessCode(access_code),
+      const phoneLast3 = normalizePhoneDigits(phone_last3);
+      if (phoneLast3.length !== 3) {
+        return NextResponse.json(
+          { error: "phone_last3 must be exactly 3 digits" },
+          { status: 400 },
+        );
+      }
+
+      const order = await findPublicOrderByOrderNumberAndIdentity(
+        orderNumber,
+        recipientName,
+        phoneLast3,
       );
       if (!order) {
         return NextResponse.json(

@@ -20,6 +20,8 @@ import {
   formatCurrency,
   calcOrderTotal,
   generateSubmissionKey,
+  getPublicOrderAccessSessionKey,
+  getPhoneLast3,
 } from "@/lib/utils";
 import { PICKUP_OPTIONS } from "@/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -165,9 +167,16 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         return;
       }
 
-      router.push(
-        `/order/${encodeURIComponent(data.order.order_number)}?code=${encodeURIComponent(data.order.access_code)}`,
+      const orderNumber = data.order.order_number as string;
+      sessionStorage.setItem(
+        getPublicOrderAccessSessionKey(orderNumber),
+        JSON.stringify({
+          recipient_name: trimmedName,
+          phone_last3: getPhoneLast3(trimmedPhone),
+        }),
       );
+
+      router.push(`/order/${encodeURIComponent(orderNumber)}`);
     } catch {
       toast({ title: "網路錯誤，請重試", variant: "destructive" });
       setSubmitting(false);

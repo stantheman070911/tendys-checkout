@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { generateAccessCode } from "@/lib/utils";
+import { normalizePhoneDigits } from "@/lib/utils";
 
 const orderWithItemsInclude = {
   order_items: true,
@@ -19,6 +19,27 @@ type OrderWithItems = Prisma.OrderGetPayload<{
 type OrderWithRelations = Prisma.OrderGetPayload<{
   include: typeof orderWithRelationsInclude;
 }>;
+
+function normalizeRecipientName(value: string | null | undefined): string {
+  return (value ?? "").trim().toLocaleLowerCase();
+}
+
+function orderMatchesPublicIdentity(
+  order: {
+    user?: {
+      recipient_name?: string | null;
+      phone?: string | null;
+    } | null;
+  },
+  recipientName: string,
+  phoneLast3: string,
+): boolean {
+  return (
+    normalizeRecipientName(order.user?.recipient_name) ===
+      normalizeRecipientName(recipientName) &&
+    normalizePhoneDigits(order.user?.phone).endsWith(phoneLast3)
+  );
+}
 
 // ─── Order Creation ──────────────────────────────────────────
 
@@ -133,7 +154,6 @@ export async function createWithItems(
       // 6. Create order + items
       const order = await tx.order.create({
         data: {
-          access_code: generateAccessCode(),
           user_id: data.user_id,
           round_id: data.round_id,
           total_amount: totalAmount,
@@ -187,17 +207,55 @@ export async function getOrderWithItems(
   });
 }
 
-export async function findOrderByNumberAndAccessCode(
+export async function findOrdersByRecipientNameAndPhoneLast3(
+  recipientName: string,
+  phoneLast3: string,
+): Promise<OrderWithRelations[]> {
+  const orders = await prisma.order.findMany({
+    where: {
+      user: {
+        is: {
+          recipient_name: {
+            equals: recipientName,
+            mode: "insensitive",
+          },
+        },
+      },
+    },
+    include: orderWithRelationsInclude,
+    orderBy: { created_at: "desc" },
+  });
+
+  return orders.filter((order) =>
+    orderMatchesPublicIdentity(order, recipientName, phoneLast3),
+  );
+}
+
+export async function findPublicOrderByOrderNumberAndIdentity(
   orderNumber: string,
-  accessCode: string,
+  recipientName: string,
+  phoneLast3: string,
 ): Promise<OrderWithRelations | null> {
-  return prisma.order.findFirst({
+  const order = await prisma.order.findFirst({
     where: {
       order_number: orderNumber,
-      access_code: accessCode,
+      user: {
+        is: {
+          recipient_name: {
+            equals: recipientName,
+            mode: "insensitive",
+          },
+        },
+      },
     },
     include: orderWithRelationsInclude,
   });
+
+  if (!order || !orderMatchesPublicIdentity(order, recipientName, phoneLast3)) {
+    return null;
+  }
+
+  return order;
 }
 
 export async function listByRound(roundId: string, statusFilter?: string) {

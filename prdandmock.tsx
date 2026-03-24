@@ -5,6 +5,9 @@
 // This file contains mock data shapes used as reference for seeding
 // and testing. The full DB schema, system flow, page structure, and
 // env vars are documented in claude.md, whatwearebuilding.md, and roadmap.md.
+// Public order access no longer uses access codes; use recipient_name +
+// phone_last3 for lookup, and order_number + recipient_name + phone_last3
+// for single-order public actions and LINE binding.
 // Do NOT duplicate that information here.
 //
 // ============================================

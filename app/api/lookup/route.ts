@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findOrderByNumberAndAccessCode } from "@/lib/db/orders";
+import { findOrdersByRecipientNameAndPhoneLast3 } from "@/lib/db/orders";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { normalizeAccessCode } from "@/lib/utils";
+import { normalizePhoneDigits } from "@/lib/utils";
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimit = checkRateLimit(`lookup:${clientIp}`, 10, 60_000);
+    const rateLimit = checkRateLimit(`lookup:${clientIp}`, 5, 60_000);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Too many requests" },
@@ -17,32 +17,44 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const orderNumber = request.nextUrl.searchParams.get("orderNumber")?.trim();
-    const accessCode = request.nextUrl.searchParams.get("accessCode")?.trim();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
-    if (!orderNumber) {
+    const { recipient_name, phone_last3 } = body as {
+      recipient_name?: string;
+      phone_last3?: string;
+    };
+
+    const recipientName = recipient_name?.trim();
+    const phoneLast3 = normalizePhoneDigits(phone_last3?.trim());
+
+    if (!recipientName) {
       return NextResponse.json(
-        { error: "orderNumber is required" },
+        { error: "recipient_name is required" },
         { status: 400 },
       );
     }
-    if (!accessCode || normalizeAccessCode(accessCode).length !== 12) {
+    if (phoneLast3.length !== 3) {
       return NextResponse.json(
-        { error: "accessCode must be exactly 12 letters or digits" },
+        { error: "phone_last3 must be exactly 3 digits" },
         { status: 400 },
       );
     }
 
-    const order = await findOrderByNumberAndAccessCode(
-      orderNumber.toUpperCase(),
-      normalizeAccessCode(accessCode),
+    const orders = await findOrdersByRecipientNameAndPhoneLast3(
+      recipientName,
+      phoneLast3,
     );
 
-    if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    if (orders.length === 0) {
+      return NextResponse.json({ error: "Orders not found" }, { status: 404 });
     }
 
-    const safeOrder = {
+    const safeOrders = orders.map((order) => ({
       order_number: order.order_number,
       status: order.status,
       total_amount: order.total_amount,
@@ -54,9 +66,9 @@ export async function GET(request: NextRequest) {
         quantity: item.quantity,
         subtotal: item.subtotal,
       })),
-    };
+    }));
 
-    return NextResponse.json({ order: safeOrder });
+    return NextResponse.json({ orders: safeOrders });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

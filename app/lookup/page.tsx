@@ -16,32 +16,37 @@ interface OrderResult extends Pick<
 
 export default function LookupPage() {
   const { toast } = useToast();
-  const [orderNumber, setOrderNumber] = useState("");
-  const [accessCode, setAccessCode] = useState("");
-  const [result, setResult] = useState<OrderResult | null>(null);
+  const [recipientName, setRecipientName] = useState("");
+  const [phoneLast3, setPhoneLast3] = useState("");
+  const [results, setResults] = useState<OrderResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
 
   async function handleSearch(e?: React.FormEvent) {
     e?.preventDefault();
-    const trimmedOrderNumber = orderNumber.trim();
-    const trimmedAccessCode = accessCode.trim();
-    if (!trimmedOrderNumber || !trimmedAccessCode) return;
+    const trimmedRecipientName = recipientName.trim();
+    const trimmedPhoneLast3 = phoneLast3.replace(/\D/g, "").slice(0, 3);
+    if (!trimmedRecipientName || trimmedPhoneLast3.length !== 3) return;
 
     setSearching(true);
     try {
-      const res = await fetch(
-        `/api/lookup?orderNumber=${encodeURIComponent(trimmedOrderNumber)}&accessCode=${encodeURIComponent(trimmedAccessCode)}`,
-      );
+      const res = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient_name: trimmedRecipientName,
+          phone_last3: trimmedPhoneLast3,
+        }),
+      });
       if (res.ok) {
         const data = await res.json();
-        setResult(data.order ?? null);
+        setResults(data.orders ?? []);
       } else {
-        setResult(null);
+        setResults([]);
         toast({ title: "查詢失敗", variant: "destructive" });
       }
     } catch {
-      setResult(null);
+      setResults([]);
       toast({ title: "網路錯誤，請稍後再試", variant: "destructive" });
     }
     setSearched(true);
@@ -60,20 +65,24 @@ export default function LookupPage() {
       </header>
       <main className="max-w-lg mx-auto p-4 space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-sm text-amber-800">
-          輸入訂單編號與查詢碼查詢
+          輸入訂購人姓名與手機末三碼查詢
         </div>
 
         <form onSubmit={handleSearch} className="space-y-2">
           <input
-            value={orderNumber}
-            onChange={(e) => setOrderNumber(e.target.value)}
-            placeholder="訂單編號，例如 ORD-20260324-001"
+            value={recipientName}
+            onChange={(e) => setRecipientName(e.target.value)}
+            placeholder="訂購人姓名"
             className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[44px]"
           />
           <input
-            value={accessCode}
-            onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-            placeholder="12 碼查詢碼"
+            value={phoneLast3}
+            onChange={(e) =>
+              setPhoneLast3(e.target.value.replace(/\D/g, "").slice(0, 3))
+            }
+            inputMode="numeric"
+            maxLength={3}
+            placeholder="手機末三碼"
             className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[44px] font-mono tracking-widest"
           />
           <button
@@ -85,41 +94,53 @@ export default function LookupPage() {
           </button>
         </form>
 
-        {searched && !result && (
+        {searched && results.length === 0 && (
           <div className="text-center py-10 text-gray-400">找不到相關訂單</div>
         )}
 
-        {result && (
-          <Link href={`/order/${encodeURIComponent(result.order_number)}?code=${encodeURIComponent(accessCode.trim())}`}>
-            <div className="bg-white rounded-xl border p-3 cursor-pointer hover:border-gray-400 transition space-y-1.5">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-sm">{result.order_number}</span>
-                <OrderStatusBadge status={result.status as OrderStatus} />
-              </div>
-              <div className="text-xs text-gray-400">
-                {result.order_items
-                  .map((i) => `${i.product_name}x${i.quantity}`)
-                  .join("、")}
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>
-                  小計{" "}
-                  {formatCurrency(
-                    result.total_amount - (result.shipping_fee ?? 0),
-                  )}
-                  {result.shipping_fee ? (
-                    <span className="text-gray-400">
-                      {" "}
-                      +{formatCurrency(result.shipping_fee)}運
-                    </span>
-                  ) : null}
-                </span>
-                <span className="font-bold">
-                  合計 {formatCurrency(result.total_amount)}
-                </span>
-              </div>
+        {results.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs text-gray-500">
+              找到 {results.length} 筆訂單
             </div>
-          </Link>
+            {results.map((result) => (
+              <Link
+                key={result.order_number}
+                href={`/order/${encodeURIComponent(result.order_number)}`}
+              >
+                <div className="bg-white rounded-xl border p-3 cursor-pointer hover:border-gray-400 transition space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-sm">
+                      {result.order_number}
+                    </span>
+                    <OrderStatusBadge status={result.status as OrderStatus} />
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {result.order_items
+                      .map((i) => `${i.product_name}x${i.quantity}`)
+                      .join("、")}
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>
+                      小計{" "}
+                      {formatCurrency(
+                        result.total_amount - (result.shipping_fee ?? 0),
+                      )}
+                      {result.shipping_fee ? (
+                        <span className="text-gray-400">
+                          {" "}
+                          +{formatCurrency(result.shipping_fee)}運
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="font-bold">
+                      合計 {formatCurrency(result.total_amount)}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </main>
     </div>

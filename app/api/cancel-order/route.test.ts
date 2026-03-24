@@ -10,7 +10,7 @@ vi.mock("@/lib/auth/supabase-admin", () => ({
 const ordersMock = vi.hoisted(() => ({
   cancelOrder: vi.fn(),
   getOrderWithItems: vi.fn(),
-  findOrderByNumberAndAccessCode: vi.fn(),
+  findPublicOrderByOrderNumberAndIdentity: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -45,7 +45,7 @@ describe("POST /api/cancel-order", () => {
 
   it("user cancel pending_payment → 200, no notification", async () => {
     authMock.mockResolvedValue(false);
-    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
+    ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue({
       ...fakeOrder,
     });
     ordersMock.cancelOrder.mockResolvedValue({
@@ -55,7 +55,11 @@ describe("POST /api/cancel-order", () => {
     });
 
     const res = await POST(
-      makeRequest({ order_number: "ORD-20260324-001", access_code: "ABCD1234EFGH" }),
+      makeRequest({
+        order_number: "ORD-20260324-001",
+        recipient_name: "王小美",
+        phone_last3: "678",
+      }),
     );
     expect(res.status).toBe(200);
     expect(notifyMock.sendOrderCancelledNotifications).not.toHaveBeenCalled();
@@ -63,7 +67,7 @@ describe("POST /api/cancel-order", () => {
 
   it("user cancel non-pending_payment → 400", async () => {
     authMock.mockResolvedValue(false);
-    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
+    ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue({
       ...fakeOrder,
     });
     ordersMock.cancelOrder.mockResolvedValue({
@@ -71,7 +75,11 @@ describe("POST /api/cancel-order", () => {
     });
 
     const res = await POST(
-      makeRequest({ order_number: "ORD-20260324-001", access_code: "ABCD1234EFGH" }),
+      makeRequest({
+        order_number: "ORD-20260324-001",
+        recipient_name: "王小美",
+        phone_last3: "678",
+      }),
     );
     expect(res.status).toBe(400);
   });
@@ -111,17 +119,35 @@ describe("POST /api/cancel-order", () => {
 
   it("order not found → 404", async () => {
     authMock.mockResolvedValue(false);
-    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue(null);
+    ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue(null);
 
     const res = await POST(
-      makeRequest({ order_number: "ORD-404", access_code: "ABCD1234EFGH" }),
+      makeRequest({
+        order_number: "ORD-404",
+        recipient_name: "王小美",
+        phone_last3: "678",
+      }),
     );
     expect(res.status).toBe(404);
   });
 
   it("missing public order_number → 400", async () => {
     authMock.mockResolvedValue(false);
-    const res = await POST(makeRequest({ access_code: "ABCD1234EFGH" }));
+    const res = await POST(
+      makeRequest({ recipient_name: "王小美", phone_last3: "678" }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("invalid phone_last3 → 400", async () => {
+    authMock.mockResolvedValue(false);
+    const res = await POST(
+      makeRequest({
+        order_number: "ORD-20260324-001",
+        recipient_name: "王小美",
+        phone_last3: "67",
+      }),
+    );
     expect(res.status).toBe(400);
   });
 });

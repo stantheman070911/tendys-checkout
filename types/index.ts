@@ -66,7 +66,6 @@ export interface User {
 export interface Order {
   id: string;
   order_number: string;
-  access_code: string;
   user_id: string | null;
   round_id: string | null;
   total_amount: number;
@@ -132,7 +131,8 @@ export interface OrderSubmitRequest {
 
 export interface PaymentReportRequest {
   order_number: string;
-  access_code: string;
+  recipient_name: string;
+  phone_last3: string;
   payment_amount: number;
   payment_last5: string;
 }

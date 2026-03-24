@@ -34,17 +34,22 @@ export function generateSubmissionKey(): string {
   return crypto.randomUUID();
 }
 
-export function generateAccessCode(): string {
-  return crypto.randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
+export function normalizePhoneDigits(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
 }
 
-export function normalizeAccessCode(value: string): string {
-  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+export function getPhoneLast3(phone: string | null | undefined): string {
+  const digits = normalizePhoneDigits(phone);
+  return digits.length >= 3 ? digits.slice(-3) : "";
+}
+
+export function getPublicOrderAccessSessionKey(orderNumber: string): string {
+  return `public-order-access:${orderNumber.toUpperCase()}`;
 }
 
 export function maskPhone(phone: string | null | undefined): string {
   if (!phone) return "";
-  const digits = phone.replace(/\D/g, "");
+  const digits = normalizePhoneDigits(phone);
   if (digits.length < 4) return phone;
   return `***-***-${digits.slice(-4)}`;
 }

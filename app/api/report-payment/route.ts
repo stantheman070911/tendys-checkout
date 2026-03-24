@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { reportPayment, findOrderByNumberAndAccessCode } from "@/lib/db/orders";
+import {
+  findPublicOrderByOrderNumberAndIdentity,
+  reportPayment,
+} from "@/lib/db/orders";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { normalizeAccessCode } from "@/lib/utils";
+import { normalizePhoneDigits } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,39 +31,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { order_number, access_code, payment_amount, payment_last5 } =
+    const {
+      order_number,
+      recipient_name,
+      phone_last3,
+      payment_amount,
+      payment_last5,
+    } =
       body as {
-      order_number?: string;
-      access_code?: string;
-      payment_amount?: number;
-      payment_last5?: string;
-    };
+        order_number?: string;
+        recipient_name?: string;
+        phone_last3?: string;
+        payment_amount?: number;
+        payment_last5?: string;
+      };
 
-    if (
-      !order_number ||
-      typeof order_number !== "string" ||
-      !order_number.trim()
-    ) {
+    const orderNumber =
+      typeof order_number === "string" ? order_number.trim().toUpperCase() : "";
+    if (!orderNumber) {
       return NextResponse.json(
         { error: "order_number is required" },
         { status: 400 },
       );
     }
 
-    if (
-      !access_code ||
-      typeof access_code !== "string" ||
-      normalizeAccessCode(access_code).length !== 12
-    ) {
+    const recipientName =
+      typeof recipient_name === "string" ? recipient_name.trim() : "";
+    if (!recipientName) {
       return NextResponse.json(
-        { error: "access_code must be exactly 12 letters or digits" },
+        { error: "recipient_name is required" },
         { status: 400 },
       );
     }
 
-    const existingOrder = await findOrderByNumberAndAccessCode(
-      order_number.trim().toUpperCase(),
-      normalizeAccessCode(access_code),
+    const phoneLast3 = normalizePhoneDigits(phone_last3);
+    if (phoneLast3.length !== 3) {
+      return NextResponse.json(
+        { error: "phone_last3 must be exactly 3 digits" },
+        { status: 400 },
+      );
+    }
+
+    const existingOrder = await findPublicOrderByOrderNumberAndIdentity(
+      orderNumber,
+      recipientName,
+      phoneLast3,
     );
     if (!existingOrder) {
       return NextResponse.json(

@@ -91,7 +91,6 @@ model User {
 model Order {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_number        String    @unique @default("")
-  access_code         String    @unique
   user_id             String?   @db.Uuid
   round_id            String?   @db.Uuid
   total_amount        Int       @default(0)

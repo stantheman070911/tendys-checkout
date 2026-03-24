@@ -15,12 +15,16 @@ import { useToast } from "@/hooks/use-toast";
 
 interface CancelOrderButtonProps {
   orderNumber: string;
-  accessCode: string;
+  recipientName: string;
+  phoneLast3: string;
+  onSuccess?: () => void | Promise<void>;
 }
 
 export function CancelOrderButton({
   orderNumber,
-  accessCode,
+  recipientName,
+  phoneLast3,
+  onSuccess,
 }: CancelOrderButtonProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -35,7 +39,8 @@ export function CancelOrderButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order_number: orderNumber,
-          access_code: accessCode,
+          recipient_name: recipientName,
+          phone_last3: phoneLast3,
         }),
       });
 
@@ -48,7 +53,11 @@ export function CancelOrderButton({
 
       toast({ title: "訂單已取消" });
       setOpen(false);
-      router.refresh();
+      if (onSuccess) {
+        await onSuccess();
+      } else {
+        router.refresh();
+      }
     } catch {
       toast({ title: "網路錯誤，請重試", variant: "destructive" });
       setCancelling(false);

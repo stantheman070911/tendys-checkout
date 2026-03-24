@@ -1,4 +1,5 @@
 import { validateOrderNumber } from "./validate-order-code";
+import { extractOrderBinding } from "./extract-order-binding";
 import { extractOrderNumber } from "./extract-order-number";
 import { sendLineMessage } from "./push";
 import { prisma } from "../db/prisma";
@@ -14,13 +15,13 @@ const MSG_ALREADY_LINKED = (orderNumber: string, status: string) =>
   `你的訂單 ${orderNumber} 已經綁定了！\n目前狀態：${STATUS_LABELS[status as OrderStatus] ?? status}`;
 
 const MSG_LINK_FAILED =
-  "綁定失敗，請確認你傳送的是完整的訂單編號和 12 碼查詢碼。";
+  "綁定失敗，請確認你傳送的是完整的訂單編號、訂購人姓名與手機末三碼。";
 
 const MSG_BIND_INSTRUCTION =
-  "請傳送「訂單編號 + 查詢碼」來綁定通知，例如：ORD-20260318-001 ABCD1234EFGH";
+  "請傳送「訂單編號 + 訂購人姓名 + 手機末三碼」來綁定通知，例如：ORD-20260318-001 王小美 678";
 
 const MSG_UNKNOWN =
-  "嗨！請把訂單編號和查詢碼貼給我，我幫你綁定出貨通知 📦\n（格式如：ORD-20260318-001 ABCD1234EFGH）";
+  "嗨！請把訂單編號、訂購人姓名和手機末三碼貼給我，我幫你綁定出貨通知 📦\n（格式如：ORD-20260318-001 王小美 678）";
 
 const MSG_ERROR = "系統有點問題，等一下再試試看 🙏";
 
@@ -39,18 +40,15 @@ export async function handleMessage(
   replyToken?: string,
 ): Promise<void> {
   const orderNumber = extractOrderNumber(text);
-  const accessCode =
-    text
-      .trim()
-      .toUpperCase()
-      .match(/\b[A-Z0-9]{12}\b/)?.[0] ?? null;
+  const binding = extractOrderBinding(text);
 
   // ── If message matches order number pattern, try to validate ─
-  if (orderNumber && accessCode) {
+  if (binding) {
     try {
       const result = await validateOrderNumber(
-        orderNumber,
-        accessCode,
+        binding.orderNumber,
+        binding.recipientName,
+        binding.phoneLast3,
         lineUserId,
       );
 

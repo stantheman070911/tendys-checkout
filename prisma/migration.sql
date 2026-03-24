@@ -59,7 +59,6 @@ create table public.users (
 create table public.orders (
   id uuid default gen_random_uuid() primary key,
   order_number text unique not null,
-  access_code text unique not null check (length(access_code) = 12),
   user_id uuid references public.users(id) on delete set null,
   round_id uuid references public.rounds(id) on delete set null,
   total_amount integer not null default 0,

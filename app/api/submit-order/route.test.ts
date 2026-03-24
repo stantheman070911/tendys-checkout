@@ -59,7 +59,6 @@ describe("POST /api/submit-order", () => {
     const fakeOrder = {
       id: "o1",
       order_number: "ORD-20260324-001",
-      access_code: "ABCD1234EFGH",
     };
     ordersMock.createWithItems.mockResolvedValue({ order: fakeOrder });
 
@@ -70,7 +69,7 @@ describe("POST /api/submit-order", () => {
   });
 
   it("returns 200 on submission_key dedup", async () => {
-    const fakeOrder = { id: "o1", order_number: "ORD-20260324-001", access_code: "ABCD1234EFGH" };
+    const fakeOrder = { id: "o1", order_number: "ORD-20260324-001" };
     ordersMock.createWithItems.mockResolvedValue({
       order: fakeOrder,
       deduplicated: true,
@@ -152,7 +151,6 @@ describe("POST /api/submit-order", () => {
     const fakeOrder = {
       id: "o2",
       order_number: "ORD-20260324-002",
-      access_code: "ZXCV1234BNMQ",
     };
     ordersMock.createWithItems.mockResolvedValue({ order: fakeOrder });
 
@@ -189,7 +187,6 @@ describe("POST /api/submit-order", () => {
       order: {
         id: "o3",
         order_number: "ORD-20260324-003",
-        access_code: "QWER1234TYUI",
       },
     });
 

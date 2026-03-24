@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ordersMock = vi.hoisted(() => ({
   reportPayment: vi.fn(),
-  findOrderByNumberAndAccessCode: vi.fn(),
+  findPublicOrderByOrderNumberAndIdentity: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -27,7 +27,7 @@ describe("POST /api/report-payment", () => {
 
   it("returns 200 on valid payment report", async () => {
     const fakeOrder = { id: "o1", status: "pending_confirm" };
-    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
+    ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue({
       id: "o1",
     });
     ordersMock.reportPayment.mockResolvedValue(fakeOrder);
@@ -35,7 +35,8 @@ describe("POST /api/report-payment", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-001",
-        access_code: "ABCD1234EFGH",
+        recipient_name: "王小美",
+        phone_last3: "678",
         payment_amount: 500,
         payment_last5: "12345",
       }),
@@ -46,12 +47,13 @@ describe("POST /api/report-payment", () => {
   });
 
   it("returns 404 when order not found or wrong status", async () => {
-    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue(null);
+    ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue(null);
 
     const res = await POST(
       makeRequest({
         order_number: "ORD-404",
-        access_code: "ABCD1234EFGH",
+        recipient_name: "王小美",
+        phone_last3: "678",
         payment_amount: 500,
         payment_last5: "12345",
       }),
@@ -60,7 +62,7 @@ describe("POST /api/report-payment", () => {
   });
 
   it("returns 400 for invalid payment_last5", async () => {
-    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
+    ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue({
       id: "o1",
     });
     const invalidValues = ["1234", "abcde", "123456"];
@@ -68,7 +70,8 @@ describe("POST /api/report-payment", () => {
       const res = await POST(
         makeRequest({
           order_number: "ORD-001",
-          access_code: "ABCD1234EFGH",
+          recipient_name: "王小美",
+          phone_last3: "678",
           payment_amount: 500,
           payment_last5,
         }),
@@ -78,7 +81,7 @@ describe("POST /api/report-payment", () => {
   });
 
   it("returns 400 for invalid payment_amount", async () => {
-    ordersMock.findOrderByNumberAndAccessCode.mockResolvedValue({
+    ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue({
       id: "o1",
     });
     const invalidValues = [0, -1, 1.5];
@@ -86,7 +89,8 @@ describe("POST /api/report-payment", () => {
       const res = await POST(
         makeRequest({
           order_number: "ORD-001",
-          access_code: "ABCD1234EFGH",
+          recipient_name: "王小美",
+          phone_last3: "678",
           payment_amount,
           payment_last5: "12345",
         }),
@@ -98,7 +102,21 @@ describe("POST /api/report-payment", () => {
   it("returns 400 for missing order_number", async () => {
     const res = await POST(
       makeRequest({
-        access_code: "ABCD1234EFGH",
+        recipient_name: "王小美",
+        phone_last3: "678",
+        payment_amount: 500,
+        payment_last5: "12345",
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for invalid phone_last3", async () => {
+    const res = await POST(
+      makeRequest({
+        order_number: "ORD-001",
+        recipient_name: "王小美",
+        phone_last3: "67",
         payment_amount: 500,
         payment_last5: "12345",
       }),

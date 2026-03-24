@@ -1,5 +1,6 @@
 import type { OrderStatus } from "@/types";
 import { prisma } from "../db/prisma";
+import { normalizePhoneDigits } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -34,17 +35,31 @@ export type ValidationResult = ValidationSuccess | ValidationFailure;
  */
 export async function validateOrderNumber(
   orderNumber: string,
-  accessCode: string,
+  recipientName: string,
+  phoneLast3: string,
   lineUserId: string,
 ): Promise<ValidationResult> {
   const order = await prisma.order.findFirst({
     where: {
       order_number: orderNumber,
-      access_code: accessCode,
+      user: {
+        is: {
+          recipient_name: {
+            equals: recipientName,
+            mode: "insensitive",
+          },
+        },
+      },
+    },
+    include: {
+      user: true,
     },
   });
 
-  if (!order) {
+  if (
+    !order ||
+    !normalizePhoneDigits(order.user?.phone).endsWith(phoneLast3)
+  ) {
     return { valid: false, error: "INVALID_ORDER_ACCESS" };
   }
 

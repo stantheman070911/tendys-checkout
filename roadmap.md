@@ -3,6 +3,8 @@
 > **READ THIS FILE AT THE START OF EVERY SESSION.**
 > This file is the single source of truth for what is done, what is in progress, and what is next.
 > After reading this file, read `CLAUDE.md` and `whatwearebuilding.md` for full context.
+>
+> **Current public access model:** Public lookup uses `recipient_name + phone_last3`. Public order detail, payment reporting, cancellation, and LINE binding use `order_number + recipient_name + phone_last3`. Older completed-phase notes may still mention `access_code` as historical context.
 
 ---
 
@@ -639,14 +641,14 @@ npx vitest run           # must pass
 
 - [ ] **7.1** Full flow smoke test (manual, against real Supabase):
   - Create supplier → create round (with shipping fee) → add products (linked to supplier, with goals)
-  - Place test orders: one 宅配 (verify shipping added), one 面交 (verify no shipping), confirm each receives an `order_number + access_code`
+  - Place test orders: one 宅配 (verify shipping added), one 面交 (verify no shipping), confirm each receives an `order_number`
   - Verify progress bars update
-  - Report payments via `order_number + access_code` → admin confirm → verify LINE + Email sent (type: payment_confirmed)
-  - Bind LINE with `order_number + access_code` → verify push notifications route to the linked LINE account
+  - Report payments via `order_number + recipient_name + phone_last3` → admin confirm → verify LINE + Email sent (type: payment_confirmed)
+  - Bind LINE with `order_number + recipient_name + phone_last3` → verify push notifications route to the linked LINE account
   - Admin clicks 通知到貨 for a product → verify relevant customers notified (type: product_arrival)
   - Admin confirms shipment (single + batch) → verify LINE + Email (type: shipment)
   - Cancel an order → verify stock restored
-  - Lookup by `order_number + access_code` → verify order detail access works and no cross-order history leaks
+  - Lookup by `recipient_name + phone_last3`, then open detail by `order_number + recipient_name + phone_last3` → verify order detail access works and no cross-order history leaks
   - Export CSV → verify shipping fee column + Chinese encoding
   - Close round → verify 已截單
 - [x] **7.2** Edge cases (92 tests / 19 files):

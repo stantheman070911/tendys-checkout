@@ -38,12 +38,12 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 2. Admin shares Vercel URL in LINE group.
 3. User opens link → browses products (progress bars show goal status) → adds to cart (stock-limited, CartBar hints shipping fee) → enters nickname (display/organizer reference only; no public auto-fill) → fills recipient info + pickup option → sees shipping fee if 宅配 → submits order (idempotent via `submission_key`).
 4. System shows bank account details + share CTA if any product is under goal.
-5. User transfers money, reports payment (amount + last 5 digits — with confirmation step before submit) from the order page protected by `order_number + access_code`.
+5. User transfers money, reports payment (amount + last 5 digits — with confirmation step before submit) from the order page protected by `order_number + recipient_name + phone_last3`.
 6. Admin reviews in dashboard → confirms single or batch → system sends LINE + Resend email (logged to `notification_logs`). Status: `confirmed`.
 7. Admin coordinates with suppliers → products arrive at 理貨中心 → admin sends arrival notification to relevant customers.
 8. Admin goes to 待出貨 page (grouped by pickup method) → marks orders as shipped (single or batch) → system sends shipment notification via LINE + Email. Status: `shipped`.
-9. User checks status via `/lookup` (by `order_number + access_code`) → can click into order detail.
-10. **LINE linking**: User pastes order number + access code (for example `ORD-20260318-001 ABCD1234EFGH`) into LINE Official Account → webhook validates both → links `line_user_id` to order → subsequent notifications sent as 1-on-1 push (not broadcast).
+9. User checks status via `/lookup` (by `recipient_name + phone_last3`) → can click into order detail and re-validate with `order_number + recipient_name + phone_last3`.
+10. **LINE linking**: User pastes `order_number + recipient_name + phone_last3` (for example `ORD-20260318-001 王小美 678`) into LINE Official Account → webhook validates all three fields → links `line_user_id` to order → subsequent notifications sent as 1-on-1 push (not broadcast).
 11. **POS mode**: Admin can create orders on behalf of customers, do instant cash confirmation, and handle face-to-face pickup.
 12. **Admin cancel**: Admin can cancel orders from any status (with reason + cancellation notification).
 
@@ -54,8 +54,8 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 ```
 app/                          → Next.js pages and API routes only
   page.tsx                    # User storefront (products + cart + checkout)
-  order/[orderNumber]/page.tsx # Order detail via order number + ?code=ACCESS_CODE
-  lookup/page.tsx             # Order lookup by order number + access code
+  order/[orderNumber]/page.tsx # Public order detail gate + client fetch by order number + recipient_name + phone_last3
+  lookup/page.tsx             # Order lookup by recipient_name + phone_last3
   gtfo/page.tsx               # Troll page for /admin snoopers ("get the fuck out")
   admin/                      # ⚠️ NOT accessible via /admin (redirects to /gtfo)
                               # Real URL: /bitchassnigga (via next.config.ts rewrites)
@@ -71,8 +71,8 @@ app/                          → Next.js pages and API routes only
   api/
     admin/session/route.ts    # Admin shell auth probe (server-verified allowlist check)
     submit-order/route.ts     # Create order (submission_key dedup, stock check, shipping fee calc)
-    report-payment/route.ts   # User reports payment via order number + access code (pending_payment → pending_confirm)
-    cancel-order/route.ts     # User cancels via order number + access code (pending_payment only) OR Admin cancels (any status, with reason)
+    report-payment/route.ts   # User reports payment via order number + recipient_name + phone_last3 (pending_payment → pending_confirm)
+    cancel-order/route.ts     # User cancels via order number + recipient_name + phone_last3 (pending_payment only) OR Admin cancels (any status, with reason)
     confirm-order/route.ts    # Admin confirms single order + notifications
     batch-confirm/route.ts    # Admin batch confirm
     confirm-shipment/route.ts # Admin marks order(s) as shipped + notifications
@@ -86,13 +86,14 @@ app/                          → Next.js pages and API routes only
     orders-by-product/route.ts # Group orders by product → customer list
     notification-logs/route.ts # Admin: notification audit log
     users/lookup/route.ts     # Admin-only nickname auto-fill (GET ?nickname=)
-    lookup/route.ts           # Order search by order number + access code
-    line/webhook/route.ts     # LINE webhook: signature verify → message handler → order linking with access code
+    lookup/route.ts           # Order search by recipient_name + phone_last3
+    lookup/order/route.ts     # Public order detail fetch by order number + recipient_name + phone_last3
+    line/webhook/route.ts     # LINE webhook: signature verify → message handler → order linking with recipient_name + phone_last3
 lib/                          → Pure TypeScript business logic (NO React/Next imports)
   db/
     prisma.ts                 # globalThis singleton PrismaClient
     users.ts                  # Nickname lookup/create/admin upsert helpers
-    orders.ts                 # Create (with submission_key + access_code), update status, query, group by product
+    orders.ts                 # Create (with submission_key), update status, query, group by product
     products.ts               # CRUD, stock decrement, progress aggregation
     rounds.ts                 # CRUD, open/close, shipping fee
     suppliers.ts              # CRUD, list with product counts
@@ -102,7 +103,7 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
     push.ts                   # LINE push/multicast/reply API (raw fetch, never-throw)
     webhook.ts                # HMAC-SHA256 signature verification for LINE webhooks
     extract-order-number.ts   # Extracts ORD-YYYYMMDD-NNN from raw or prefixed LINE messages
-    validate-order-code.ts    # Validates order number + access code, links line_user_id to order
+    validate-order-code.ts    # Validates order number + recipient_name + phone_last3, links line_user_id to order
     message-handler.ts        # Handles incoming LINE text messages (order linking + status check)
   notifications/
     email.ts                  # Resend client + templates (order confirm, shipment, arrival)
@@ -114,7 +115,7 @@ lib/                          → Pure TypeScript business logic (NO React/Next 
     paths.ts                  # Shared admin path builder (real base path, no hardcoded /admin links)
     notification-summary.ts   # Notification log grouping helpers for dashboard/admin feedback
     order-search.ts           # Shared admin order search + shipment grouping helpers
-  utils.ts                    # cn(), formatting, share URL builders, submission/access code helpers, calcOrderTotal
+  utils.ts                    # cn(), formatting, share URL builders, submission/public identity helpers, calcOrderTotal
 components/
   ui/                         # shadcn/ui generated components
   StorefrontClient.tsx        # Main storefront client component (cart, checkout, form)
@@ -146,7 +147,7 @@ prisma/
   migration_002_line_push.sql # Add line_user_id column to orders
   migration_003_notification_log_context.sql # Add notification_logs round/product context + skipped status
   migration_004_single_open_round.sql # Partial unique index: at most one open round
-  migration_006_public_access_security.sql # Add access_code + harden RLS on users/orders/order_items
+  migration_006_public_access_security.sql # Harden RLS on users/orders/order_items
   seed.ts                     # Dev seed data
 ```
 
@@ -159,7 +160,7 @@ Round          → id, name, is_open, deadline, shipping_fee, created_at
 Supplier       → id, name, contact_name, phone, email, note, created_at, updated_at
 Product        → id, round_id(FK), supplier_id(FK), name, price, unit, is_active, stock, goal_qty, image_url, created_at
 User           → id, nickname(UNIQUE), recipient_name, phone, address, email, created_at, updated_at
-Order          → id, order_number(UNIQUE), access_code(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), line_user_id, created_at
+Order          → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), line_user_id, created_at
 OrderItem      → id, order_id(FK), product_id(FK), product_name, unit_price, quantity, subtotal
 NotificationLog → id, order_id(FK|null), round_id(FK|null), product_id(FK|null), channel('line'|'email'), type('payment_confirmed'|'shipment'|'product_arrival'|'order_cancelled'), status('success'|'failed'|'skipped'), error_message, created_at
 ```
@@ -169,12 +170,11 @@ NotificationLog → id, order_id(FK|null), round_id(FK|null), product_id(FK|null
 - **`rounds.shipping_fee`**: Integer, nullable. When set, 宅配 orders add this to total. 面交/取貨 orders do not.
 - **`suppliers` table**: Linked to products via `products.supplier_id`. Used for 供應商管理 page and product-arrival notifications.
 - **`orders.shipping_fee`**: Snapshot of the round's shipping fee at order time (so changing the round fee later doesn't affect existing orders). Null if pickup.
-- **`orders.access_code`**: 12-character per-order secret required for public lookup, payment report, cancellation, and LINE binding.
 - **`orders.shipped_at`**: Timestamp written when admin confirms shipment.
 - **`orders.cancel_reason`**: Text, nullable. Written when admin cancels an order (optional reason).
 - **`notification_logs.type`**: Four values: `payment_confirmed`, `shipment`, `product_arrival`, `order_cancelled`.
 - **Public nickname safety**: The public storefront no longer auto-fills saved user data. Existing nicknames may only be reused publicly when the submitted details match the saved profile exactly; admin POS can still update saved details under auth.
-- **`orders.line_user_id`**: Text, nullable. Set when user pastes order number + access code into LINE OA via webhook. Used for 1-on-1 push notifications. Per-order (not per-user) — each order must be linked individually.
+- **`orders.line_user_id`**: Text, nullable. Set when user pastes order number + recipient name + phone last 3 digits into LINE OA via webhook. Used for 1-on-1 push notifications. Per-order (not per-user) — each order must be linked individually.
 - **`notification_logs` Context**: The `order_id` is nullable. Added `round_id` and `product_id` for accurate notification analytics, and a `skipped` status for tracking gracefully skipped notifications (e.g., missing `line_user_id`).
 
 ### Order Status Flow
@@ -205,19 +205,18 @@ Cancel stock restore: yes for pending_payment/pending_confirm/confirmed; no for 
 | 確認取貨 | Mark 面交 order as picked up (same status: `shipped`) |
 | 代客下單 | Admin creates order on behalf of customer (POS) |
 | 快速收款 | POS cash payment → quick-confirm (pending_payment → confirmed) |
-| 綁定訂單 | User pastes order number + access code in LINE OA → webhook links `line_user_id` to that order |
+| 綁定訂單 | User pastes order number + recipient_name + phone_last3 in LINE OA → webhook links `line_user_id` to that order |
 
 ### Key DB Behaviors
 
 - **Order number generation**: Trigger-based `ORD-YYYYMMDD-NNN` with `pg_advisory_xact_lock`.
-- **Access code generation**: `orders.access_code` is a 12-character uppercase code generated at order creation and required for all public order-specific actions.
 - **`submission_key`**: UUID UNIQUE. Client generates before submit; duplicate inserts fail harmlessly.
 - **`product_progress` view**: Aggregates `order_items` by product (excluding cancelled orders).
 - **Auto `updated_at`**: Trigger on `users` and `suppliers` tables.
 - **Shipping fee calculation**: `submit-order` route checks `pickup_location`: if null/empty (宅配), adds `round.shipping_fee` to total and snapshots it in `orders.shipping_fee`.
-- **Public lookup / mutations**: `/api/lookup`, `/api/report-payment`, `/api/cancel-order`, and the public order page all require `order_number + access_code`. Nickname and phone suffix are not ownership proofs.
-- **LINE order linking**: User pastes `ORD-YYYYMMDD-NNN ACCESSCODE` in LINE OA → webhook verifies both and writes `line_user_id` on that order. Per-order (not per-user). Idempotent — re-pasting same order by same user is a no-op. One order = one LINE account.
-- **LINE message extraction**: The webhook parser accepts raw or prefixed text containing an order number, but binding only proceeds when a valid 12-character access code is also present.
+- **Public lookup / mutations**: `/api/lookup` requires `recipient_name + phone_last3`, while `/api/lookup/order`, `/api/report-payment`, `/api/cancel-order`, and LINE binding require `order_number + recipient_name + phone_last3`. Internal UUIDs stay private on public routes.
+- **LINE order linking**: User pastes `ORD-YYYYMMDD-NNN 王小美 678` in LINE OA → webhook verifies all three fields and writes `line_user_id` on that order. Per-order (not per-user). Idempotent — re-pasting the same order by the same user is a no-op. One order = one LINE account.
+- **LINE message extraction**: The webhook parser accepts exactly one order number, one 3-digit suffix, and a non-empty recipient name; ambiguous messages fail closed.
 - **Single-open-round invariant**: At most one round can have `is_open = true`, enforced by a partial unique index (`idx_rounds_single_open`). `create()` atomically closes existing open rounds in a transaction. `update()` does a friendly precheck and catches `P2002` from concurrent conflicts.
 - **Order creation two-phase validation**: `createWithItems()` validates all products (existence, round ownership, `is_active`) before any stock mutation. All errors throw `OrderValidationError` inside the `$transaction` to trigger rollback, caught outside and converted to `{ error }` for the API contract.
 - **Arrival notification customer counting**: `getCustomersForArrivalNotification()` returns `customerCount` (unique `user_id`, falling back to `order.id` for guests) alongside `lineUserIds` and `emails`. The `customersNotified` field in notify-arrival response reflects unique customers, not delivery endpoints.
@@ -250,7 +249,7 @@ Public storefront/order operations go through server-side API routes and Prisma,
 6. **`submission_key` is generated client-side** (once per checkout session). The API deduplicates on the server against the unique constraint.
 7. **Shipping fee is snapshotted on order creation.** The order stores `shipping_fee` at creation time. Never recalculate from the round after the fact.
 8. **Product arrival notifications target customers by product**, not by order. Query: all users who ordered product X in non-cancelled orders for the current round.
-9. **Public order access requires `order_number + access_code`.** Do not reintroduce nickname-only lookup, phone-suffix ownership, or UUID disclosure on public routes.
+9. **Public order access requires `recipient_name + phone_last3` and, for single-order actions, `order_number + recipient_name + phone_last3`.** Do not expose internal UUIDs on public routes.
 
 ### API Routes
 
@@ -261,12 +260,12 @@ Public storefront/order operations go through server-side API routes and Prisma,
 - `confirm-order` and `batch-confirm`: update status → send notifications → log results. Notification failure does NOT rollback confirmation.
 - `confirm-shipment`: update status to `shipped` + write `shipped_at` → send shipment notifications → log results.
 - `notify-arrival`: takes `productId` + `roundId` → find all customers with that product in non-cancelled orders → send "已到達理貨中心" notification to each → log results.
-- `report-payment`: public path requires `order_number + access_code + payment_amount + payment_last5`.
-- `cancel-order`: Two modes — user (only `pending_payment`, requires `order_number + access_code`) and admin (any status, requires auth, optional `cancel_reason`). Restores stock except for `shipped`. Sends cancellation notification (admin cancel only).
+- `report-payment`: public path requires `order_number + recipient_name + phone_last3 + payment_amount + payment_last5`.
+- `cancel-order`: Two modes — user (only `pending_payment`, requires `order_number + recipient_name + phone_last3`) and admin (any status, requires auth, optional `cancel_reason`). Restores stock except for `shipped`. Sends cancellation notification (admin cancel only).
 - `quick-confirm`: Admin POS shortcut — takes `orderId`, skips `pending_confirm`, sets status to `confirmed` + writes `confirmed_at` + auto-fills payment fields. For cash/in-person payments.
-- `lookup`: public path requires `orderNumber + accessCode`; it must never return internal order IDs or cross-order history.
+- `lookup`: public path requires `recipient_name + phone_last3`; single-order public detail fetch uses `order_number + recipient_name + phone_last3`. Public routes must never return internal order IDs.
 - `users/lookup`: admin-only helper for POS autofill. Never expose it to anonymous callers again.
-- `line/webhook`: LINE webhook receiver. Verifies `x-line-signature` (HMAC-SHA256), dispatches text messages to `handleMessage()`. Always returns 200. Handles: order number + access code → validate + link `line_user_id`; existing user → show status; unknown text → show instructions.
+- `line/webhook`: LINE webhook receiver. Verifies `x-line-signature` (HMAC-SHA256), dispatches text messages to `handleMessage()`. Always returns 200. Handles: order number + recipient name + phone last 3 → validate + link `line_user_id`; existing user → show status; unknown text → show instructions.
 
 ### Git
 
@@ -329,7 +328,7 @@ Phase 1–5 is now considered complete for merge after the audit/remediation pas
 ### What Was Fixed
 
 - **Schema alignment:** `prisma/schema.prisma`, `prisma/migration.sql`, `prisma/migration_003_notification_log_context.sql`, and `types/index.ts` now agree on `notification_logs.round_id`, `notification_logs.product_id`, and `status = 'skipped'`.
-- **LINE flow correctness:** Order detail copy now tells users to paste `order_number + access_code`; the webhook parser accepts raw or prefixed order text but only binds when a valid access code is present; the pending-payment share CTA was restored.
+- **LINE flow correctness:** Order detail copy now tells users to paste `order_number + recipient_name + phone_last3`; the webhook parser accepts raw or prefixed order text but only binds when exactly one order number, one 3-digit suffix, and a non-empty recipient name are present; the pending-payment share CTA was restored.
 - **Admin routing:** Admin print/navigation paths now use shared helpers instead of hardcoded `/admin/...`, so obfuscation via `ADMIN_BASE` remains intact.
 - **Idempotent batch ops:** Batch confirm/shipment now transition-guard on source state and send notifications only for rows actually changed in that call.
 - **Dashboard gaps:** Product-demand expansion now shows order numbers, product demand uses cached product lookups, and admins have a per-product packing-list print action instead of page-only printing.
@@ -403,18 +402,15 @@ Audit-driven hardening closed the public trust-boundary gaps identified in the C
 
 ### What Was Changed
 
-- Added `orders.access_code` as a 12-character public capability and backfilled existing rows via `prisma/migration_006_public_access_security.sql`.
 - Locked RLS on `users`, `orders`, and `order_items` to authenticated/admin access only. Anonymous direct reads/writes to those tables are no longer allowed.
-- Removed public nickname-based lookup/autofill/history. Public lookup, payment reporting, cancellation, and order detail access now require `order_number + access_code`.
+- Removed public nickname-based lookup/autofill/history. Public lookup now uses `recipient_name + phone_last3`, and single-order public actions use `order_number + recipient_name + phone_last3`.
 - Made `/api/users/lookup` admin-only for POS autofill.
 - Added lightweight rate limiting on `submit-order`, `lookup`, `report-payment`, and `cancel-order`.
-- Updated LINE binding so users must send both order number and access code; binding failure copy no longer acts as a strong existence oracle.
+- Updated LINE binding so users must send order number + recipient name + phone last 3; binding failure copy no longer acts as a strong existence oracle.
 - Prevented public nickname collisions from overwriting an existing saved profile with different phone/address/email details.
 
-### Verified Migration 006 Results
+### Verified Public Access Results
 
-- `orders.access_code` is `NOT NULL`, `UNIQUE`, and length-checked at 12 characters.
-- Existing orders were backfilled successfully; no rows remained with missing or invalid access codes.
 - Anonymous direct Supabase access to `users`, `orders`, and `order_items` is blocked by RLS (`SELECT` returns no rows; `INSERT`/`UPDATE` are rejected or blocked).
 - Authenticated/admin access remains available for those tables.
 - Public read access for `rounds` and `products` remains intact.

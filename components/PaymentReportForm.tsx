@@ -7,14 +7,18 @@ import { useToast } from "@/hooks/use-toast";
 
 interface PaymentReportFormProps {
   orderNumber: string;
-  accessCode: string;
+  recipientName: string;
+  phoneLast3: string;
   orderTotal: number;
+  onSuccess?: () => void | Promise<void>;
 }
 
 export function PaymentReportForm({
   orderNumber,
-  accessCode,
+  recipientName,
+  phoneLast3,
   orderTotal,
+  onSuccess,
 }: PaymentReportFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -46,7 +50,8 @@ export function PaymentReportForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order_number: orderNumber,
-          access_code: accessCode,
+          recipient_name: recipientName,
+          phone_last3: phoneLast3,
           payment_amount: parseInt(amount, 10),
           payment_last5: last5.trim(),
         }),
@@ -60,7 +65,11 @@ export function PaymentReportForm({
       }
 
       toast({ title: "回報成功！" });
-      router.refresh();
+      if (onSuccess) {
+        await onSuccess();
+      } else {
+        router.refresh();
+      }
     } catch {
       toast({ title: "網路錯誤，請重試", variant: "destructive" });
       setSubmitting(false);
