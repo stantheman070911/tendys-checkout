@@ -15,7 +15,7 @@ const dbMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/suppliers", () => dbMock);
 
-import { PUT, POST } from "./route";
+import { PUT, POST, DELETE } from "./route";
 
 function makeRequest(body: unknown, method = "PUT") {
   return new Request("http://localhost/api/suppliers", {
@@ -23,6 +23,14 @@ function makeRequest(body: unknown, method = "PUT") {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   }) as unknown as import("next/server").NextRequest;
+}
+
+function makeDeleteRequest(id?: string) {
+  const params = id ? `?id=${id}` : "";
+  const url = new URL(`http://localhost/api/suppliers${params}`);
+  return {
+    nextUrl: url,
+  } as unknown as import("next/server").NextRequest;
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -50,7 +58,7 @@ describe("PUT /api/suppliers", () => {
         phone: null,
         email: null,
         note: null,
-      })
+      }),
     );
 
     expect(res.status).toBe(200);
@@ -94,5 +102,37 @@ describe("POST /api/suppliers", () => {
     expect(res.status).toBe(400);
     expect(body.error).toMatch(/name/i);
     expect(dbMock.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/suppliers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.mockResolvedValue(true);
+  });
+
+  it("returns 400 when supplier has linked products", async () => {
+    dbMock.deleteSupplier.mockResolvedValue({
+      error: "Cannot delete supplier with linked products",
+    });
+
+    const res = await DELETE(makeDeleteRequest("s1"));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/product/i);
+  });
+
+  it("returns 200 when supplier has no products", async () => {
+    dbMock.deleteSupplier.mockResolvedValue({ success: true });
+
+    const res = await DELETE(makeDeleteRequest("s1"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+  });
+
+  it("returns 400 when id is missing", async () => {
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(400);
   });
 });
