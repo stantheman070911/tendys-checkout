@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -201,7 +202,15 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
       <header className="bg-green-700 text-white p-3 sticky top-0 z-10">
-        <span className="font-bold text-sm">{round.name}</span>
+        <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
+          <span className="font-bold text-sm">{round.name}</span>
+          <Link
+            href="/lookup"
+            className="shrink-0 rounded-xl border border-green-500/60 bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-500"
+          >
+            查訂單
+          </Link>
+        </div>
       </header>
       <main className="max-w-lg mx-auto p-3 space-y-3">
         <DeadlineBanner

@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { getOpenRound } from "@/lib/db/rounds";
 import { listActiveByRound } from "@/lib/db/products";
 import { prisma } from "@/lib/db/prisma";
@@ -20,7 +21,15 @@ export default async function Home({
   if (!round) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <p className="text-lg text-muted-foreground">目前沒有進行中的團購</p>
+        <div className="space-y-4 text-center">
+          <p className="text-lg text-muted-foreground">目前沒有進行中的團購</p>
+          <Link
+            href="/lookup"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            查詢訂單
+          </Link>
+        </div>
       </main>
     );
   }
