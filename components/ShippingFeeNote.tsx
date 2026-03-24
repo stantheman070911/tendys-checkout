@@ -6,8 +6,8 @@ interface ShippingFeeNoteProps {
 
 export function ShippingFeeNote({ fee }: ShippingFeeNoteProps) {
   return (
-    <p className="text-sm text-gray-600">
-      宅配到以上地址，運費 {formatCurrency(fee)}
+    <p className="text-sm text-[hsl(var(--muted-foreground))]">
+      宅配到以上地址，另收 {formatCurrency(fee)}，面交則免運。
     </p>
   );
 }

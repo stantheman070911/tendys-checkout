@@ -184,223 +184,306 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-28">
-      <header className="bg-green-700 text-white p-3 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
-          <span className="font-bold text-sm">{round.name}</span>
+    <div className="lux-shell">
+      <header className="sticky top-0 z-20 border-b border-[rgba(177,140,92,0.18)] bg-[rgba(246,241,233,0.72)] backdrop-blur-xl">
+        <div className="lux-page flex items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <div className="lux-kicker">Tendy Market Round</div>
+            <span className="truncate font-display text-lg text-[hsl(var(--ink))] md:text-xl">
+              {round.name}
+            </span>
+          </div>
           <Link
             href="/lookup"
-            className="shrink-0 rounded-xl border border-green-500/60 bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-500"
+            className="shrink-0 rounded-full border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] px-4 py-2 text-xs font-semibold tracking-[0.08em] text-[hsl(var(--ink))] hover:-translate-y-0.5 hover:bg-white"
           >
             查訂單
           </Link>
         </div>
       </header>
-      <main className="max-w-lg mx-auto p-3 space-y-3">
-        <DeadlineBanner
-          deadline={round.deadline}
-          isOpen={round.is_open}
-          roundName={round.name}
-        />
-        {round.shipping_fee && (
-          <p className="text-xs text-center text-gray-400">
-            宅配 +{formatCurrency(round.shipping_fee)} · 指定面交點免運費
-          </p>
-        )}
-        <SharePanel roundId={round.id} show={anyUnderGoal} />
-
-        {/* Product List */}
-        <div className="space-y-3">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              cartQty={cart.get(product.id)?.quantity ?? 0}
-              onAdd={() => addToCart(product)}
-              onRemove={() => removeFromCart(product.id)}
-              disabled={roundClosed}
-            />
-          ))}
-        </div>
-
-        {products.length === 0 && (
-          <p className="text-center text-muted-foreground py-8">目前沒有商品</p>
-        )}
-
-        {/* Checkout Form */}
-        {checkoutOpen && (
-          <div ref={checkoutRef} className="space-y-4">
-            {/* Order Details Card */}
-            <div className="bg-white rounded-xl border p-4">
-              <div className="font-medium text-gray-600 mb-2 text-sm">
-                訂單明細
+      <main className="lux-page space-y-6 md:space-y-8">
+        <section className="lux-panel-strong relative overflow-hidden p-5 md:p-8">
+          <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(177,140,92,0.24),transparent_48%)] md:block" />
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.8fr)] lg:items-end">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="lux-kicker">Premium Group Purchase</div>
+                <h1 className="lux-title text-balance">
+                  這一輪，只收當令好貨。
+                </h1>
+                <p className="lux-subtitle max-w-2xl">
+                  精選供應商、清楚成團門檻、一次完成下單與匯款回報。用更乾淨的節奏，把生鮮團購做得像精品採買。
+                </p>
               </div>
-              {cartItems.map((item) => (
-                <div
-                  key={item.product_id}
-                  className="flex justify-between text-sm py-0.5"
-                >
-                  <span>
-                    {item.product_name} x{item.quantity}
+
+              <div className="flex flex-wrap gap-2.5">
+                <span className="lux-pill">{products.length} 款商品</span>
+                <span className="lux-pill">
+                  {round.shipping_fee
+                    ? `宅配運費 ${formatCurrency(round.shipping_fee)}`
+                    : "依團務設定運費"}
+                </span>
+                <span className="lux-pill">
+                  指定面交點免運
+                </span>
+                {roundClosed && (
+                  <span className="lux-pill border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] text-[rgb(140,67,56)]">
+                    本輪已截單
                   </span>
-                  <span>{formatCurrency(item.subtotal)}</span>
-                </div>
-              ))}
-              <div className="border-t mt-2 pt-2 space-y-1">
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>商品小計</span>
-                  <span>{formatCurrency(itemsTotal)}</span>
-                </div>
-                {shippingFee ? (
-                  <div className="flex justify-between text-sm text-blue-600">
-                    <span>宅配運費</span>
-                    <span>{formatCurrency(shippingFee)}</span>
-                  </div>
-                ) : !isDelivery ? (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>面交免運</span>
-                    <span>$0</span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between font-bold text-lg pt-1">
-                  <span>合計</span>
-                  <span>{formatCurrency(orderTotal)}</span>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Customer Info Card */}
-            <div className="bg-white rounded-xl border p-4 space-y-3">
-              <div className="font-medium text-gray-600 text-sm">收貨資訊</div>
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    LINE 暱稱 *
-                  </label>
-                  <Input
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="你在群組的暱稱"
-                    required
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    為保護個資，系統不再自動帶入舊的收貨資料。
-                  </p>
+            <div className="space-y-3">
+              <DeadlineBanner
+                deadline={round.deadline}
+                isOpen={round.is_open}
+                roundName={round.name}
+              />
+              <div className="lux-panel-muted p-4">
+                <div className="lux-kicker">How It Works</div>
+                <div className="mt-2 space-y-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                  <p>挑選商品後直接完成下單，訂單成立後即可查看匯款資訊與後續狀態。</p>
+                  <p>如有成團中商品，可直接把本團分享給熟客朋友一起湊單。</p>
                 </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    收貨人 *
-                  </label>
-                  <Input
-                    value={recipientName}
-                    onChange={(e) => setRecipientName(e.target.value)}
-                    placeholder="真實姓名"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    電話 *
-                  </label>
-                  <Input
-                    type="tel"
-                    inputMode="tel"
-                    maxLength={20}
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0912-345-678"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    取貨方式
-                  </label>
-                  <Select
-                    value={pickupLocation}
-                    onValueChange={setPickupLocation}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PICKUP_OPTIONS.map((opt) => (
-                        <SelectItem
-                          key={opt.value || DELIVERY_VALUE}
-                          value={opt.value || DELIVERY_VALUE}
-                        >
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {isDelivery && (
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      收貨地址
-                    </label>
-                    <Input
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="縣市、區、路、號"
-                    />
-                    {shippingFee && <ShippingFeeNote fee={shippingFee} />}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    Email（選填）
-                  </label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    備註（選填）
-                  </label>
-                  <Input
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="特殊需求"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={
-                    submitting ||
-                    cartItems.length === 0 ||
-                    roundClosed ||
-                    (isDelivery && !address.trim())
-                  }
-                  className="w-full bg-green-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-50 hover:bg-green-700 transition"
-                >
-                  {submitting
-                    ? "送出中..."
-                    : `送出訂單 · ${formatCurrency(orderTotal)}`}
-                </button>
-                {isDelivery && !address.trim() && (
-                  <p className="text-xs text-center text-gray-400">
-                    宅配請填寫收貨地址
-                  </p>
-                )}
-              </form>
+              </div>
             </div>
           </div>
+        </section>
+
+        <SharePanel roundId={round.id} show={anyUnderGoal} />
+
+        <section className="space-y-4">
+          <div className="lux-section-heading">
+            <div>
+              <div className="lux-eyebrow">Current Selection</div>
+              <h2 className="font-display text-2xl text-[hsl(var(--ink))] md:text-3xl">
+                本輪鮮貨清單
+              </h2>
+            </div>
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+              {roundClosed ? "本輪已結束，仍可查詢既有訂單" : "點擊加減，直接完成選購"}
+            </div>
+          </div>
+
+          {products.length === 0 ? (
+            <div className="lux-panel p-12 text-center text-[hsl(var(--muted-foreground))]">
+              目前沒有商品
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  cartQty={cart.get(product.id)?.quantity ?? 0}
+                  onAdd={() => addToCart(product)}
+                  onRemove={() => removeFromCart(product.id)}
+                  disabled={roundClosed}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {checkoutOpen && (
+          <section ref={checkoutRef} className="space-y-4 md:space-y-5">
+            <div className="lux-section-heading">
+              <div>
+                <div className="lux-eyebrow">Order Composition</div>
+                <h2 className="font-display text-2xl text-[hsl(var(--ink))] md:text-3xl">
+                  完成這筆訂單
+                </h2>
+              </div>
+              <div className="text-sm text-[hsl(var(--muted-foreground))]">
+                一頁完成收貨資訊與訂單確認
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
+              <div className="lux-panel-strong p-5 md:p-6">
+                <div className="lux-kicker">Order Summary</div>
+                <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
+                  訂單明細
+                </div>
+                <div className="mt-5 space-y-3">
+                  {cartItems.map((item) => (
+                    <div
+                      key={item.product_id}
+                      className="flex items-start justify-between gap-4 border-b border-[rgba(177,140,92,0.14)] pb-3 text-sm last:border-0 last:pb-0"
+                    >
+                      <span className="leading-6 text-[hsl(var(--ink))]">
+                        {item.product_name} ×{item.quantity}
+                      </span>
+                      <span className="shrink-0 font-semibold text-[hsl(var(--ink))]">
+                        {formatCurrency(item.subtotal)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 space-y-2 border-t border-[rgba(177,140,92,0.18)] pt-4 text-sm">
+                  <div className="flex justify-between text-[hsl(var(--muted-foreground))]">
+                    <span>商品小計</span>
+                    <span>{formatCurrency(itemsTotal)}</span>
+                  </div>
+                  {shippingFee ? (
+                    <div className="flex justify-between text-[rgb(74,96,136)]">
+                      <span>宅配運費</span>
+                      <span>{formatCurrency(shippingFee)}</span>
+                    </div>
+                  ) : !isDelivery ? (
+                    <div className="flex justify-between text-[rgb(65,98,61)]">
+                      <span>面交免運</span>
+                      <span>$0</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between pt-2 font-display text-2xl text-[hsl(var(--ink))]">
+                    <span>合計</span>
+                    <span>{formatCurrency(orderTotal)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lux-panel p-5 md:p-6">
+                <div className="space-y-2">
+                  <div className="lux-kicker">Recipient Details</div>
+                  <div className="font-display text-2xl text-[hsl(var(--ink))]">
+                    收貨與聯絡資訊
+                  </div>
+                  <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                    為保護個資，系統不再自動帶入舊資料。請重新確認本次收貨資訊。
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                      LINE 暱稱
+                    </label>
+                    <Input
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      placeholder="你在群組的暱稱"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                        收貨人
+                      </label>
+                      <Input
+                        value={recipientName}
+                        onChange={(e) => setRecipientName(e.target.value)}
+                        placeholder="真實姓名"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                        電話
+                      </label>
+                      <Input
+                        type="tel"
+                        inputMode="tel"
+                        maxLength={20}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0912-345-678"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                      取貨方式
+                    </label>
+                    <Select
+                      value={pickupLocation}
+                      onValueChange={setPickupLocation}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PICKUP_OPTIONS.map((opt) => (
+                          <SelectItem
+                            key={opt.value || DELIVERY_VALUE}
+                            value={opt.value || DELIVERY_VALUE}
+                          >
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {isDelivery && (
+                    <div className="space-y-2">
+                      <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                        收貨地址
+                      </label>
+                      <Input
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="縣市、區、路、號"
+                      />
+                      {shippingFee && <ShippingFeeNote fee={shippingFee} />}
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                        Email
+                      </label>
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="your@email.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                        備註
+                      </label>
+                      <textarea
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="特殊需求"
+                        className="lux-textarea min-h-[48px]"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={
+                      submitting ||
+                      cartItems.length === 0 ||
+                      roundClosed ||
+                      (isDelivery && !address.trim())
+                    }
+                    className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] px-5 py-4 text-base font-semibold text-[hsl(var(--mist))] shadow-[0_24px_46px_-32px_rgba(22,31,26,0.78)] disabled:opacity-50"
+                  >
+                    {submitting
+                      ? "送出中..."
+                      : `送出訂單 · ${formatCurrency(orderTotal)}`}
+                  </button>
+                  {isDelivery && !address.trim() && (
+                    <p className="text-center text-xs text-[hsl(var(--muted-foreground))]">
+                      宅配請填寫完整收貨地址。
+                    </p>
+                  )}
+                </form>
+              </div>
+            </div>
+          </section>
         )}
 
-        {/* CartBar */}
         {!roundClosed && (
           <CartBar
             items={cartItems}

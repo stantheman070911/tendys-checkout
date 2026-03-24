@@ -187,7 +187,7 @@ export default function OrdersPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
       </div>
     );
   }
@@ -209,19 +209,33 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="space-y-2">
-      {/* Search */}
-      <div className="flex gap-2 items-center">
+    <div className="space-y-4">
+      <section className="lux-panel-strong p-5 md:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <div className="lux-kicker">Order Desk</div>
+            <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+              訂單管理
+            </h1>
+            <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              搜尋、篩選、快速收款與列印，維持本輪訂單節奏。
+            </p>
+          </div>
+          <div className="lux-pill">{filtered.length} 筆顯示中</div>
+        </div>
+      </section>
+
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜尋 暱稱 / 電話 / 訂單號"
-          className="flex-1 border rounded-xl px-3 py-2.5 text-sm"
+          className="lux-input flex-1"
         />
         {search && (
           <button
             onClick={() => setSearch("")}
-            className="w-9 h-9 flex items-center justify-center border rounded-xl text-gray-400 hover:text-red-500"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] text-[hsl(var(--muted-foreground))]"
           >
             ✕
           </button>
@@ -229,20 +243,26 @@ export default function OrdersPage() {
         <button
           onClick={handleCSVExport}
           disabled={csvExporting}
-          className={`text-xs px-3 py-2.5 border rounded-xl whitespace-nowrap ${csvExporting ? "opacity-50 text-gray-400" : "text-gray-500 hover:text-indigo-600"}`}
+          className={`inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2.5 text-xs font-semibold tracking-[0.08em] whitespace-nowrap ${
+            csvExporting
+              ? "opacity-50 text-[hsl(var(--muted-foreground))]"
+              : "text-[hsl(var(--ink))]"
+          }`}
         >
           {csvExporting ? "匯出中..." : "CSV"}
         </button>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1.5 flex-wrap items-center">
+      <div className="lux-panel flex flex-wrap items-center gap-2 p-3">
         {FILTER_OPTIONS.map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}
-            className={`text-xs px-3 py-1.5 rounded-full transition ${
-              filter === s ? "bg-indigo-600 text-white" : "bg-white border"
+            className={`rounded-full px-4 py-2 text-xs font-semibold tracking-[0.08em] transition ${
+              filter === s
+                ? "bg-[hsl(var(--forest))] text-[hsl(var(--mist))]"
+                : "border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] text-[hsl(var(--muted-foreground))]"
             }`}
           >
             {s === "all" ? "全部" : STATUS_LABELS[s]}
@@ -252,7 +272,7 @@ export default function OrdersPage() {
           (filter === "all" || filter === "pending_confirm") && (
             <button
               onClick={selectAllPending}
-              className="text-xs px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 ml-auto"
+              className="ml-auto rounded-full border border-[rgba(80,112,147,0.16)] bg-[rgba(222,231,242,0.8)] px-4 py-2 text-xs font-semibold text-[rgb(74,96,136)]"
             >
               全選待確認
             </button>
@@ -261,7 +281,9 @@ export default function OrdersPage() {
 
       {/* Orders */}
       {filtered.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">沒有符合的訂單</div>
+        <div className="lux-panel p-12 text-center text-[hsl(var(--muted-foreground))]">
+          沒有符合的訂單
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((o) => (
@@ -279,24 +301,26 @@ export default function OrdersPage() {
 
       {/* Batch confirm bar */}
       {batchSel.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-indigo-700 text-white px-4 py-3 flex items-center justify-between z-40 shadow-2xl">
-          <span className="font-medium text-sm">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+          <div className="lux-floating-bar pointer-events-auto mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+            <span className="text-sm font-medium">
             已選 <b>{batchSel.size}</b> 筆
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setBatchSel(new Set())}
-              className="px-3 py-1.5 border border-indigo-500 rounded-xl text-sm"
-            >
-              清除
-            </button>
-            <button
-              onClick={batchConfirm}
-              disabled={batchActing}
-              className="px-4 py-1.5 bg-green-500 rounded-xl text-sm font-bold disabled:opacity-50"
-            >
-              {batchActing ? "處理中…" : "批次確認付款"}
-            </button>
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBatchSel(new Set())}
+                className="rounded-full border border-white/20 px-4 py-2 text-sm"
+              >
+                清除
+              </button>
+              <button
+                onClick={batchConfirm}
+                disabled={batchActing}
+                className="rounded-full bg-[rgba(255,248,240,0.96)] px-5 py-2 text-sm font-semibold text-[hsl(var(--forest-deep))] disabled:opacity-50"
+              >
+                {batchActing ? "處理中…" : "批次確認付款"}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/toaster";
+import "@fontsource/noto-sans-tc/400.css";
+import "@fontsource/noto-sans-tc/500.css";
+import "@fontsource/noto-sans-tc/600.css";
+import "@fontsource/noto-sans-tc/700.css";
+import "@fontsource/noto-serif-tc/400.css";
+import "@fontsource/noto-serif-tc/600.css";
+import "@fontsource/noto-serif-tc/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +30,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-TW">
-      <body>
+      <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
         <Toaster />
         <Analytics />

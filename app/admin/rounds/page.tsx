@@ -119,7 +119,7 @@ export default function RoundsPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
       </div>
     );
   }
@@ -133,41 +133,53 @@ export default function RoundsPage() {
   }
 
   return (
-    <div className="space-y-3">
-      <h3 className="font-bold text-gray-700 text-sm">開團管理</h3>
+    <div className="space-y-4">
+      <section className="lux-panel-strong p-5 md:p-6">
+        <div className="space-y-2">
+          <div className="lux-kicker">Round Planning</div>
+          <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+            開團管理
+          </h1>
+          <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            調整本輪截止時間、宅配運費，或建立下一輪團購。
+          </p>
+        </div>
+      </section>
 
       {/* Current Round */}
       {currentRound ? (
-        <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="lux-panel p-5 space-y-4">
           <div className="flex justify-between items-start">
             <div>
-              <div className="font-bold">{currentRound.name}</div>
+              <div className="font-display text-2xl text-[hsl(var(--ink))]">
+                {currentRound.name}
+              </div>
 
               {/* Deadline */}
               {editingDeadline ? (
-                <div className="flex items-center gap-1.5 mt-1">
+                <div className="mt-1 flex items-center gap-1.5">
                   <input
                     type="datetime-local"
                     value={deadlineInput}
                     onChange={(e) => setDeadlineInput(e.target.value)}
-                    className="border rounded-lg px-2 py-1 text-sm"
+                    className="lux-input"
                     autoFocus
                   />
                   <button
                     onClick={saveDeadline}
-                    className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg"
+                    className="rounded-full bg-[rgb(74,96,136)] px-3 py-1.5 text-xs font-semibold text-white"
                   >
                     儲存
                   </button>
                   <button
                     onClick={() => setEditingDeadline(false)}
-                    className="text-xs text-gray-400"
+                    className="text-xs text-[hsl(var(--muted-foreground))]"
                   >
                     取消
                   </button>
                 </div>
               ) : (
-                <div className="text-xs text-gray-400 mt-0.5">
+                <div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
                   截止{" "}
                   {currentRound.deadline
                     ? new Date(currentRound.deadline).toLocaleString("zh-TW")
@@ -176,11 +188,11 @@ export default function RoundsPage() {
               )}
 
               {/* Shipping fee */}
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-blue-500">宅配運費：</span>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-xs text-[rgb(74,96,136)]">宅配運費：</span>
                 {editingFee ? (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-400">$</span>
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">$</span>
                     <input
                       type="number"
                       min="0"
@@ -190,25 +202,25 @@ export default function RoundsPage() {
                         if (e.key === "Enter") saveFee();
                         if (e.key === "Escape") setEditingFee(false);
                       }}
-                      className="w-20 border rounded-lg px-2 py-1 text-sm font-bold"
+                      className="lux-input w-24 font-semibold"
                       autoFocus
                     />
                     <button
                       onClick={saveFee}
-                      className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg"
+                      className="rounded-full bg-[rgb(74,96,136)] px-3 py-1.5 text-xs font-semibold text-white"
                     >
                       儲存
                     </button>
                     <button
                       onClick={() => setEditingFee(false)}
-                      className="text-xs text-gray-400"
+                      className="text-xs text-[hsl(var(--muted-foreground))]"
                     >
                       取消
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold text-blue-600">
+                    <span className="text-sm font-semibold text-[rgb(74,96,136)]">
                       {currentRound.shipping_fee != null
                         ? formatCurrency(currentRound.shipping_fee)
                         : "未設定"}
@@ -218,7 +230,7 @@ export default function RoundsPage() {
                         setFeeInput(String(currentRound.shipping_fee ?? 0));
                         setEditingFee(true);
                       }}
-                      className="text-xs text-gray-400 hover:text-blue-500 underline"
+                      className="text-xs text-[hsl(var(--muted-foreground))] underline"
                     >
                       修改
                     </button>
@@ -226,14 +238,14 @@ export default function RoundsPage() {
                 )}
               </div>
             </div>
-            <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+            <span className="rounded-full border border-[rgba(95,126,92,0.2)] bg-[rgba(228,239,223,0.82)] px-3 py-1 text-xs font-semibold text-[rgb(65,98,61)]">
               開團中
             </span>
           </div>
           <div className="flex gap-2">
             <button
               onClick={closeRound}
-              className="flex-1 bg-red-600 text-white rounded-xl py-2 text-sm font-medium"
+              className="flex-1 rounded-[1.1rem] bg-red-600 py-3 text-sm font-semibold text-white"
             >
               截單
             </button>
@@ -245,14 +257,14 @@ export default function RoundsPage() {
                 setDeadlineInput(dl);
                 setEditingDeadline(true);
               }}
-              className="flex-1 border rounded-xl py-2 text-sm"
+              className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
             >
               改截止
             </button>
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border p-4 text-center text-gray-400 text-sm">
+        <div className="lux-panel p-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
           目前沒有進行中的團購
         </div>
       )}
@@ -261,36 +273,42 @@ export default function RoundsPage() {
       {showNewForm ? (
         <form
           onSubmit={createRound}
-          className="bg-white rounded-xl border p-4 space-y-3"
+          className="lux-panel space-y-4 p-5"
         >
-          <div className="font-medium text-sm text-gray-700">新開一團</div>
+          <div className="font-display text-2xl text-[hsl(var(--ink))]">
+            新開一團
+          </div>
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="團名（例：第13團：三月第四週）"
-            className="w-full border rounded-xl px-3 py-2.5 text-sm"
+            className="lux-input"
             required
             autoFocus
           />
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">截止時間</label>
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                截止時間
+              </label>
               <input
                 type="datetime-local"
                 value={newDeadline}
                 onChange={(e) => setNewDeadline(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">宅配運費</label>
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                宅配運費
+              </label>
               <input
                 type="number"
                 min="0"
                 value={newFee}
                 onChange={(e) => setNewFee(e.target.value)}
                 placeholder="0"
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
             </div>
           </div>
@@ -298,14 +316,14 @@ export default function RoundsPage() {
             <button
               type="button"
               onClick={() => setShowNewForm(false)}
-              className="flex-1 border rounded-xl py-2.5 text-sm"
+              className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={creating || !newName.trim()}
-              className="flex-1 bg-indigo-600 text-white rounded-xl py-2.5 font-bold text-sm disabled:opacity-50"
+              className="flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
             >
               {creating ? "建立中…" : "建立"}
             </button>
@@ -314,23 +332,25 @@ export default function RoundsPage() {
       ) : (
         <button
           onClick={() => setShowNewForm(true)}
-          className="w-full bg-indigo-600 text-white rounded-xl py-3 font-bold"
+          className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] py-4 font-semibold text-[hsl(var(--mist))]"
         >
-          + 新開一團
+          新開一團
         </button>
       )}
 
       {/* History */}
       {pastRounds.length > 0 && (
-        <div className="bg-white rounded-xl border p-3">
-          <div className="font-medium text-sm mb-2 text-gray-700">歷史記錄</div>
+        <div className="lux-panel p-4">
+          <div className="mb-3 font-display text-2xl text-[hsl(var(--ink))]">
+            歷史記錄
+          </div>
           {pastRounds.map((r) => (
             <div
               key={r.id}
-              className="flex justify-between text-sm text-gray-500 py-1.5 border-b last:border-0"
+              className="flex justify-between border-b border-[rgba(177,140,92,0.14)] py-2 text-sm text-[hsl(var(--muted-foreground))] last:border-0"
             >
               <span>{r.name}</span>
-              <span className="text-xs text-gray-300">已截單</span>
+              <span className="text-xs">已截單</span>
             </div>
           ))}
         </div>

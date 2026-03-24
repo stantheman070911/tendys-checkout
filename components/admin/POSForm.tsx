@@ -199,7 +199,7 @@ export function POSForm({
         <div className="space-y-4">
           {/* Product picker */}
           <div>
-            <div className="text-sm font-medium text-gray-700 mb-2">
+            <div className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
               選擇商品
             </div>
             <div className="space-y-2">
@@ -209,15 +209,15 @@ export function POSForm({
                 return (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2"
+                    className="flex items-center justify-between rounded-[1.15rem] border border-[rgba(177,140,92,0.16)] bg-[rgba(244,239,230,0.72)] px-3 py-3"
                   >
-                    <div className="text-sm">
+                    <div className="text-sm text-[hsl(var(--ink))]">
                       {p.name}{" "}
-                      <span className="text-gray-400">
+                      <span className="text-[hsl(var(--muted-foreground))]">
                         {formatCurrency(p.price)}/{p.unit}
                       </span>
                       {p.stock != null && (
-                        <span className="text-xs text-gray-400 ml-1">
+                        <span className="ml-1 text-xs text-[hsl(var(--muted-foreground))]">
                           庫存{p.stock}
                         </span>
                       )}
@@ -226,17 +226,17 @@ export function POSForm({
                       <button
                         onClick={() => updateQty(p.id, -1)}
                         disabled={qty === 0}
-                        className="w-7 h-7 rounded-lg border text-sm disabled:opacity-30"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] text-sm disabled:opacity-30"
                       >
                         −
                       </button>
-                      <span className="w-6 text-center text-sm font-bold">
+                      <span className="w-6 text-center text-sm font-semibold text-[hsl(var(--ink))]">
                         {qty}
                       </span>
                       <button
                         onClick={() => updateQty(p.id, 1)}
                         disabled={p.stock != null && qty >= p.stock}
-                        className="w-7 h-7 rounded-lg border text-sm disabled:opacity-30"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--forest))] text-sm text-[hsl(var(--mist))] disabled:opacity-30"
                       >
                         +
                       </button>
@@ -249,7 +249,9 @@ export function POSForm({
 
           {/* Customer info */}
           <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-700">客戶資料</div>
+            <div className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+              客戶資料
+            </div>
             <input
               value={nickname}
               onChange={(e) => {
@@ -257,48 +259,50 @@ export function POSForm({
                 setAutoFilled(false);
               }}
               placeholder="LINE 暱稱"
-              className="w-full border rounded-xl px-3 py-2.5 text-sm"
+              className="lux-input"
             />
             <div className="grid grid-cols-2 gap-2">
               <input
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
                 placeholder="收貨人姓名"
-                className="border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="電話"
-                className="border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
             </div>
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="地址（宅配時填寫）"
-              className="w-full border rounded-xl px-3 py-2.5 text-sm"
+              className="lux-input"
             />
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email（選填）"
-              className="w-full border rounded-xl px-3 py-2.5 text-sm"
+              className="lux-input"
             />
           </div>
 
           {/* Pickup */}
           <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-700">取貨方式</div>
+            <div className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+              取貨方式
+            </div>
             <div className="flex gap-2 flex-wrap">
               {PICKUP_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setPickup(opt.value)}
-                  className={`text-xs px-3 py-1.5 rounded-full transition ${
+                  className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
                     pickup === opt.value
-                      ? "bg-indigo-600 text-white"
-                      : "bg-white border"
+                      ? "bg-[hsl(var(--forest))] text-[hsl(var(--mist))]"
+                      : "border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] text-[hsl(var(--muted-foreground))]"
                   }`}
                 >
                   {opt.label}
@@ -312,12 +316,12 @@ export function POSForm({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="備註（選填）"
-            className="w-full border rounded-xl px-3 py-2.5 text-sm"
+            className="lux-input"
           />
 
           {/* Summary */}
           {cart.length > 0 && (
-            <div className="bg-gray-50 rounded-xl p-3 space-y-1 text-sm">
+            <div className="lux-panel-muted space-y-1 p-4 text-sm">
               {cart.map((c) => (
                 <div key={c.product_id} className="flex justify-between">
                   <span>
@@ -327,12 +331,12 @@ export function POSForm({
                 </div>
               ))}
               {appliedFee > 0 && (
-                <div className="flex justify-between text-blue-500">
+                <div className="flex justify-between text-[rgb(74,96,136)]">
                   <span>宅配運費</span>
                   <span>{formatCurrency(appliedFee)}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold border-t pt-1">
+              <div className="flex justify-between border-t border-[rgba(177,140,92,0.16)] pt-1 font-semibold text-[hsl(var(--ink))]">
                 <span>合計</span>
                 <span>{formatCurrency(total)}</span>
               </div>
@@ -344,14 +348,14 @@ export function POSForm({
             <button
               onClick={() => handleSubmit(false)}
               disabled={!canSubmit || submitting}
-              className="flex-1 border-2 border-indigo-600 text-indigo-600 rounded-xl py-2.5 text-sm font-bold disabled:opacity-50"
+              className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))] disabled:opacity-50"
             >
               建立訂單
             </button>
             <button
               onClick={() => handleSubmit(true)}
               disabled={!canSubmit || submitting}
-              className="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50"
+              className="flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
             >
               {submitting ? "處理中…" : "建立並現場收款"}
             </button>

@@ -8,6 +8,43 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 
 ---
 
+## Latest Handoff
+
+- Public + admin UI were refactored into one editorial-natural luxury design system.
+- Global brand layer lives in `app/globals.css`: warm ivory paper, olive-charcoal ink, muted forest primary, bronze accents, premium rounded surfaces, and shared `lux-*` utility classes.
+- Intended typography is now explicitly loaded in `app/layout.tsx` via vendored local package assets:
+  - `@fontsource/noto-sans-tc`
+  - `@fontsource/noto-serif-tc`
+- Cart-bar secondary copy contrast was raised in `components/CartBar.tsx` to avoid marginal readability on weaker screens.
+- The redesign was visual only. Business logic and public/admin flows were intentionally preserved.
+- Verified after redesign + font fix:
+  - `npx tsc --noEmit`
+  - `npm run lint`
+  - `npm run build`
+  - `npx vitest run`
+
+### Primary Redesign Files
+
+- Public shell + storefront: `app/page.tsx`, `components/StorefrontClient.tsx`, `components/ProductCard.tsx`, `components/CartBar.tsx`, `components/SharePanel.tsx`
+- Public order flows: `app/lookup/page.tsx`, `components/PublicOrderPage.tsx`, `components/PaymentReportForm.tsx`, `components/CancelOrderButton.tsx`
+- Admin shell + key screens: `app/admin/layout.tsx`, `app/admin/page.tsx`, `app/admin/dashboard/page.tsx`, `app/admin/orders/page.tsx`, `app/admin/shipments/page.tsx`, `app/admin/products/page.tsx`, `app/admin/rounds/page.tsx`, `app/admin/suppliers/page.tsx`
+- Shared admin cards/forms: `components/admin/OrderCard.tsx`, `ShipmentCard.tsx`, `POSForm.tsx`, `ProductAggregationTable.tsx`, `ProductForm.tsx`, `SupplierForm.tsx`
+- Shared primitives: `components/ui/button.tsx`, `input.tsx`, `dialog.tsx`, `select.tsx`
+
+### Design Intent
+
+- Mood: warm, natural, premium-market, editorial. Avoid flashy-tech or nightclub-dark aesthetics.
+- Public and admin must feel like the same product family.
+- If extending the UI, prefer existing `lux-*` classes before inventing new one-off Tailwind styling.
+- Preserve the stronger hierarchy introduced in the redesign:
+  - serif display headlines
+  - restrained bronze meta labels
+  - floating dark tray for cart/batch actions
+  - image-first product presentation
+  - premium receipt-like order detail
+
+---
+
 ## Project
 
 Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organizers share a link in LINE groups → users browse, order, report bank transfers → admin confirms payments, ships, coordinates with suppliers, sends notifications.

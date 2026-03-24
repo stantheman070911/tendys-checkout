@@ -57,6 +57,15 @@
 - [x] **7.4** Error + loading states (lookup errors, CSV loading, product toggle, POS validation, clipboard fallback)
 - [x] **7.5** Final cleanup (Prettier, no console.log/debugger, .gitignore, checkpoint order)
 - [x] **7.6** Seed data rewrite (deterministic, 2 suppliers, 1 round, 5 products, 3 users)
+- [x] **7.7** Public + admin luxury redesign
+  - Added unified editorial-natural visual system in `app/globals.css`
+  - Restyled public storefront, checkout, lookup, order detail, share flow
+  - Restyled admin shell, dashboard, orders, shipments, products, rounds, suppliers, POS, dialogs
+  - Kept all business logic and route contracts unchanged
+- [x] **7.8** Typography + readability follow-up
+  - Loaded `Noto Sans TC` + `Noto Serif TC` in `app/layout.tsx`
+  - Added local package dependencies: `@fontsource/noto-sans-tc`, `@fontsource/noto-serif-tc`
+  - Raised CartBar secondary text contrast for accessibility
 
 ### Checkpoint 7 (Final)
 
@@ -87,6 +96,7 @@ npx vitest run       # must pass
 - [ ] **LINE ambiguity handling** — Reject or disambiguate messages with multiple order numbers (currently first-match-wins)
 - [ ] **Integration coverage** — Route-to-notification integration test
 - [ ] **Dependency remediation** — `npm audit` issues in dedicated pass
+- [ ] **Visual QA pass** — Device-by-device screenshot / browser review for the new luxury theme on low-end mobile and Safari
 
 ---
 

@@ -74,7 +74,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
       </div>
     );
   }
@@ -142,26 +142,51 @@ export default function DashboardPage() {
   const notificationSummary = summarizeNotificationLogs(logs);
 
   return (
-    <div className="space-y-3">
-      <h3 className="font-bold text-gray-700 text-sm">
-        {round.name}
-        {round.shipping_fee != null &&
-          ` · 宅配運費 ${formatCurrency(round.shipping_fee)}`}
-      </h3>
+    <div className="space-y-5">
+      <section className="lux-panel-strong p-5 md:p-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <div className="lux-kicker">Live Round Overview</div>
+            <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+              {round.name}
+            </h1>
+            <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              掌握本輪訂單、營收、待確認付款與待出貨節奏。
+              {round.shipping_fee != null &&
+                ` 宅配運費目前為 ${formatCurrency(round.shipping_fee)}。`}
+            </p>
+          </div>
+          <div className="lux-panel-muted p-4 text-right">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
+              Active Orders
+            </div>
+            <div className="mt-2 font-display text-3xl text-[hsl(var(--ink))]">
+              {nonCancelled.length}
+            </div>
+          </div>
+        </div>
+      </section>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {stats.map(([label, value, fn], i) => (
           <div
             key={i}
             onClick={fn ?? undefined}
-            className={`bg-white rounded-xl border p-3 text-center transition ${
-              fn ? "cursor-pointer hover:border-indigo-400" : ""
+            className={`lux-panel lux-card-hover p-4 ${
+              fn ? "cursor-pointer" : ""
             }`}
           >
-            <div className="text-xs text-gray-400 mb-0.5">{label}</div>
-            <div className="font-bold text-xl">{value}</div>
-            {fn && <div className="text-xs text-indigo-400 mt-0.5">→</div>}
+            <div className="text-[11px] uppercase tracking-[0.2em] text-[hsl(var(--bronze))]">
+              {label}
+            </div>
+            <div className="mt-3 font-display text-3xl text-[hsl(var(--ink))]">
+              {value}
+            </div>
+            {fn && (
+              <div className="mt-2 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                查看明細
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -176,44 +201,44 @@ export default function DashboardPage() {
 
       {/* Notification Summary */}
       {notificationSummary.length > 0 && (
-        <div className="bg-white rounded-xl border p-4">
-          <div className="font-medium text-sm mb-3 text-gray-700">
+        <div className="lux-panel p-5">
+          <div className="mb-3 font-display text-2xl text-[hsl(var(--ink))]">
             通知發送統計 (本團)
           </div>
           <div className="space-y-3">
             {notificationSummary.map((entry) => (
               <div
                 key={entry.type}
-                className="border-b last:border-0 pb-3 last:pb-0"
+                className="border-b border-[rgba(177,140,92,0.14)] pb-3 last:border-0 last:pb-0"
               >
-                <div className="text-xs font-bold text-gray-600 mb-1">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--bronze))]">
                   {entry.type}
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
-                    <span className="font-medium text-gray-500">LINE</span>
+                  <div className="lux-panel-muted flex items-center justify-between rounded-[1rem] p-3">
+                    <span className="font-medium text-[hsl(var(--muted-foreground))]">LINE</span>
                     <span>
-                      <span className="text-green-600 font-medium mr-2">
+                      <span className="mr-2 font-medium text-[rgb(65,98,61)]">
                         ✓ {entry.line.success}
                       </span>
-                      <span className="text-red-500 font-medium mr-2">
+                      <span className="mr-2 font-medium text-[rgb(140,67,56)]">
                         ✗ {entry.line.failed}
                       </span>
-                      <span className="text-gray-400 font-medium">
+                      <span className="font-medium text-[hsl(var(--muted-foreground))]">
                         — {entry.line.skipped}
                       </span>
                     </span>
                   </div>
-                  <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
-                    <span className="font-medium text-gray-500">Email</span>
+                  <div className="lux-panel-muted flex items-center justify-between rounded-[1rem] p-3">
+                    <span className="font-medium text-[hsl(var(--muted-foreground))]">Email</span>
                     <span>
-                      <span className="text-green-600 font-medium mr-2">
+                      <span className="mr-2 font-medium text-[rgb(65,98,61)]">
                         ✓ {entry.email.success}
                       </span>
-                      <span className="text-red-500 font-medium mr-2">
+                      <span className="mr-2 font-medium text-[rgb(140,67,56)]">
                         ✗ {entry.email.failed}
                       </span>
-                      <span className="text-gray-400 font-medium">
+                      <span className="font-medium text-[hsl(var(--muted-foreground))]">
                         — {entry.email.skipped}
                       </span>
                     </span>

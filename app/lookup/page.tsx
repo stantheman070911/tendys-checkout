@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Order, OrderItem, OrderStatus } from "@/types";
@@ -54,53 +56,73 @@ export default function LookupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-gray-700 text-white p-3 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto flex items-center gap-3">
-          <Link href="/" className="text-xl leading-none">
+    <div className="lux-shell">
+      <header className="sticky top-0 z-20 border-b border-[rgba(177,140,92,0.18)] bg-[rgba(246,241,233,0.72)] backdrop-blur-xl">
+        <div className="lux-page flex items-center gap-3 py-3">
+          <Link
+            href="/"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] text-lg text-[hsl(var(--ink))]"
+          >
             ←
           </Link>
-          <span className="font-bold">訂單查詢</span>
+          <div>
+            <div className="lux-kicker">Order Lookup</div>
+            <span className="font-display text-xl text-[hsl(var(--ink))]">
+              查詢既有訂單
+            </span>
+          </div>
         </div>
       </header>
-      <main className="max-w-lg mx-auto p-4 space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-sm text-amber-800">
-          輸入訂購人姓名與手機末三碼查詢
-        </div>
+      <main className="lux-page space-y-6">
+        <section className="lux-panel-strong mx-auto max-w-3xl overflow-hidden p-5 md:p-8">
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)] md:items-end">
+            <div className="space-y-3">
+              <div className="lux-kicker">Recipient Verification</div>
+              <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+                用姓名與手機末三碼，快速找回訂單。
+              </h1>
+              <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                系統會列出所有符合的歷史訂單。點進單筆訂單後，仍需再次驗證才能查看完整內容與後續操作。
+              </p>
+            </div>
 
-        <form onSubmit={handleSearch} className="space-y-2">
-          <input
-            value={recipientName}
-            onChange={(e) => setRecipientName(e.target.value)}
-            placeholder="訂購人姓名"
-            className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[44px]"
-          />
-          <input
-            value={phoneLast3}
-            onChange={(e) =>
-              setPhoneLast3(e.target.value.replace(/\D/g, "").slice(0, 3))
-            }
-            inputMode="numeric"
-            maxLength={3}
-            placeholder="手機末三碼"
-            className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[44px] font-mono tracking-widest"
-          />
-          <button
-            type="submit"
-            disabled={searching}
-            className="w-full bg-gray-800 text-white px-5 rounded-xl text-sm font-medium min-h-[44px]"
-          >
-            {searching ? "搜尋中..." : "查詢"}
-          </button>
-        </form>
+            <form onSubmit={handleSearch} className="space-y-3">
+              <Input
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                placeholder="訂購人姓名"
+              />
+              <Input
+                value={phoneLast3}
+                onChange={(e) =>
+                  setPhoneLast3(e.target.value.replace(/\D/g, "").slice(0, 3))
+                }
+                inputMode="numeric"
+                maxLength={3}
+                placeholder="手機末三碼"
+                className="font-mono tracking-[0.35em]"
+              />
+              <Button
+                type="submit"
+                disabled={searching}
+                size="lg"
+                className="w-full"
+              >
+                {searching ? "搜尋中..." : "查詢訂單"}
+              </Button>
+            </form>
+          </div>
+        </section>
 
         {searched && results.length === 0 && (
-          <div className="text-center py-10 text-gray-400">找不到相關訂單</div>
+          <div className="lux-panel mx-auto max-w-3xl p-10 text-center text-[hsl(var(--muted-foreground))]">
+            找不到相關訂單
+          </div>
         )}
 
         {results.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-xs text-gray-500">
+          <section className="mx-auto max-w-3xl space-y-3">
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
               找到 {results.length} 筆訂單
             </div>
             {results.map((result) => (
@@ -108,39 +130,44 @@ export default function LookupPage() {
                 key={result.order_number}
                 href={`/order/${encodeURIComponent(result.order_number)}`}
               >
-                <div className="bg-white rounded-xl border p-3 cursor-pointer hover:border-gray-400 transition space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-sm">
-                      {result.order_number}
-                    </span>
+                <div className="lux-panel lux-card-hover cursor-pointer space-y-3 p-4 md:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="lux-kicker">Order Number</div>
+                      <span className="font-mono text-sm font-semibold text-[hsl(var(--ink))]">
+                        {result.order_number}
+                      </span>
+                    </div>
                     <OrderStatusBadge status={result.status as OrderStatus} />
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                     {result.order_items
-                      .map((i) => `${i.product_name}x${i.quantity}`)
+                      .map((i) => `${i.product_name} × ${i.quantity}`)
                       .join("、")}
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>
-                      小計{" "}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(177,140,92,0.16)] pt-3 text-sm">
+                    <span className="text-[hsl(var(--muted-foreground))]">
+                      商品小計{" "}
                       {formatCurrency(
                         result.total_amount - (result.shipping_fee ?? 0),
                       )}
                       {result.shipping_fee ? (
-                        <span className="text-gray-400">
-                          {" "}
-                          +{formatCurrency(result.shipping_fee)}運
+                        <span className="ml-1 text-[hsl(var(--bronze))]">
+                          + {formatCurrency(result.shipping_fee)} 運費
                         </span>
                       ) : null}
                     </span>
-                    <span className="font-bold">
-                      合計 {formatCurrency(result.total_amount)}
+                    <span className="font-display text-2xl text-[hsl(var(--ink))]">
+                      {formatCurrency(result.total_amount)}
                     </span>
+                  </div>
+                  <div className="text-right text-xs uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
+                    view detail
                   </div>
                 </div>
               </Link>
             ))}
-          </div>
+          </section>
         )}
       </main>
     </div>

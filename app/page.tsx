@@ -20,12 +20,18 @@ export default async function Home({
 
   if (!round) {
     return (
-      <main className="flex min-h-screen items-center justify-center px-4">
-        <div className="space-y-4 text-center">
-          <p className="text-lg text-muted-foreground">目前沒有進行中的團購</p>
+      <main className="lux-shell flex items-center justify-center px-4">
+        <div className="lux-panel-strong max-w-xl space-y-4 p-8 text-center">
+          <div className="lux-kicker">No Active Round</div>
+          <p className="font-display text-3xl text-[hsl(var(--ink))]">
+            目前沒有進行中的團購
+          </p>
+          <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            開團後，這裡會顯示本輪精選商品與下單入口。
+          </p>
           <Link
             href="/lookup"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] px-5 py-2.5 text-sm font-semibold text-[hsl(var(--ink))]"
           >
             查詢訂單
           </Link>

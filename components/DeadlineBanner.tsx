@@ -23,7 +23,7 @@ export function DeadlineBanner({
 
   if (!isOpen) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-sm text-red-700 text-center font-medium">
+      <div className="lux-panel rounded-[1.4rem] border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] p-4 text-center text-sm font-medium text-[rgb(140,67,56)]">
         本團已截單
       </div>
     );
@@ -36,7 +36,7 @@ export function DeadlineBanner({
 
   if (remaining <= 0) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-sm text-red-700 text-center font-medium">
+      <div className="lux-panel rounded-[1.4rem] border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] p-4 text-center text-sm font-medium text-[rgb(140,67,56)]">
         本團已截單
       </div>
     );
@@ -51,23 +51,27 @@ export function DeadlineBanner({
   });
 
   const isUrgent = hrs < 1;
-  const bannerColor = isUrgent
-    ? "bg-red-50 border-red-200 text-red-800"
-    : "bg-amber-50 border-amber-200 text-amber-800";
-
   return (
-    <div
-      className={`${bannerColor} border rounded-xl p-2.5 text-sm text-center`}
-    >
-      {roundName && <span className="font-medium">{roundName}</span>}
-      {roundName && "\u3000"}截止 {dateStr} {timeStr}
-      {isUrgent ? (
-        <span className="ml-2 text-red-600 font-bold">剩 {mins} 分鐘</span>
-      ) : hrs < 48 ? (
-        <span className="ml-2 text-orange-600 font-bold">
-          剩 {hrs}h {mins}m
-        </span>
-      ) : null}
+    <div className="lux-panel-strong overflow-hidden p-4 md:p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <div className="lux-kicker">Round Window</div>
+          <div className="text-sm text-[hsl(var(--ink))] md:text-base">
+            {roundName && <span className="font-medium">{roundName}</span>}
+            {roundName && <span className="mx-2 text-[hsl(var(--bronze))]">•</span>}
+            截止 {dateStr} {timeStr}
+          </div>
+        </div>
+        <div
+          className={`inline-flex w-fit items-center rounded-full border px-3.5 py-2 text-xs font-semibold tracking-[0.18em] ${
+            isUrgent
+              ? "border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] text-[rgb(140,67,56)]"
+              : "border-[rgba(184,132,71,0.2)] bg-[rgba(242,228,203,0.84)] text-[rgb(120,84,39)]"
+          }`}
+        >
+          {isUrgent ? `剩 ${mins} 分鐘` : hrs < 48 ? `剩 ${hrs}h ${mins}m` : "開放中"}
+        </div>
+      </div>
     </div>
   );
 }

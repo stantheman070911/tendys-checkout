@@ -98,65 +98,71 @@ export function SupplierForm({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
               供應商名稱
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2.5 text-sm"
+              className="lux-input"
               required
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                 聯絡人
               </label>
               <input
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">電話</label>
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                電話
+              </label>
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Email</label>
+            <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+              Email
+            </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2.5 text-sm"
+              className="lux-input"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">備註</label>
+            <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+              備註
+            </label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[60px]"
+              className="lux-textarea"
             />
           </div>
           <DialogFooter>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border-2 rounded-xl py-2.5 font-medium text-gray-600"
+              className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={submitting || !name.trim()}
-              className="flex-1 bg-indigo-600 text-white rounded-xl py-2.5 font-bold disabled:opacity-50"
+              className="flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
             >
               {submitting ? "儲存中…" : isEdit ? "更新" : "新增"}
             </button>

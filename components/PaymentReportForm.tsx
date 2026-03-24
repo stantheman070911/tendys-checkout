@@ -82,31 +82,33 @@ export function PaymentReportForm({
 
     return (
       <div
-        className={`rounded-xl p-4 border-2 ${
+        className={`rounded-[1.4rem] border p-5 ${
           match
-            ? "border-green-400 bg-green-50"
-            : "border-orange-300 bg-orange-50"
+            ? "border-[rgba(95,126,92,0.2)] bg-[rgba(228,239,223,0.78)]"
+            : "border-[rgba(184,132,71,0.24)] bg-[rgba(242,228,203,0.82)]"
         }`}
       >
-        <div className="font-bold text-center mb-3">
+        <div className="mb-3 text-center font-display text-2xl text-[hsl(var(--ink))]">
           {match ? "金額吻合" : "金額不符，請確認"}
         </div>
-        <div className="space-y-2 text-sm bg-white rounded-xl p-3">
+        <div className="space-y-2 rounded-[1.2rem] bg-[rgba(255,251,246,0.88)] p-4 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-500">訂單應付</span>
-            <span className="font-bold">{formatCurrency(orderTotal)}</span>
+            <span className="text-[hsl(var(--muted-foreground))]">訂單應付</span>
+            <span className="font-semibold text-[hsl(var(--ink))]">
+              {formatCurrency(orderTotal)}
+            </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">填寫匯款</span>
+            <span className="text-[hsl(var(--muted-foreground))]">填寫匯款</span>
             <span
-              className={`font-bold ${match ? "text-green-700" : "text-orange-600"}`}
+              className={`font-semibold ${match ? "text-[rgb(65,98,61)]" : "text-[rgb(120,84,39)]"}`}
             >
               {formatCurrency(parsedAmount)}
             </span>
           </div>
-          <div className="flex justify-between border-t pt-2">
-            <span className="text-gray-500">帳號後五碼</span>
-            <span className="font-bold font-mono tracking-widest">
+          <div className="flex justify-between border-t border-[rgba(177,140,92,0.16)] pt-2">
+            <span className="text-[hsl(var(--muted-foreground))]">帳號後五碼</span>
+            <span className="font-mono font-semibold tracking-[0.28em] text-[hsl(var(--ink))]">
               {last5.trim()}
             </span>
           </div>
@@ -115,14 +117,14 @@ export function PaymentReportForm({
           <button
             onClick={() => setConfirming(false)}
             disabled={submitting}
-            className="flex-1 border-2 rounded-xl py-3 font-medium text-gray-600"
+            className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
           >
-            ← 修改
+            返回修改
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex-1 bg-green-600 text-white rounded-xl py-3 font-bold disabled:opacity-50"
+            className="flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
           >
             {submitting ? "送出中..." : "確認送出"}
           </button>
@@ -134,7 +136,7 @@ export function PaymentReportForm({
   return (
     <form onSubmit={handleReview} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1.5">
+        <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
           匯款金額
         </label>
         <input
@@ -143,13 +145,13 @@ export function PaymentReportForm({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder={String(orderTotal)}
-          className="w-full border rounded-xl px-4 py-3.5 text-2xl font-bold"
+          className="lux-input text-2xl font-semibold"
           required
           autoFocus
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1.5">
+        <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
           帳號後五碼
         </label>
         <input
@@ -157,16 +159,16 @@ export function PaymentReportForm({
           value={last5}
           onChange={(e) => setLast5(e.target.value)}
           placeholder="56789"
-          className="w-full border rounded-xl px-4 py-3.5 text-2xl font-bold tracking-widest"
+          className="lux-input text-2xl font-semibold tracking-[0.35em]"
           required
         />
       </div>
       <button
         type="submit"
         disabled={!amount || last5.length < 5}
-        className="w-full bg-green-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-40 hover:bg-green-700 transition"
+        className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] py-4 text-base font-semibold text-[hsl(var(--mist))] disabled:opacity-40"
       >
-        核對後確認送出 →
+        核對後送出
       </button>
     </form>
   );

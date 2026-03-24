@@ -6,6 +6,7 @@ import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { PaymentReportForm } from "@/components/PaymentReportForm";
 import { CancelOrderButton } from "@/components/CancelOrderButton";
 import { SharePanel } from "@/components/SharePanel";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { BANK_INFO } from "@/constants";
 import {
@@ -175,75 +176,94 @@ export function PublicOrderPage({
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-green-700 text-white p-3 sticky top-0 z-10">
-          <div className="max-w-lg mx-auto flex items-center justify-between">
-            <span className="font-bold">訂單詳情</span>
-            <span className="font-mono text-xs">{orderNumber}</span>
+      <div className="lux-shell">
+        <header className="sticky top-0 z-20 border-b border-[rgba(177,140,92,0.18)] bg-[rgba(246,241,233,0.72)] backdrop-blur-xl">
+          <div className="lux-page flex items-center justify-between gap-3 py-3">
+            <div>
+              <div className="lux-kicker">Order Access</div>
+              <span className="font-display text-xl text-[hsl(var(--ink))]">
+                訂單詳情
+              </span>
+            </div>
+            <span className="rounded-full border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.88)] px-3 py-1.5 font-mono text-xs text-[hsl(var(--muted-foreground))]">
+              {orderNumber}
+            </span>
           </div>
         </header>
-        <main className="max-w-lg mx-auto p-4 space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            輸入訂購人姓名與手機末三碼，才能查看這張訂單。
-          </div>
+        <main className="lux-page">
+          <section className="mx-auto max-w-3xl space-y-5">
+            <div className="lux-panel-strong overflow-hidden p-6 md:p-8">
+              <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)] md:items-end">
+                <div className="space-y-3">
+                  <div className="lux-kicker">Recipient Verification</div>
+                  <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+                    先驗證收件人，再查看這筆訂單。
+                  </h1>
+                  <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                    請輸入訂購人姓名與手機末三碼。舊的
+                    <span className="mx-1 rounded bg-[rgba(236,224,205,0.5)] px-1.5 py-0.5 font-mono text-xs text-[hsl(var(--ink))]">
+                      ?code=
+                    </span>
+                    連結不再作為驗證方式。
+                  </p>
+                </div>
 
-          <form
-            onSubmit={handleUnlock}
-            className="space-y-3 rounded-xl border bg-white p-4"
-          >
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                訂單編號
-              </label>
-              <div className="rounded-xl bg-gray-50 px-3 py-2.5 font-mono text-sm text-gray-700">
-                {orderNumber}
+                <form onSubmit={handleUnlock} className="space-y-3">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                      訂單編號
+                    </label>
+                    <div className="lux-input flex items-center font-mono text-sm text-[hsl(var(--muted-foreground))]">
+                      {orderNumber}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                      訂購人姓名
+                    </label>
+                    <Input
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      placeholder="王小美"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                      手機末三碼
+                    </label>
+                    <Input
+                      value={phoneLast3}
+                      onChange={(e) =>
+                        setPhoneLast3(e.target.value.replace(/\D/g, "").slice(0, 3))
+                      }
+                      inputMode="numeric"
+                      maxLength={3}
+                      placeholder="678"
+                      className="font-mono tracking-[0.35em]"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={unlocking}
+                    className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] px-5 py-4 text-sm font-semibold text-[hsl(var(--mist))] shadow-[0_24px_46px_-32px_rgba(22,31,26,0.78)] disabled:opacity-50"
+                  >
+                    {unlocking
+                      ? autoUnlockChecked
+                        ? "驗證中..."
+                        : "載入中..."
+                      : "查看訂單"}
+                  </button>
+                </form>
               </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                訂購人姓名
-              </label>
-              <input
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="王小美"
-                className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[44px]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                手機末三碼
-              </label>
-              <input
-                value={phoneLast3}
-                onChange={(e) =>
-                  setPhoneLast3(e.target.value.replace(/\D/g, "").slice(0, 3))
-                }
-                inputMode="numeric"
-                maxLength={3}
-                placeholder="678"
-                className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[44px] font-mono tracking-widest"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={unlocking}
-              className="w-full bg-green-600 text-white rounded-xl py-3 font-bold disabled:opacity-50"
-            >
-              {unlocking
-                ? autoUnlockChecked
-                  ? "驗證中..."
-                  : "載入中..."
-                : "查看訂單"}
-            </button>
-          </form>
 
-          <Link
-            href="/lookup"
-            className="block text-center text-sm text-gray-500 underline underline-offset-4"
-          >
-            返回訂單查詢
-          </Link>
+            <Link
+              href="/lookup"
+              className="block text-center text-sm text-[hsl(var(--muted-foreground))] underline underline-offset-4"
+            >
+              返回訂單查詢
+            </Link>
+          </section>
         </main>
       </div>
     );
@@ -257,252 +277,228 @@ export function PublicOrderPage({
     `${order.order_number} ${identity.recipient_name} ${identity.phone_last3}`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-green-700 text-white p-3 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <span className="font-bold">訂單詳情</span>
+    <div className="lux-shell">
+      <header className="sticky top-0 z-20 border-b border-[rgba(177,140,92,0.18)] bg-[rgba(246,241,233,0.72)] backdrop-blur-xl">
+        <div className="lux-page flex items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <div className="lux-kicker">Order Detail</div>
+            <span className="truncate font-display text-xl text-[hsl(var(--ink))]">
+              {order.order_number}
+            </span>
+          </div>
           <OrderStatusBadge status={status} />
         </div>
       </header>
-      <main className="max-w-lg mx-auto p-4 space-y-4">
-        {status === "pending_payment" && (
-          <div className="text-center py-4">
-            <div className="text-5xl mb-2">📋</div>
-            <h2 className="font-bold text-xl">訂單已成立</h2>
-            <p className="text-gray-400 text-sm mt-1 font-mono">
-              {order.order_number}
-            </p>
-          </div>
-        )}
-
-        {status === "pending_confirm" && (
-          <div className="text-center py-4">
-            <div className="text-5xl mb-2">⏳</div>
-            <h2 className="font-bold text-xl">匯款回報完成</h2>
-            <p className="text-gray-400 text-sm mt-1">
-              等待賣家確認，確認後收到 LINE + Email 通知
-            </p>
-            <div className="mt-3 bg-white rounded-xl border p-4 text-sm text-left space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-400">訂單</span>
+      <main className="lux-page space-y-5">
+        <section className="lux-panel-strong overflow-hidden p-5 md:p-7">
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <div className="space-y-3">
+              <div className="lux-kicker">Order Receipt</div>
+              <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+                {status === "pending_payment" && "訂單已成立，等待匯款。"}
+                {status === "pending_confirm" && "匯款回報已送出，等待賣家確認。"}
+                {status === "confirmed" && "付款已確認，正在安排出貨。"}
+                {status === "shipped" && "訂單已完成出貨。"}
+                {status === "cancelled" && "這筆訂單已取消。"}
+              </h1>
+              <div className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                 <span className="font-mono">{order.order_number}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">狀態</span>
-                <span className="text-blue-600 font-medium">待確認</span>
-              </div>
-              {order.payment_amount !== null && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400">匯款</span>
-                  <span>{formatCurrency(order.payment_amount)}</span>
-                </div>
-              )}
-              {order.payment_last5 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400">後五碼</span>
-                  <span className="font-mono tracking-widest">
-                    {order.payment_last5}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {status === "confirmed" && (
-          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-center">
-            <p className="font-medium text-green-700">
-              訂單已確認，等待出貨中...
-            </p>
-          </div>
-        )}
-
-        {status === "shipped" && (
-          <div className="rounded-xl bg-purple-50 border border-purple-200 p-4 text-center">
-            <p className="font-medium text-purple-700">已出貨！</p>
-            {order.shipped_at && (
-              <p className="text-sm text-purple-600 mt-1">
-                📦 出貨：{new Date(order.shipped_at).toLocaleString("zh-TW")}
-              </p>
-            )}
-          </div>
-        )}
-
-        {status === "cancelled" && (
-          <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-center space-y-1">
-            <p className="font-medium text-red-700">訂單已取消</p>
-            {order.cancel_reason && (
-              <p className="text-sm text-red-600">取消：{order.cancel_reason}</p>
-            )}
-          </div>
-        )}
-
-        {status === "pending_payment" && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="font-bold text-blue-800 text-center mb-3 text-sm">
-              匯款帳戶資訊
-            </div>
-            <div className="bg-white rounded-xl p-3 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">銀行</span>
-                <span className="font-medium">{BANK_INFO.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">戶名</span>
-                <span className="font-medium">{BANK_INFO.holder}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">帳號</span>
-                <span className="font-bold font-mono text-lg tracking-widest">
-                  {BANK_INFO.account}
-                </span>
-              </div>
-              <div className="border-t pt-2">
-                <div className="flex justify-between text-gray-400">
-                  <span>商品小計</span>
-                  <span>{formatCurrency(itemsTotal)}</span>
-                </div>
-                {order.shipping_fee !== null && order.shipping_fee > 0 && (
-                  <div className="flex justify-between text-blue-500">
-                    <span>宅配運費</span>
-                    <span>{formatCurrency(order.shipping_fee)}</span>
-                  </div>
-                )}
-                {order.pickup_location && (
-                  <div className="flex justify-between text-green-600">
-                    <span>面交免運</span>
-                    <span>$0</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold text-green-700 text-2xl mt-1">
-                  <span>應付</span>
-                  <span>{formatCurrency(order.total_amount)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {status !== "cancelled" && !order.line_user_id && lineBindMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm">
-            <h3 className="font-bold text-green-800 text-sm mb-1.5 flex items-center">
-              <span className="text-lg mr-1.5">💬</span> 接收 LINE 出貨通知
-            </h3>
-            <p className="text-green-700 text-xs mb-3 text-balance leading-relaxed">
-              將下方內容貼到官方 LINE，才會綁定這筆訂單。
-            </p>
-            <div className="bg-white rounded-lg p-3 border text-green-800 font-mono font-bold text-sm shadow-inner space-y-2 mb-3">
-              <div className="text-center select-all cursor-text">
-                {lineBindMessage}
-              </div>
-            </div>
-            <div className="text-center text-xs text-green-600">
-              傳送格式：{lineBindMessage}
-            </div>
-          </div>
-        )}
-
-        {status === "pending_payment" && identity && (
-          <PaymentReportForm
-            orderNumber={order.order_number}
-            recipientName={identity.recipient_name}
-            phoneLast3={identity.phone_last3}
-            orderTotal={order.total_amount}
-            onSuccess={() => unlockOrder(identity, { showErrorToast: false })}
-          />
-        )}
-
-        {status !== "pending_payment" && (
-          <div className="bg-white rounded-xl border p-4 space-y-3">
-            <div>
-              <div className="font-bold">{order.order_number}</div>
-              <div className="text-gray-500 text-sm">
-                {order.user?.recipient_name ?? "收貨人未提供"}
-                {order.user?.masked_phone ? ` · ${order.user.masked_phone}` : ""}
-              </div>
-            </div>
-            <div className="border-t pt-3 space-y-1 text-sm">
-              {items.map((item) => (
-                <div key={item.id} className="flex justify-between">
+                {order.user?.recipient_name && (
                   <span>
-                    {item.product_name} x{item.quantity}
+                    {" "}
+                    · {order.user.recipient_name}
+                    {order.user?.masked_phone ? ` · ${order.user.masked_phone}` : ""}
                   </span>
-                  <span>{formatCurrency(item.subtotal)}</span>
+                )}
+              </div>
+              {status === "pending_confirm" && order.payment_amount !== null && (
+                <div className="flex flex-wrap gap-2">
+                  <span className="lux-pill">
+                    已回報 {formatCurrency(order.payment_amount)}
+                  </span>
+                  {order.payment_last5 && (
+                    <span className="lux-pill font-mono">
+                      後五碼 {order.payment_last5}
+                    </span>
+                  )}
+                </div>
+              )}
+              {status === "shipped" && order.shipped_at && (
+                <div className="lux-pill">
+                  出貨時間 {new Date(order.shipped_at).toLocaleString("zh-TW")}
+                </div>
+              )}
+              {status === "cancelled" && order.cancel_reason && (
+                <div className="lux-pill border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] text-[rgb(140,67,56)]">
+                  取消原因：{order.cancel_reason}
+                </div>
+              )}
+            </div>
+            <div className="lux-panel-muted p-4 text-right">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
+                Total
+              </div>
+              <div className="mt-2 font-display text-3xl text-[hsl(var(--ink))]">
+                {formatCurrency(order.total_amount)}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="lux-panel p-5 md:p-6">
+            <div className="lux-kicker">Order Summary</div>
+            <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
+              訂單內容
+            </div>
+            <div className="mt-5 space-y-3">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-start justify-between gap-4 border-b border-[rgba(177,140,92,0.14)] pb-3 text-sm last:border-0 last:pb-0"
+                >
+                  <span className="leading-6 text-[hsl(var(--ink))]">
+                    {item.product_name} ×{item.quantity}
+                  </span>
+                  <span className="shrink-0 font-semibold text-[hsl(var(--ink))]">
+                    {formatCurrency(item.subtotal)}
+                  </span>
                 </div>
               ))}
+            </div>
+            <div className="mt-6 space-y-2 border-t border-[rgba(177,140,92,0.18)] pt-4 text-sm">
+              <div className="flex justify-between text-[hsl(var(--muted-foreground))]">
+                <span>商品小計</span>
+                <span>{formatCurrency(itemsTotal)}</span>
+              </div>
               {order.shipping_fee !== null && order.shipping_fee > 0 && (
-                <div className="flex justify-between text-blue-600">
-                  <span>運費</span>
+                <div className="flex justify-between text-[rgb(74,96,136)]">
+                  <span>宅配運費</span>
                   <span>{formatCurrency(order.shipping_fee)}</span>
                 </div>
               )}
-              <div className="border-t pt-1.5 font-bold flex justify-between">
+              {order.pickup_location && (
+                <div className="flex justify-between text-[rgb(65,98,61)]">
+                  <span>面交免運</span>
+                  <span>$0</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-2 font-display text-2xl text-[hsl(var(--ink))]">
                 <span>合計</span>
                 <span>{formatCurrency(order.total_amount)}</span>
               </div>
             </div>
-            {order.pickup_location && (
-              <div className="text-sm text-purple-600 bg-purple-50 rounded-lg p-2">
-                📍 {order.pickup_location}
+
+            <div className="mt-6 space-y-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              {order.pickup_location ? (
+                <div className="lux-panel-muted p-3">面交地點：{order.pickup_location}</div>
+              ) : (
+                <div className="lux-panel-muted p-3">宅配寄送中，請留意通知。</div>
+              )}
+              {order.note && <div className="lux-panel-muted p-3">備註：{order.note}</div>}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {status === "pending_payment" && (
+              <div className="lux-panel-strong p-5 md:p-6">
+                <div className="lux-kicker">Bank Transfer</div>
+                <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
+                  匯款帳戶資訊
+                </div>
+                <div className="mt-5 space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-[hsl(var(--muted-foreground))]">銀行</span>
+                    <span className="font-medium text-[hsl(var(--ink))]">{BANK_INFO.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[hsl(var(--muted-foreground))]">戶名</span>
+                    <span className="font-medium text-[hsl(var(--ink))]">{BANK_INFO.holder}</span>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.88)] px-4 py-3 text-center">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
+                      Account
+                    </div>
+                    <div className="mt-2 font-mono text-lg font-semibold tracking-[0.28em] text-[hsl(var(--ink))]">
+                      {BANK_INFO.account}
+                    </div>
+                  </div>
+                  <div className="lux-panel-muted p-4">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
+                      Amount Due
+                    </div>
+                    <div className="mt-2 font-display text-3xl text-[hsl(var(--forest))]">
+                      {formatCurrency(order.total_amount)}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
-            {order.note && (
-              <p className="text-sm text-gray-500">備註：{order.note}</p>
-            )}
-          </div>
-        )}
 
-        {status === "pending_payment" && (
-          <div className="space-y-3">
-            {order.round_id && (
-              <SharePanel roundId={order.round_id} show={anyUnderGoal} />
+            {status !== "cancelled" && !order.line_user_id && lineBindMessage && (
+              <div className="lux-panel p-5 md:p-6">
+                <div className="lux-kicker">LINE Binding</div>
+                <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
+                  綁定 LINE 通知
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                  將以下內容完整貼到官方 LINE，之後這筆訂單的到貨與出貨通知就會直接送到你。
+                </p>
+                <div className="mt-4 rounded-[1.35rem] border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.92)] px-4 py-4 text-center font-mono text-sm font-semibold tracking-[0.12em] text-[hsl(var(--ink))]">
+                  <span className="select-all cursor-text">{lineBindMessage}</span>
+                </div>
+              </div>
             )}
-            <div className="flex gap-3">
-              {order.round_id && (
-                <a
-                  href={buildShareUrl(order.round_id)}
-                  className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 text-center"
-                >
-                  繼續選購
-                </a>
-              )}
-              <div className="flex-1">
-                {identity && (
-                  <CancelOrderButton
+
+            {status === "pending_payment" && identity && (
+              <div className="lux-panel p-5 md:p-6">
+                <div className="lux-kicker">Payment Report</div>
+                <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
+                  完成匯款回報
+                </div>
+                <div className="mt-5">
+                  <PaymentReportForm
                     orderNumber={order.order_number}
                     recipientName={identity.recipient_name}
                     phoneLast3={identity.phone_last3}
-                    onSuccess={() =>
-                      unlockOrder(identity, { showErrorToast: false })
-                    }
+                    orderTotal={order.total_amount}
+                    onSuccess={() => unlockOrder(identity, { showErrorToast: false })}
                   />
-                )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </section>
 
-        {status !== "cancelled" &&
-          status !== "pending_payment" &&
-          order.round_id && (
-            <div className="space-y-3">
-              <SharePanel roundId={order.round_id} show={anyUnderGoal} />
-              <div className="flex gap-3">
-                <a
-                  href={buildShareUrl(order.round_id)}
-                  className="flex-1 bg-green-600 text-white rounded-xl py-3 font-bold text-center"
-                >
-                  繼續選購
-                </a>
-                <Link
-                  href="/"
-                  className="flex-1 border-2 rounded-xl py-3 text-sm text-gray-600 text-center"
-                >
-                  返回首頁
-                </Link>
-              </div>
-            </div>
+        {order.round_id && <SharePanel roundId={order.round_id} show={anyUnderGoal} />}
+
+        <section className="flex flex-col gap-3 md:flex-row">
+          {order.round_id && (
+            <a
+              href={buildShareUrl(order.round_id)}
+              className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-[1.2rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] px-5 py-3 text-sm font-semibold text-[hsl(var(--ink))]"
+            >
+              繼續選購
+            </a>
           )}
+          {status === "pending_payment" && identity ? (
+            <div className="flex-1">
+              <CancelOrderButton
+                orderNumber={order.order_number}
+                recipientName={identity.recipient_name}
+                phoneLast3={identity.phone_last3}
+                onSuccess={() => unlockOrder(identity, { showErrorToast: false })}
+              />
+            </div>
+          ) : (
+            <Link
+              href="/"
+              className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-[1.2rem] bg-[hsl(var(--forest))] px-5 py-3 text-sm font-semibold text-[hsl(var(--mist))]"
+            >
+              返回首頁
+            </Link>
+          )}
+        </section>
 
         {status !== "pending_payment" && identity && (
           <button
@@ -510,7 +506,7 @@ export function PublicOrderPage({
               setOrder(null);
               setIdentity(null);
             }}
-            className="w-full text-sm text-gray-500 underline underline-offset-4"
+            className="w-full text-sm text-[hsl(var(--muted-foreground))] underline underline-offset-4"
           >
             重新驗證其他訂單
           </button>

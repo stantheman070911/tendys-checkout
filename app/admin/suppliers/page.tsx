@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { buildAdminPath } from "@/lib/admin/paths";
-import { formatCurrency } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SupplierForm } from "@/components/admin/SupplierForm";
 import {
@@ -198,7 +197,7 @@ export default function SuppliersPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
       </div>
     );
   }
@@ -212,23 +211,32 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-gray-700 text-sm">
-          供應商管理
-          <span className="ml-2 text-gray-400 font-normal">
-            ({suppliers.length})
-          </span>
-        </h3>
+      <section className="lux-panel-strong p-5 md:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <div className="lux-kicker">Supplier Directory</div>
+            <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+              供應商管理
+            </h1>
+            <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              維護供應商資料，並追蹤本輪各供應商商品需求與到貨通知。
+            </p>
+          </div>
+          <div className="lux-pill">{suppliers.length} 位供應商</div>
+        </div>
+      </section>
+
+      <div className="flex justify-end">
         <button
           onClick={() => {
             setEditSupplier(null);
             setFormOpen(true);
           }}
-          className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-xl font-medium"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[hsl(var(--forest))] px-5 py-2.5 text-sm font-semibold text-[hsl(var(--mist))]"
         >
-          + 新增供應商
+          新增供應商
         </button>
       </div>
 
@@ -246,23 +254,27 @@ export default function SuppliersPage() {
             return (
               <div
                 key={s.id}
-                className={`bg-white rounded-xl border transition ${
-                  isExpanded ? "border-indigo-400 shadow-md" : ""
+                className={`lux-panel transition ${
+                  isExpanded
+                    ? "border-[rgba(177,140,92,0.34)] shadow-[var(--shadow-soft)]"
+                    : "lux-card-hover"
                 }`}
               >
                 {/* Supplier header */}
                 <div
                   onClick={() => setExpandedSupplier(isExpanded ? null : s.id)}
-                  className="flex items-center gap-2 p-3 cursor-pointer select-none"
+                  className="flex cursor-pointer items-center gap-3 p-4 select-none"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-semibold text-sm">{s.name}</span>
-                      <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-display text-2xl text-[hsl(var(--ink))]">
+                        {s.name}
+                      </span>
+                      <span className="rounded-full border border-[rgba(177,140,92,0.22)] bg-[rgba(255,251,246,0.88)] px-2 py-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">
                         {s._count.products} 商品
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
                       {[s.contact_name, s.phone, s.email]
                         .filter(Boolean)
                         .join(" · ") || "—"}
@@ -275,7 +287,7 @@ export default function SuppliersPage() {
                         setEditSupplier(s);
                         setFormOpen(true);
                       }}
-                      className="text-xs px-2 py-1 border rounded-lg text-gray-500 hover:text-indigo-600"
+                      className="rounded-full border border-[rgba(177,140,92,0.24)] px-3 py-1.5 text-xs font-medium text-[hsl(var(--ink))]"
                     >
                       編輯
                     </button>
@@ -284,11 +296,11 @@ export default function SuppliersPage() {
                         e.stopPropagation();
                         setDeleteTarget(s);
                       }}
-                      className="text-xs px-2 py-1 border rounded-lg text-gray-500 hover:text-red-500"
+                      className="rounded-full border border-[rgba(189,111,98,0.22)] px-3 py-1.5 text-xs font-medium text-[rgb(140,67,56)]"
                     >
                       刪除
                     </button>
-                    <span className="text-gray-300 text-xs">
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">
                       {isExpanded ? "▲" : "▼"}
                     </span>
                   </div>
@@ -296,13 +308,13 @@ export default function SuppliersPage() {
 
                 {/* Expanded: supplier products */}
                 {isExpanded && (
-                  <div className="border-t px-3 pb-3 space-y-2 pt-2">
+                  <div className="space-y-3 border-t border-[rgba(177,140,92,0.14)] px-4 pb-4 pt-4">
                     {!round ? (
-                      <div className="text-xs text-gray-400 text-center py-4">
+                      <div className="py-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
                         目前沒有進行中的團購，無法顯示商品資料。
                       </div>
                     ) : supplierProducts.length === 0 ? (
-                      <div className="text-xs text-gray-400 text-center py-4">
+                      <div className="py-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
                         本團沒有此供應商的商品。
                       </div>
                     ) : (
@@ -316,21 +328,21 @@ export default function SuppliersPage() {
                         return (
                           <div
                             key={p.id}
-                            className="border-b last:border-0 pb-2"
+                            className="border-b border-[rgba(177,140,92,0.14)] pb-3 last:border-0"
                           >
-                            <div className="flex justify-between items-center gap-2">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                               <button
                                 onClick={() => toggleProduct(p.id)}
-                                className="flex items-center gap-1 text-sm font-medium hover:text-indigo-600 text-left"
+                                className="flex items-center gap-2 text-left text-sm font-medium text-[hsl(var(--ink))]"
                               >
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-[hsl(var(--muted-foreground))]">
                                   {isProdExpanded ? "▼" : "▶"}
-                                </span>{" "}
+                                </span>
                                 {p.name}
                               </button>
-                              <div className="flex items-center gap-2 flex-wrap justify-end">
+                              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                                 {p.goal_qty != null && p.goal_qty > 0 && (
-                                  <div className="w-20">
+                                  <div className="w-28">
                                     <ProgressBar
                                       currentQty={p.current_qty}
                                       goalQty={p.goal_qty}
@@ -338,7 +350,7 @@ export default function SuppliersPage() {
                                     />
                                   </div>
                                 )}
-                                <span className="font-bold text-indigo-600 text-xs">
+                                <span className="lux-pill">
                                   {p.current_qty}
                                   {p.unit}
                                 </span>
@@ -351,56 +363,52 @@ export default function SuppliersPage() {
                                       "_self",
                                     )
                                   }
-                                  className="text-xs px-2 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100"
+                                  className="rounded-full border border-[rgba(115,107,153,0.18)] bg-[rgba(230,228,242,0.74)] px-3 py-1.5 text-xs font-medium text-[rgb(74,70,113)]"
                                 >
-                                  📦 前往出貨
+                                  前往出貨
                                 </button>
                                 <button
                                   onClick={() => sendArrival(p.id)}
                                   disabled={isSent || isSending}
-                                  className={`text-xs px-2 py-1 rounded-lg ${
+                                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${
                                     isSent
-                                      ? "bg-green-100 text-green-700"
-                                      : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                      ? "border border-[rgba(95,126,92,0.2)] bg-[rgba(228,239,223,0.82)] text-[rgb(65,98,61)]"
+                                      : "border border-[rgba(184,132,71,0.22)] bg-[rgba(242,228,203,0.82)] text-[rgb(120,84,39)]"
                                   }`}
                                 >
-                                  {isSending
-                                    ? "…"
-                                    : isSent
-                                      ? "✓ 已通知"
-                                      : "📢 通知到貨"}
+                                  {isSending ? "處理中" : isSent ? "已通知" : "通知到貨"}
                                 </button>
                               </div>
                             </div>
 
                             {/* Customer drill-down */}
                             {isProdExpanded && (
-                              <div className="mt-2 ml-4 bg-gray-50 rounded-xl p-2.5 space-y-1">
+                              <div className="mt-3 rounded-[1.25rem] bg-[rgba(244,239,230,0.72)] p-3">
                                 {isLoadingCustomers ? (
-                                  <div className="text-xs text-gray-400 text-center py-2">
+                                  <div className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">
                                     載入中…
                                   </div>
                                 ) : customers.length === 0 ? (
-                                  <div className="text-xs text-gray-400 text-center py-2">
+                                  <div className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">
                                     無客戶資料
                                   </div>
                                 ) : (
                                   customers.map((c, i) => (
                                     <div
                                       key={i}
-                                      className="grid grid-cols-[4.5rem,5rem,1fr,7.5rem,4rem] text-xs gap-2"
+                                      className="grid gap-2 border-b border-[rgba(177,140,92,0.12)] py-2 text-xs last:border-0 lg:grid-cols-[5rem,6rem,1fr,8rem,5rem]"
                                     >
                                       <span className="font-medium">
                                         {c.nickname}
                                       </span>
                                       <span>{c.recipient_name ?? "—"}</span>
-                                      <span className="text-gray-400 truncate">
+                                      <span className="truncate text-[hsl(var(--muted-foreground))]">
                                         {c.phone ?? "—"}
                                       </span>
-                                      <span className="font-mono text-gray-500">
+                                      <span className="font-mono text-[hsl(var(--muted-foreground))]">
                                         {c.order_number}
                                       </span>
-                                      <span className="font-bold text-indigo-600 text-right">
+                                      <span className="text-right font-semibold text-[hsl(var(--ink))]">
                                         {c.quantity}
                                         {p.unit}
                                       </span>
@@ -416,7 +424,7 @@ export default function SuppliersPage() {
 
                     {/* Supplier note */}
                     {s.note && (
-                      <div className="text-xs text-gray-400 bg-gray-50 rounded-lg p-2 mt-1">
+                      <div className="lux-panel-muted mt-1 p-3 text-xs text-[hsl(var(--muted-foreground))]">
                         {s.note}
                       </div>
                     )}
@@ -452,7 +460,7 @@ export default function SuppliersPage() {
           <p className="text-sm text-gray-600">
             確定要刪除供應商「{deleteTarget?.name}」嗎？
             {(deleteTarget?._count.products ?? 0) > 0 && (
-              <span className="text-red-500 block mt-1">
+              <span className="mt-1 block text-[rgb(140,67,56)]">
                 此供應商有 {deleteTarget?._count.products}{" "}
                 個關聯商品，無法刪除。
               </span>
@@ -462,14 +470,14 @@ export default function SuppliersPage() {
             <button
               onClick={() => setDeleteTarget(null)}
               disabled={deleting}
-              className="flex-1 border-2 rounded-xl py-2.5 font-medium text-gray-600"
+              className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
             >
               取消
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting || (deleteTarget?._count.products ?? 0) > 0}
-              className="flex-1 bg-red-600 text-white rounded-xl py-2.5 font-bold disabled:opacity-50"
+              className="flex-1 rounded-[1.1rem] bg-red-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
               {deleting ? "刪除中…" : "確定刪除"}
             </button>

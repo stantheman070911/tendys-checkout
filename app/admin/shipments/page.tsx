@@ -13,7 +13,6 @@ import {
 } from "@/lib/admin/shipment-status";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/utils";
 import { ShipmentCard } from "@/components/admin/ShipmentCard";
 import type { Round, OrderWithItems } from "@/types";
 
@@ -242,7 +241,7 @@ export default function ShipmentsPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
       </div>
     );
   }
@@ -264,31 +263,37 @@ export default function ShipmentsPage() {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-gray-700 text-sm">
-          待出貨 · {round.name}
-          <span className="ml-2 text-gray-400 font-normal">
-            ({filtered.length} 筆)
-          </span>
-        </h3>
-        <div className="flex gap-2">
+      <section className="lux-panel-strong p-5 md:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <div className="lux-kicker">Shipment Queue</div>
+            <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+              待出貨 · {round.name}
+            </h1>
+            <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              依宅配與面交點分組確認，並即時追蹤通知送達結果。
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <span className="lux-pill">{filtered.length} 筆待處理</span>
           {orders.length > 0 && (
             <button
               onClick={printAll}
-              className="text-xs px-3 py-1.5 border rounded-xl text-gray-600 hover:bg-gray-50 print:hidden"
+              className="print:hidden inline-flex min-h-[40px] items-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2 text-xs font-semibold text-[hsl(var(--ink))]"
             >
-              🖨️ 列印全部
+              列印全部
             </button>
           )}
         </div>
-      </div>
+        </div>
+      </section>
 
       {/* Product filter chip */}
       {productFilterId && (
         <div className="flex items-center gap-2">
-          <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-200">
+          <span className="rounded-full border border-[rgba(80,112,147,0.16)] bg-[rgba(222,231,242,0.8)] px-3 py-1.5 text-xs font-semibold text-[rgb(74,96,136)]">
             篩選: {productFilterName || productFilterId}
           </span>
           <button
@@ -299,7 +304,7 @@ export default function ShipmentsPage() {
               window.history.replaceState(null, "", url.toString());
               window.location.reload();
             }}
-            className="text-xs text-red-400 hover:text-red-600"
+            className="text-xs text-[rgb(140,67,56)]"
           >
             ✕ 清除
           </button>
@@ -307,17 +312,17 @@ export default function ShipmentsPage() {
       )}
 
       {/* Search */}
-      <div className="flex gap-2 items-center">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜尋 暱稱 / 電話 / 訂單號"
-          className="flex-1 border rounded-xl px-3 py-2.5 text-sm"
+          className="lux-input flex-1"
         />
         {search && (
           <button
             onClick={() => setSearch("")}
-            className="w-9 h-9 flex items-center justify-center border rounded-xl text-gray-400 hover:text-red-500"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] text-[hsl(var(--muted-foreground))]"
           >
             ✕
           </button>
@@ -325,7 +330,7 @@ export default function ShipmentsPage() {
         {filtered.length > 0 && (
           <button
             onClick={selectAll}
-            className="text-xs px-3 py-2.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 whitespace-nowrap"
+            className="rounded-full border border-[rgba(80,112,147,0.16)] bg-[rgba(222,231,242,0.8)] px-4 py-2.5 text-xs font-semibold text-[rgb(74,96,136)] whitespace-nowrap"
           >
             全選
           </button>
@@ -334,21 +339,26 @@ export default function ShipmentsPage() {
 
       {/* Recent notification results */}
       {recentResults.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-3 space-y-1">
+        <div className="lux-panel space-y-2 p-4">
           <div className="flex justify-between items-center">
-            <span className="text-xs font-medium text-green-800">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--bronze))]">
               最近出貨通知結果
             </span>
             <button
               onClick={() => setRecentResults([])}
-              className="text-xs text-green-600 hover:text-green-800"
+              className="text-xs text-[hsl(var(--muted-foreground))]"
             >
               清除
             </button>
           </div>
           {recentResults.slice(0, 10).map((r, i) => (
-            <div key={i} className="text-xs text-green-700 flex gap-2">
-              <span className="font-mono">{r.orderNumber}</span>
+            <div
+              key={i}
+              className="flex gap-2 text-xs text-[hsl(var(--muted-foreground))]"
+            >
+              <span className="font-mono text-[hsl(var(--ink))]">
+                {r.orderNumber}
+              </span>
               <span>
                 LINE {renderNotifyIcon(r.line)} · Email{" "}
                 {renderNotifyIcon(r.email)}
@@ -360,25 +370,25 @@ export default function ShipmentsPage() {
 
       {/* Grouped orders */}
       {filtered.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">
+        <div className="lux-panel p-12 text-center text-[hsl(var(--muted-foreground))]">
           {orders.length === 0 ? "沒有待出貨的訂單" : "沒有符合搜尋條件的訂單"}
         </div>
       ) : (
         sortedGroups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.label);
           return (
-            <div key={group.label} className="space-y-2">
+            <div key={group.label} className="space-y-3">
               <button
                 onClick={() => toggleGroup(group.label)}
-                className="flex items-center gap-2 w-full text-left"
+                className="lux-panel flex w-full items-center gap-2 p-3 text-left"
               >
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-[hsl(var(--muted-foreground))]">
                   {isCollapsed ? "▶" : "▼"}
                 </span>
-                <span className="font-medium text-sm">
-                  {group.label === "宅配" ? "🚚 宅配" : `📍 ${group.label}`}
+                <span className="text-sm font-semibold text-[hsl(var(--ink))]">
+                  {group.label === "宅配" ? "宅配" : group.label}
                 </span>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                <span className="rounded-full border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.88)] px-2.5 py-1 text-xs text-[hsl(var(--muted-foreground))]">
                   {group.orders.length}
                 </span>
               </button>
@@ -406,24 +416,26 @@ export default function ShipmentsPage() {
 
       {/* Batch confirm bar */}
       {batchSel.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-indigo-700 text-white px-4 py-3 flex items-center justify-between z-40 shadow-2xl">
-          <span className="font-medium text-sm">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+          <div className="lux-floating-bar pointer-events-auto mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+            <span className="text-sm font-medium">
             已選 <b>{batchSel.size}</b> 筆
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setBatchSel(new Set())}
-              className="px-3 py-1.5 border border-indigo-500 rounded-xl text-sm"
-            >
-              清除
-            </button>
-            <button
-              onClick={batchConfirmShipment}
-              disabled={batchActing}
-              className="px-4 py-1.5 bg-purple-500 rounded-xl text-sm font-bold disabled:opacity-50"
-            >
-              {batchActing ? "處理中…" : getBatchLabel()}
-            </button>
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBatchSel(new Set())}
+                className="rounded-full border border-white/20 px-4 py-2 text-sm"
+              >
+                清除
+              </button>
+              <button
+                onClick={batchConfirmShipment}
+                disabled={batchActing}
+                className="rounded-full bg-[rgba(255,248,240,0.96)] px-5 py-2 text-sm font-semibold text-[rgb(74,70,113)] disabled:opacity-50"
+              >
+                {batchActing ? "處理中…" : getBatchLabel()}
+              </button>
+            </div>
           </div>
         </div>
       )}

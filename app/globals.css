@@ -4,45 +4,310 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --paper: 38 43% 95%;
+    --ink: 150 11% 15%;
+    --forest: 147 29% 24%;
+    --forest-deep: 149 34% 18%;
+    --bronze: 31 38% 53%;
+    --sage: 115 14% 62%;
+    --stone: 33 17% 86%;
+    --blush: 16 36% 90%;
+    --mist: 40 22% 98%;
+
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: 40 39% 97%;
+    --card-foreground: var(--ink);
+    --popover: 40 39% 97%;
+    --popover-foreground: var(--ink);
+    --primary: var(--forest);
+    --primary-foreground: 42 35% 97%;
+    --secondary: 39 28% 91%;
+    --secondary-foreground: 148 13% 24%;
+    --muted: 36 21% 90%;
+    --muted-foreground: 148 9% 35%;
+    --accent: 24 35% 90%;
+    --accent-foreground: 149 20% 20%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --border: 32 20% 80%;
+    --input: 32 20% 82%;
+    --ring: 147 29% 24%;
+    --radius: 1.35rem;
+    --shadow-soft:
+      0 24px 60px -30px rgba(31, 40, 32, 0.45),
+      0 16px 32px -24px rgba(31, 40, 32, 0.2);
+    --shadow-card:
+      0 24px 60px -32px rgba(31, 40, 32, 0.25),
+      0 10px 22px -18px rgba(31, 40, 32, 0.18);
+    --font-display: "Noto Serif TC", "Songti TC", "PMingLiU", "Times New Roman", serif;
+    --font-body:
+      "Noto Sans TC",
+      "PingFang TC",
+      "Microsoft JhengHei",
+      system-ui,
+      sans-serif;
   }
 }
 
 @layer base {
+  html {
+    background-color: hsl(var(--background));
+  }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
+    font-family: var(--font-body);
+    background-image:
+      radial-gradient(circle at top left, rgba(236, 224, 205, 0.75), transparent 34%),
+      radial-gradient(circle at top right, rgba(204, 175, 139, 0.18), transparent 26%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(244, 238, 227, 0.9) 58%, rgba(237, 230, 216, 0.92) 100%);
+    min-height: 100vh;
   }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.2;
+    background-image:
+      linear-gradient(115deg, rgba(255, 255, 255, 0.3), transparent 22%),
+      radial-gradient(circle at 20% 20%, rgba(115, 129, 108, 0.12) 0, transparent 22%),
+      radial-gradient(circle at 80% 0%, rgba(182, 139, 89, 0.12) 0, transparent 18%);
+    mix-blend-mode: multiply;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
   /* Mobile-first: ensure inputs meet 44px touch target */
   input,
   select,
   textarea {
     min-height: 44px;
     font-size: 16px; /* prevents iOS zoom on focus */
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    transition:
+      color 180ms ease,
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease,
+      opacity 180ms ease;
+  }
+
+  ::selection {
+    background: rgba(63, 91, 74, 0.2);
+  }
+}
+
+@layer components {
+  .lux-shell {
+    position: relative;
+    min-height: 100vh;
+    padding-bottom: 7rem;
+  }
+
+  .lux-page {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 72rem;
+    padding: 1.25rem 1rem;
+  }
+
+  .lux-panel {
+    border: 1px solid rgba(203, 190, 173, 0.85);
+    border-radius: 1.5rem;
+    background: rgba(255, 250, 244, 0.82);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(10px);
+  }
+
+  .lux-panel-strong {
+    border: 1px solid rgba(177, 140, 92, 0.28);
+    border-radius: 1.75rem;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 253, 250, 0.96),
+      rgba(248, 242, 233, 0.9)
+    );
+    box-shadow: var(--shadow-soft);
+  }
+
+  .lux-panel-muted {
+    border: 1px solid rgba(177, 140, 92, 0.18);
+    border-radius: 1.4rem;
+    background: rgba(248, 243, 235, 0.7);
+  }
+
+  .lux-kicker {
+    color: hsl(var(--bronze));
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+
+  .lux-title {
+    color: hsl(var(--ink));
+    font-family: var(--font-display);
+    font-size: 1.875rem;
+    line-height: 1.08;
+  }
+
+  .lux-subtitle {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875rem;
+    line-height: 1.7;
+  }
+
+  .lux-pill {
+    display: inline-flex;
+    min-height: 2.35rem;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid rgba(177, 140, 92, 0.22);
+    border-radius: 9999px;
+    background: rgba(255, 251, 246, 0.88);
+    padding: 0.5rem 0.875rem;
+    color: hsl(var(--ink));
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .lux-status-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .lux-input,
+  .lux-textarea,
+  .lux-select-trigger {
+    width: 100%;
+    border: 1px solid rgba(177, 140, 92, 0.3);
+    border-radius: 1.15rem;
+    background: rgba(255, 251, 246, 0.9);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    color: hsl(var(--ink));
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .lux-textarea {
+    min-height: 110px;
+  }
+
+  .lux-section-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .lux-eyebrow {
+    color: hsl(var(--bronze));
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  .lux-card-hover {
+    transition:
+      transform 300ms ease,
+      box-shadow 300ms ease;
+  }
+
+  .lux-floating-bar {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 1.6rem;
+    background: rgba(33, 46, 39, 0.88);
+    color: hsl(var(--mist));
+    box-shadow: 0 20px 45px -28px rgba(22, 31, 26, 0.6);
+    backdrop-filter: blur(24px);
+  }
+
+  .lux-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .lux-input::placeholder,
+  .lux-textarea::placeholder,
+  .lux-select-trigger[data-placeholder] {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.8;
+  }
+
+  .lux-input:focus,
+  .lux-textarea:focus,
+  .lux-select-trigger:focus,
+  .lux-select-trigger:focus-visible {
+    border-color: rgba(63, 91, 74, 0.65);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 0 0 2px rgba(63, 91, 74, 0.16);
+    outline: none;
+  }
+
+  .lux-card-hover:hover {
+    box-shadow: 0 30px 60px -36px rgba(31, 40, 32, 0.35);
+    transform: translateY(-2px);
+  }
+
+  @media (min-width: 768px) {
+    .lux-page {
+      padding: 1.5rem;
+    }
+
+    .lux-title {
+      font-size: 3rem;
+    }
+
+    .lux-subtitle {
+      font-size: 1rem;
+    }
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .paper-grid {
+    background-image:
+      linear-gradient(rgba(140, 119, 93, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(140, 119, 93, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }
 
@@ -61,11 +326,16 @@
   body {
     background: white !important;
     font-size: 12px;
+    background-image: none !important;
   }
 
   .bg-white {
     box-shadow: none !important;
     border: 1px solid #ddd !important;
+  }
+
+  body::before {
+    display: none !important;
   }
 
   .rounded-xl {

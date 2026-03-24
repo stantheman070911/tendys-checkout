@@ -78,33 +78,43 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
+    <main className="lux-shell flex items-center justify-center px-4">
       <form
         onSubmit={handleLogin}
-        className="w-full max-w-sm bg-white rounded-xl border p-6 space-y-4"
+        className="lux-panel-strong w-full max-w-md space-y-5 p-6 md:p-8"
       >
-        <h1 className="text-xl font-bold text-center text-gray-800">
-          Admin 登入
-        </h1>
+        <div className="space-y-2 text-center">
+          <div className="lux-kicker">Admin Atelier</div>
+          <h1 className="font-display text-3xl text-[hsl(var(--ink))]">
+            Admin 登入
+          </h1>
+          <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            使用管理員帳號登入後台，處理訂單、出貨與供應商協作。
+          </p>
+        </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Email</label>
+          <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+            Email
+          </label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border rounded-xl px-3 py-2.5 text-sm"
+            className="lux-input"
             placeholder="admin@example.com"
             required
             autoFocus
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">密碼</label>
+          <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+            密碼
+          </label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border rounded-xl px-3 py-2.5 text-sm"
+            className="lux-input"
             placeholder="••••••••"
             required
           />
@@ -112,7 +122,7 @@ export default function AdminLoginPage() {
         <button
           type="submit"
           disabled={submitting || !email.trim() || !password}
-          className="w-full bg-indigo-600 text-white rounded-xl py-2.5 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "登入中…" : "登入"}
         </button>

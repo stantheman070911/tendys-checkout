@@ -111,42 +111,50 @@ export function ProductForm({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">品名</label>
+            <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+              品名
+            </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2.5 text-sm"
+              className="lux-input"
               required
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">單價</label>
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                單價
+              </label>
               <input
                 type="number"
                 min="1"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
                 required
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">單位</label>
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                單位
+              </label>
               <input
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
                 required
               />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">供應商</label>
+            <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+              供應商
+            </label>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white"
+              className="lux-input bg-[rgba(255,251,246,0.9)]"
             >
               <option value="">（無）</option>
               {suppliers.map((s) => (
@@ -158,7 +166,7 @@ export function ProductForm({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                 庫存（空=不限）
               </label>
               <input
@@ -166,11 +174,11 @@ export function ProductForm({
                 min="0"
                 value={stock}
                 onChange={(e) => setStock(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                 目標量（空=無目標）
               </label>
               <input
@@ -178,18 +186,18 @@ export function ProductForm({
                 min="1"
                 value={goalQty}
                 onChange={(e) => setGoalQty(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2.5 text-sm"
+                className="lux-input"
               />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
               圖片網址（選填）
             </label>
             <input
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2.5 text-sm"
+              className="lux-input"
               placeholder="https://..."
             />
           </div>
@@ -197,14 +205,14 @@ export function ProductForm({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border-2 rounded-xl py-2.5 font-medium text-gray-600"
+              className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={submitting || !name.trim() || !price || !unit.trim()}
-              className="flex-1 bg-indigo-600 text-white rounded-xl py-2.5 font-bold disabled:opacity-50"
+              className="flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
             >
               {submitting ? "儲存中…" : isEdit ? "更新" : "新增"}
             </button>

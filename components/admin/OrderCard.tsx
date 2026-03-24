@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
-import { STATUS_LABELS } from "@/constants";
 import { buildAdminPath } from "@/lib/admin/paths";
 import { formatCurrency, formatOrderItems } from "@/lib/utils";
 import {
@@ -13,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Order, OrderItem, OrderStatus, User } from "@/types";
+import type { Order, OrderItem, User } from "@/types";
 
 type OrderWithRelations = Order & {
   order_items: OrderItem[];
@@ -118,14 +117,16 @@ export function OrderCard({
   return (
     <>
       <div
-        className={`bg-white rounded-xl border transition ${
-          expanded ? "border-indigo-400 shadow-md" : "hover:border-gray-300"
+        className={`lux-panel transition ${
+          expanded
+            ? "border-[rgba(177,140,92,0.34)] shadow-[var(--shadow-soft)]"
+            : "lux-card-hover"
         }`}
       >
         {/* Collapsed row */}
         <div
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-2 p-3 cursor-pointer select-none"
+          className="flex cursor-pointer items-center gap-3 p-4 select-none"
         >
           {showCheckbox && (
             <input
@@ -133,37 +134,37 @@ export function OrderCard({
               checked={selected}
               onChange={() => onToggleSelect(o.id)}
               onClick={(e) => e.stopPropagation()}
-              className="accent-indigo-600 w-4 h-4 shrink-0"
+              className="h-4 w-4 shrink-0 accent-[hsl(var(--forest))]"
             />
           )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs text-gray-400">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
                 {o.order_number}
               </span>
-              <span className="font-semibold text-sm">
+              <span className="text-sm font-semibold text-[hsl(var(--ink))]">
                 {o.user?.nickname ?? "—"}
               </span>
               {o.pickup_location ? (
-                <span className="text-xs text-purple-500 bg-purple-50 px-1.5 rounded">
+                <span className="rounded-full border border-[rgba(115,107,153,0.18)] bg-[rgba(230,228,242,0.74)] px-2 py-0.5 text-[11px] font-medium text-[rgb(74,70,113)]">
                   面交
                 </span>
               ) : (
-                <span className="text-xs text-blue-400 bg-blue-50 px-1.5 rounded">
+                <span className="rounded-full border border-[rgba(80,112,147,0.16)] bg-[rgba(222,231,242,0.8)] px-2 py-0.5 text-[11px] font-medium text-[rgb(74,96,136)]">
                   宅配
                 </span>
               )}
             </div>
-            <div className="text-xs text-gray-400 truncate">
+            <div className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">
               {formatOrderItems(o.order_items)}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="font-bold text-sm">
+            <span className="font-display text-xl text-[hsl(var(--ink))]">
               {formatCurrency(o.total_amount)}
             </span>
             <OrderStatusBadge status={o.status} />
-            <span className="text-gray-300 text-xs">
+            <span className="text-xs text-[hsl(var(--muted-foreground))]">
               {expanded ? "▲" : "▼"}
             </span>
           </div>
@@ -171,13 +172,13 @@ export function OrderCard({
 
         {/* Expanded detail */}
         {expanded && (
-          <div className="border-t px-3 pb-3 space-y-3">
+          <div className="space-y-4 border-t border-[rgba(177,140,92,0.14)] px-4 pb-4">
             {/* Items breakdown */}
-            <div className="pt-2 space-y-1 text-sm">
+            <div className="space-y-2 pt-4 text-sm">
               {o.order_items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex justify-between text-gray-600"
+                  className="flex justify-between text-[hsl(var(--ink))]"
                 >
                   <span>
                     {item.product_name} ×{item.quantity}
@@ -186,18 +187,18 @@ export function OrderCard({
                 </div>
               ))}
               {o.shipping_fee != null && o.shipping_fee > 0 && (
-                <div className="flex justify-between text-blue-500">
+                <div className="flex justify-between text-[rgb(74,96,136)]">
                   <span>宅配運費</span>
                   <span>{formatCurrency(o.shipping_fee)}</span>
                 </div>
               )}
               {o.pickup_location && !o.shipping_fee && (
-                <div className="flex justify-between text-green-500">
+                <div className="flex justify-between text-[rgb(65,98,61)]">
                   <span>面交免運</span>
                   <span>$0</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold border-t pt-1">
+              <div className="flex justify-between border-t border-[rgba(177,140,92,0.16)] pt-2 font-semibold text-[hsl(var(--ink))]">
                 <span>合計</span>
                 <span>{formatCurrency(o.total_amount)}</span>
               </div>
@@ -206,28 +207,27 @@ export function OrderCard({
             {/* Payment info */}
             {o.payment_amount != null && (
               <div
-                className={`rounded-xl p-2.5 text-sm ${
+                className={`rounded-[1.25rem] p-3 text-sm ${
                   amtMatch
-                    ? "bg-green-50 border border-green-200"
-                    : "bg-orange-50 border border-orange-200"
+                    ? "border border-[rgba(95,126,92,0.2)] bg-[rgba(228,239,223,0.78)]"
+                    : "border border-[rgba(184,132,71,0.22)] bg-[rgba(242,228,203,0.82)]"
                 }`}
               >
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-4 text-[hsl(var(--ink))]">
                   <span>
-                    {amtMatch ? "✅" : "⚠️"} 匯款{" "}
-                    <b>{formatCurrency(o.payment_amount)}</b>
+                    匯款 <b>{formatCurrency(o.payment_amount)}</b>
                   </span>
                   <span>
                     後五碼 <b>{o.payment_last5 ?? "—"}</b>
                   </span>
                   {o.payment_reported_at && (
-                    <span className="text-gray-400">
+                    <span className="text-[hsl(var(--muted-foreground))]">
                       {new Date(o.payment_reported_at).toLocaleString("zh-TW")}
                     </span>
                   )}
                 </div>
                 {amtMismatch && (
-                  <div className="text-orange-700 text-xs mt-1">
+                  <div className="mt-1 text-xs text-[rgb(120,84,39)]">
                     金額不符：訂單 {formatCurrency(o.total_amount)} ≠ 匯款{" "}
                     {formatCurrency(o.payment_amount)}
                   </div>
@@ -236,24 +236,24 @@ export function OrderCard({
             )}
 
             {/* Customer info */}
-            <div className="text-xs text-gray-500 bg-gray-50 rounded-xl p-2.5 space-y-0.5">
+            <div className="lux-panel-muted space-y-1 p-3 text-xs text-[hsl(var(--muted-foreground))]">
               <div>
-                <span className="font-medium">
+                <span className="font-medium text-[hsl(var(--ink))]">
                   {o.user?.recipient_name ?? "—"}
                 </span>{" "}
                 · {o.user?.phone ?? "—"}
               </div>
               {o.pickup_location ? (
-                <div className="text-purple-600">📍 {o.pickup_location}</div>
+                <div className="text-[rgb(74,70,113)]">{o.pickup_location}</div>
               ) : (
-                <div className="text-blue-500">🚚 {o.user?.address ?? "—"}</div>
+                <div className="text-[rgb(74,96,136)]">{o.user?.address ?? "—"}</div>
               )}
               {o.cancel_reason && (
-                <div className="text-red-500 mt-0.5">{o.cancel_reason}</div>
+                <div className="mt-0.5 text-[rgb(140,67,56)]">{o.cancel_reason}</div>
               )}
               {o.shipped_at && (
-                <div className="text-purple-600 mt-0.5">
-                  📦 {new Date(o.shipped_at).toLocaleString("zh-TW")}
+                <div className="mt-0.5 text-[rgb(74,70,113)]">
+                  {new Date(o.shipped_at).toLocaleString("zh-TW")}
                 </div>
               )}
             </div>
@@ -265,16 +265,16 @@ export function OrderCard({
                   <button
                     onClick={confirmPayment}
                     disabled={acting}
-                    className="flex-1 min-w-0 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50"
+                    className="min-w-0 flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
                   >
-                    ✓ 確認付款
+                    確認付款
                   </button>
                   <button
                     onClick={() => setCancelOpen(true)}
                     disabled={acting}
-                    className="px-3 py-2.5 border border-red-200 rounded-xl text-sm text-red-500"
+                    className="rounded-[1.1rem] border border-[rgba(189,111,98,0.28)] px-3 py-3 text-sm font-medium text-[rgb(140,67,56)]"
                   >
-                    ✕
+                    取消
                   </button>
                 </>
               )}
@@ -283,16 +283,16 @@ export function OrderCard({
                   <button
                     onClick={quickConfirm}
                     disabled={acting}
-                    className="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50"
+                    className="flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
                   >
-                    ✓ 已現場收款
+                    已現場收款
                   </button>
                   <button
                     onClick={() => setCancelOpen(true)}
                     disabled={acting}
-                    className="px-3 py-2.5 border border-red-200 rounded-xl text-sm text-red-500"
+                    className="rounded-[1.1rem] border border-[rgba(189,111,98,0.28)] px-3 py-3 text-sm font-medium text-[rgb(140,67,56)]"
                   >
-                    ✕
+                    取消
                   </button>
                 </>
               )}
@@ -301,16 +301,16 @@ export function OrderCard({
                   <button
                     onClick={confirmShipment}
                     disabled={acting}
-                    className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50"
+                    className="flex-1 rounded-[1.1rem] bg-[rgb(74,70,113)] py-3 text-sm font-semibold text-white disabled:opacity-50"
                   >
-                    {o.pickup_location ? "確認取貨 📍" : "確認寄出 🚚"}
+                    {o.pickup_location ? "確認取貨" : "確認寄出"}
                   </button>
                   <button
                     onClick={() => setCancelOpen(true)}
                     disabled={acting}
-                    className="px-3 py-2.5 border border-red-200 rounded-xl text-sm text-red-500"
+                    className="rounded-[1.1rem] border border-[rgba(189,111,98,0.28)] px-3 py-3 text-sm font-medium text-[rgb(140,67,56)]"
                   >
-                    ✕
+                    取消
                   </button>
                 </>
               )}
@@ -322,13 +322,13 @@ export function OrderCard({
                       "_blank",
                     )
                   }
-                  className="px-3 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
+                  className="flex items-center gap-1.5 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] px-4 py-3 text-sm font-medium text-[hsl(var(--ink))]"
                 >
-                  🖨️ 列印裝箱單
+                  列印裝箱單
                 </button>
               )}
               {o.status === "shipped" && (
-                <span className="text-sm text-gray-400 py-2">
+                <span className="py-2 text-sm text-[hsl(var(--muted-foreground))]">
                   出貨{" "}
                   {o.shipped_at
                     ? new Date(o.shipped_at).toLocaleString("zh-TW")
@@ -336,7 +336,7 @@ export function OrderCard({
                 </span>
               )}
               {o.status === "cancelled" && (
-                <span className="text-sm text-red-400 py-2">
+                <span className="py-2 text-sm text-[rgb(140,67,56)]">
                   {o.cancel_reason ?? "已取消"}
                 </span>
               )}
@@ -355,20 +355,20 @@ export function OrderCard({
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
             placeholder="取消原因（選填）"
-            className="w-full border rounded-xl px-3 py-2.5 text-sm min-h-[80px]"
+            className="lux-textarea"
           />
           <DialogFooter>
             <button
               onClick={() => setCancelOpen(false)}
               disabled={acting}
-              className="flex-1 border-2 rounded-xl py-2.5 font-medium text-gray-600"
+              className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
             >
               返回
             </button>
             <button
               onClick={handleCancel}
               disabled={acting}
-              className="flex-1 bg-red-600 text-white rounded-xl py-2.5 font-bold disabled:opacity-50"
+              className="flex-1 rounded-[1.1rem] bg-red-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
               {acting ? "取消中…" : "確定取消"}
             </button>

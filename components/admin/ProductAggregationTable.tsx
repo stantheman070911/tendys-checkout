@@ -251,11 +251,11 @@ export function ProductAggregationTable({
 
   if (rows.length === 0) {
     return (
-      <div className="bg-white rounded-xl border p-4">
-        <div className="font-medium text-sm mb-2 text-gray-700">
+      <div className="lux-panel p-5">
+        <div className="mb-2 font-display text-2xl text-[hsl(var(--ink))]">
           商品需求彙總
         </div>
-        <div className="text-sm text-gray-400 text-center py-4">
+        <div className="py-4 text-center text-sm text-[hsl(var(--muted-foreground))]">
           尚無訂單資料
         </div>
       </div>
@@ -263,14 +263,19 @@ export function ProductAggregationTable({
   }
 
   return (
-    <div className="bg-white rounded-xl border p-4">
-      <div className="flex justify-between items-center mb-3">
-        <div className="font-medium text-sm text-gray-700">商品需求彙總</div>
+    <div className="lux-panel p-5 md:p-6">
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="lux-kicker">Demand Snapshot</div>
+          <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
+            商品需求彙總
+          </div>
+        </div>
         <button
           onClick={() => window.print()}
-          className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 print:hidden flex items-center gap-1.5 font-medium transition-colors"
+          className="print:hidden inline-flex min-h-[40px] items-center gap-2 rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2 text-xs font-semibold text-[hsl(var(--ink))]"
         >
-          🖨️ 列印總表
+          列印總表
         </button>
       </div>
       {rows.map((row) => {
@@ -281,28 +286,37 @@ export function ProductAggregationTable({
         const isLoadingCustomers = loadingProductId === row.productId;
 
         return (
-          <div key={row.productId} className="border-b last:border-0 py-2">
-            <div className="flex justify-between items-center gap-3">
+          <div
+            key={row.productId}
+            className="border-b border-[rgba(177,140,92,0.14)] py-3 last:border-0"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <button
                 onClick={() => toggleExpand(row.productId)}
-                className="flex items-center gap-1 text-sm font-medium hover:text-indigo-600 text-left"
+                className="flex items-center gap-2 text-left text-sm font-medium text-[hsl(var(--ink))]"
               >
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-[hsl(var(--muted-foreground))]">
                   {isExpanded ? "▼" : "▶"}
-                </span>{" "}
-                {row.name}
+                </span>
+                <span>{row.name}</span>
                 {row.supplierName && (
-                  <span className="text-xs text-gray-400">
-                    ({row.supplierName})
+                  <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                    {row.supplierName}
                   </span>
                 )}
               </button>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <span className="font-bold text-indigo-600 text-sm">
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <span className="lux-pill">
                   {row.qty}
                   {row.unit}
                 </span>
-                <span className="text-xs text-gray-400">${row.revenue}</span>
+                <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                  {row.revenue.toLocaleString("zh-TW", {
+                    style: "currency",
+                    currency: "TWD",
+                    maximumFractionDigits: 0,
+                  })}
+                </span>
                 <button
                   onClick={() =>
                     window.open(
@@ -312,54 +326,56 @@ export function ProductAggregationTable({
                       "_self",
                     )
                   }
-                  className="text-xs px-2 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100"
+                  className="rounded-full border border-[rgba(115,107,153,0.18)] bg-[rgba(230,228,242,0.74)] px-3 py-1.5 text-xs font-medium text-[rgb(74,70,113)]"
                 >
-                  📦 前往出貨
+                  前往出貨
                 </button>
                 <button
                   onClick={() => void printAllocationList(row)}
-                  className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  className="rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-3 py-1.5 text-xs font-medium text-[hsl(var(--ink))]"
                 >
-                  🖨️ 列印理貨清單
+                  列印理貨清單
                 </button>
                 <button
                   onClick={() => sendArrival(row.productId)}
                   disabled={isSent || isSending}
-                  className={`text-xs px-2 py-1 rounded-lg ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${
                     isSent
-                      ? "bg-green-100 text-green-700"
-                      : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                      ? "border border-[rgba(95,126,92,0.2)] bg-[rgba(228,239,223,0.82)] text-[rgb(65,98,61)]"
+                      : "border border-[rgba(184,132,71,0.22)] bg-[rgba(242,228,203,0.82)] text-[rgb(120,84,39)]"
                   }`}
                 >
-                  {isSending ? "…" : isSent ? "✓ 已通知" : "📢 通知到貨"}
+                  {isSending ? "處理中" : isSent ? "已通知" : "通知到貨"}
                 </button>
               </div>
             </div>
             {isExpanded && (
-              <div className="mt-2 ml-4 bg-gray-50 rounded-xl p-2.5 space-y-1">
+              <div className="mt-3 rounded-[1.25rem] bg-[rgba(244,239,230,0.72)] p-3">
                 {isLoadingCustomers ? (
-                  <div className="text-xs text-gray-400 text-center py-2">
+                  <div className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">
                     載入中…
                   </div>
                 ) : customers.length === 0 ? (
-                  <div className="text-xs text-gray-400 text-center py-2">
+                  <div className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">
                     無客戶資料
                   </div>
                 ) : (
                   customers.map((c, i) => (
                     <div
                       key={i}
-                      className="grid grid-cols-[4.5rem,5rem,1fr,7.5rem,4rem] text-xs gap-2"
+                      className="grid gap-2 border-b border-[rgba(177,140,92,0.12)] py-2 text-xs last:border-0 lg:grid-cols-[5rem,6rem,1fr,8rem,5rem]"
                     >
-                      <span className="font-medium">{c.nickname}</span>
+                      <span className="font-medium text-[hsl(var(--ink))]">
+                        {c.nickname}
+                      </span>
                       <span>{c.recipient_name ?? "—"}</span>
-                      <span className="text-gray-400 truncate">
+                      <span className="truncate text-[hsl(var(--muted-foreground))]">
                         {c.phone ?? "—"}
                       </span>
-                      <span className="font-mono text-gray-500">
+                      <span className="font-mono text-[hsl(var(--muted-foreground))]">
                         {c.order_number}
                       </span>
-                      <span className="font-bold text-indigo-600 text-right">
+                      <span className="text-right font-semibold text-[hsl(var(--ink))]">
                         {c.quantity}
                         {row.unit}
                       </span>

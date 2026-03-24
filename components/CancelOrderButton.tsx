@@ -67,7 +67,7 @@ export function CancelOrderButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="w-full border-2 border-red-200 text-red-600 rounded-xl py-2.5 text-sm font-medium min-h-[44px]">
+        <button className="w-full rounded-[1.2rem] border border-[rgba(189,111,98,0.28)] bg-[rgba(255,249,248,0.88)] py-3 text-sm font-semibold text-[rgb(140,67,56)] min-h-[44px]">
           取消訂單
         </button>
       </DialogTrigger>
@@ -82,14 +82,14 @@ export function CancelOrderButton({
           <button
             onClick={() => setOpen(false)}
             disabled={cancelling}
-            className="flex-1 border-2 rounded-xl py-2.5 font-medium text-gray-600"
+            className="flex-1 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] py-3 text-sm font-semibold text-[hsl(var(--ink))]"
           >
             返回
           </button>
           <button
             onClick={handleCancel}
             disabled={cancelling}
-            className="flex-1 bg-red-600 text-white rounded-xl py-2.5 font-bold disabled:opacity-50"
+            className="flex-1 rounded-[1.1rem] bg-red-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
           >
             {cancelling ? "取消中..." : "確定取消"}
           </button>
