@@ -20,7 +20,7 @@ export default function AdminLoginPage() {
     setSubmitting(true);
     try {
       const supabase = getSupabaseBrowser();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -29,6 +29,37 @@ export default function AdminLoginPage() {
         toast({
           title: "登入失敗",
           description: error.message,
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        toast({
+          title: "登入失敗",
+          description: "登入成功但未取得 session，請稍後再試",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      const authRes = await fetch("/api/admin/session", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!authRes.ok) {
+        await supabase.auth.signOut();
+        toast({
+          title: authRes.status === 401 ? "沒有後台權限" : "登入失敗",
+          description:
+            authRes.status === 401
+              ? "這個帳號已通過登入，但不在 ADMIN_EMAILS。請把該 email 加到 ADMIN_EMAILS（用逗號分隔）後重新部署。"
+              : "後台權限驗證失敗，請檢查 ADMIN_EMAILS 與伺服器設定。",
           variant: "destructive",
         });
         setSubmitting(false);
