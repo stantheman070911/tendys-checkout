@@ -209,7 +209,8 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
               <div className="space-y-2">
                 <div className="lux-kicker">你好！我們是 Tendy。</div>
                 <h1 className="lux-title text-balance">
-                  讓好好種的人，被好好吃的人看見。
+                  <span className="block">讓好好種的人，</span>
+                  <span className="block">被好好吃的人看見。</span>
                 </h1>
                 <p className="lux-subtitle max-w-2xl">
                   一個連結優質農民與消費者的生鮮品牌。為消費者策展優質蔬果，一次完成下單與匯款回報。
