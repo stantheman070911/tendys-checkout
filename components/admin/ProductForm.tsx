@@ -121,7 +121,7 @@ export function ProductForm({
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-2 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                 單價
@@ -164,7 +164,7 @@ export function ProductForm({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-2 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                 庫存（空=不限）

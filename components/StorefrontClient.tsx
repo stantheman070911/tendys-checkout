@@ -207,12 +207,12 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
           <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.8fr)] lg:items-end">
             <div className="space-y-4">
               <div className="space-y-2">
-                <div className="lux-kicker">Premium Group Purchase</div>
+                <div className="lux-kicker">你好！我們是 Tendy。</div>
                 <h1 className="lux-title text-balance">
-                  這一輪，只收當令好貨。
+                  讓好好種的人，被好好吃的人看見。
                 </h1>
                 <p className="lux-subtitle max-w-2xl">
-                  精選供應商、清楚成團門檻、一次完成下單與匯款回報。用更乾淨的節奏，把生鮮團購做得像精品採買。
+                  一個連結優質農民與消費者的生鮮品牌。為消費者策展優質蔬果，一次完成下單與匯款回報。
                 </p>
               </div>
 

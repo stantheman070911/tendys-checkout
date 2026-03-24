@@ -286,7 +286,7 @@ export default function RoundsPage() {
             required
             autoFocus
           />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-2 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                 截止時間

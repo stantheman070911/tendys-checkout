@@ -214,7 +214,7 @@ export default function DashboardPage() {
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--bronze))]">
                   {entry.type}
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid gap-2 text-xs sm:grid-cols-2">
                   <div className="lux-panel-muted flex items-center justify-between rounded-[1rem] p-3">
                     <span className="font-medium text-[hsl(var(--muted-foreground))]">LINE</span>
                     <span>

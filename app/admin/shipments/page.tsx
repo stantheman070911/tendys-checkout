@@ -417,11 +417,11 @@ export default function ShipmentsPage() {
       {/* Batch confirm bar */}
       {batchSel.size > 0 && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
-          <div className="lux-floating-bar pointer-events-auto mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <div className="lux-floating-bar pointer-events-auto mx-auto flex w-full max-w-6xl flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm font-medium">
             已選 <b>{batchSel.size}</b> 筆
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={() => setBatchSel(new Set())}
                 className="rounded-full border border-white/20 px-4 py-2 text-sm"

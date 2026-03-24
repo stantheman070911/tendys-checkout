@@ -18,7 +18,7 @@ export function CartBar({ items, shippingFee, onCheckout }: CartBarProps) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
-      <div className="lux-floating-bar pointer-events-auto mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 md:px-5">
+      <div className="lux-floating-bar pointer-events-auto mx-auto flex w-full max-w-5xl flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-5">
         <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-[0.22em] text-[rgba(245,240,231,0.78)]">
             {count} items selected
@@ -39,7 +39,7 @@ export function CartBar({ items, shippingFee, onCheckout }: CartBarProps) {
         </div>
         <button
           onClick={onCheckout}
-          className="shrink-0 rounded-full border border-white/20 bg-[rgba(255,248,240,0.96)] px-5 py-3 text-sm font-semibold text-[hsl(var(--forest-deep))] shadow-[0_18px_30px_-24px_rgba(0,0,0,0.55)] active:translate-y-px"
+          className="w-full shrink-0 rounded-full border border-white/20 bg-[rgba(255,248,240,0.96)] px-5 py-3 text-sm font-semibold text-[hsl(var(--forest-deep))] shadow-[0_18px_30px_-24px_rgba(0,0,0,0.55)] active:translate-y-px sm:w-auto"
         >
           前往下單
         </button>

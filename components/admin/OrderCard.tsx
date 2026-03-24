@@ -126,7 +126,7 @@ export function OrderCard({
         {/* Collapsed row */}
         <div
           onClick={() => setExpanded(!expanded)}
-          className="flex cursor-pointer items-center gap-3 p-4 select-none"
+          className="flex cursor-pointer items-start gap-3 p-4 select-none sm:items-center"
         >
           {showCheckbox && (
             <input
@@ -159,8 +159,8 @@ export function OrderCard({
               {formatOrderItems(o.order_items)}
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="font-display text-xl text-[hsl(var(--ink))]">
+          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+            <span className="font-display text-lg text-[hsl(var(--ink))] sm:text-xl">
               {formatCurrency(o.total_amount)}
             </span>
             <OrderStatusBadge status={o.status} />
@@ -265,7 +265,7 @@ export function OrderCard({
                   <button
                     onClick={confirmPayment}
                     disabled={acting}
-                    className="min-w-0 flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
+                    className="min-w-0 basis-full rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50 sm:basis-auto sm:flex-1"
                   >
                     確認付款
                   </button>
@@ -283,7 +283,7 @@ export function OrderCard({
                   <button
                     onClick={quickConfirm}
                     disabled={acting}
-                    className="flex-1 rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50"
+                    className="basis-full rounded-[1.1rem] bg-[hsl(var(--forest))] py-3 text-sm font-semibold text-[hsl(var(--mist))] disabled:opacity-50 sm:basis-auto sm:flex-1"
                   >
                     已現場收款
                   </button>
@@ -301,7 +301,7 @@ export function OrderCard({
                   <button
                     onClick={confirmShipment}
                     disabled={acting}
-                    className="flex-1 rounded-[1.1rem] bg-[rgb(74,70,113)] py-3 text-sm font-semibold text-white disabled:opacity-50"
+                    className="basis-full rounded-[1.1rem] bg-[rgb(74,70,113)] py-3 text-sm font-semibold text-white disabled:opacity-50 sm:basis-auto sm:flex-1"
                   >
                     {o.pickup_location ? "確認取貨" : "確認寄出"}
                   </button>

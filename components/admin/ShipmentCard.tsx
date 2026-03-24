@@ -84,7 +84,7 @@ export function ShipmentCard({
   return (
     <div className="lux-panel space-y-3 p-4">
       {/* Header row */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2 sm:items-center">
         <input
           type="checkbox"
           checked={selected}
@@ -110,7 +110,7 @@ export function ShipmentCard({
             )}
           </div>
         </div>
-        <span className="font-display text-xl shrink-0 text-[hsl(var(--ink))]">
+        <span className="shrink-0 font-display text-lg text-[hsl(var(--ink))] sm:text-xl">
           {formatCurrency(o.total_amount)}
         </span>
       </div>
@@ -154,7 +154,7 @@ export function ShipmentCard({
       </div>
 
       {/* Action */}
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <button
           onClick={confirmShipment}
           disabled={acting}

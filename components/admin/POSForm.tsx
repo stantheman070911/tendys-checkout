@@ -261,7 +261,7 @@ export function POSForm({
               placeholder="LINE 暱稱"
               className="lux-input"
             />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-2 md:grid-cols-2">
               <input
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
