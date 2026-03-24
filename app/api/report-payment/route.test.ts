@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ordersMock = vi.hoisted(() => ({
   reportPayment: vi.fn(),
+  getOrderWithItems: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -26,6 +27,10 @@ describe("POST /api/report-payment", () => {
 
   it("returns 200 on valid payment report", async () => {
     const fakeOrder = { id: "o1", status: "pending_confirm" };
+    ordersMock.getOrderWithItems.mockResolvedValue({
+      id: "o1",
+      user: { phone: "0912345678" },
+    });
     ordersMock.reportPayment.mockResolvedValue(fakeOrder);
 
     const res = await POST(
@@ -33,6 +38,7 @@ describe("POST /api/report-payment", () => {
         order_id: "o1",
         payment_amount: 500,
         payment_last5: "12345",
+        phone_last4: "5678",
       }),
     );
     expect(res.status).toBe(200);
@@ -41,6 +47,10 @@ describe("POST /api/report-payment", () => {
   });
 
   it("returns 404 when order not found or wrong status", async () => {
+    ordersMock.getOrderWithItems.mockResolvedValue({
+      id: "nonexistent",
+      user: { phone: "0912345678" },
+    });
     ordersMock.reportPayment.mockResolvedValue(null);
 
     const res = await POST(
@@ -48,6 +58,7 @@ describe("POST /api/report-payment", () => {
         order_id: "nonexistent",
         payment_amount: 500,
         payment_last5: "12345",
+        phone_last4: "5678",
       }),
     );
     expect(res.status).toBe(404);

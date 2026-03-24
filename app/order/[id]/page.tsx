@@ -189,6 +189,7 @@ export default async function OrderPage({
           <PaymentReportForm
             orderId={order.id}
             orderTotal={order.total_amount}
+            userPhone={order.user?.phone ?? ""}
           />
         )}
 
@@ -252,7 +253,7 @@ export default async function OrderPage({
                 </a>
               )}
               <div className="flex-1">
-                <CancelOrderButton orderId={order.id} />
+                <CancelOrderButton orderId={order.id} userPhone={order.user?.phone ?? ""} />
               </div>
             </div>
           </div>

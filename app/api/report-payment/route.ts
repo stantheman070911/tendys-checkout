@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { reportPayment } from "@/lib/db/orders";
+import { reportPayment, getOrderWithItems } from "@/lib/db/orders";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,10 +10,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { order_id, payment_amount, payment_last5 } = body as {
+    const { order_id, payment_amount, payment_last5, phone_last4 } = body as {
       order_id?: string;
       payment_amount?: number;
       payment_last5?: string;
+      phone_last4?: string;
     };
 
     // Validate order_id
@@ -21,6 +22,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "order_id is required" },
         { status: 400 },
+      );
+    }
+
+    // Validate phone_last4 (ownership verification)
+    if (
+      !phone_last4 ||
+      typeof phone_last4 !== "string" ||
+      !/^\d{4}$/.test(phone_last4)
+    ) {
+      return NextResponse.json(
+        { error: "phone_last4 must be exactly 4 digits" },
+        { status: 400 },
+      );
+    }
+
+    // Verify phone_last4 matches the order's user
+    const existingOrder = await getOrderWithItems(order_id.trim());
+    if (!existingOrder) {
+      return NextResponse.json(
+        { error: "Order not found" },
+        { status: 404 },
+      );
+    }
+    const userPhone = existingOrder.user?.phone?.replace(/\D/g, "") ?? "";
+    if (userPhone.slice(-4) !== phone_last4) {
+      return NextResponse.json(
+        { error: "Phone verification failed" },
+        { status: 403 },
       );
     }
 

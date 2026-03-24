@@ -194,6 +194,12 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return NextResponse.json(
+        { error: "email format is invalid" },
+        { status: 400 },
+      );
+    }
 
     const trimmedNote =
       typeof note === "string" ? note.trim() || undefined : undefined;

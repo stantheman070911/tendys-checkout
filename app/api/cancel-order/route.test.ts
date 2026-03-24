@@ -9,6 +9,7 @@ vi.mock("@/lib/auth/supabase-admin", () => ({
 
 const ordersMock = vi.hoisted(() => ({
   cancelOrder: vi.fn(),
+  getOrderWithItems: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -43,24 +44,32 @@ describe("POST /api/cancel-order", () => {
 
   it("user cancel pending_payment → 200, no notification", async () => {
     authMock.mockResolvedValue(false);
+    ordersMock.getOrderWithItems.mockResolvedValue({
+      ...fakeOrder,
+      user: { phone: "0912345678" },
+    });
     ordersMock.cancelOrder.mockResolvedValue({
       changed: true,
       order: fakeOrder,
       order_items: fakeOrder.order_items,
     });
 
-    const res = await POST(makeRequest({ orderId: "o1" }));
+    const res = await POST(makeRequest({ orderId: "o1", phone_last4: "5678" }));
     expect(res.status).toBe(200);
     expect(notifyMock.sendOrderCancelledNotifications).not.toHaveBeenCalled();
   });
 
   it("user cancel non-pending_payment → 400", async () => {
     authMock.mockResolvedValue(false);
+    ordersMock.getOrderWithItems.mockResolvedValue({
+      ...fakeOrder,
+      user: { phone: "0912345678" },
+    });
     ordersMock.cancelOrder.mockResolvedValue({
       error: "Only pending_payment orders can be cancelled by user",
     });
 
-    const res = await POST(makeRequest({ orderId: "o1" }));
+    const res = await POST(makeRequest({ orderId: "o1", phone_last4: "5678" }));
     expect(res.status).toBe(400);
   });
 
@@ -99,9 +108,9 @@ describe("POST /api/cancel-order", () => {
 
   it("order not found → 404", async () => {
     authMock.mockResolvedValue(false);
-    ordersMock.cancelOrder.mockResolvedValue(null);
+    ordersMock.getOrderWithItems.mockResolvedValue(null);
 
-    const res = await POST(makeRequest({ orderId: "nonexistent" }));
+    const res = await POST(makeRequest({ orderId: "nonexistent", phone_last4: "1234" }));
     expect(res.status).toBe(404);
   });
 

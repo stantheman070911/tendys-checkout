@@ -116,6 +116,7 @@ model Order {
   @@index([status])
   @@index([user_id])
   @@index([round_id])
+  @@index([line_user_id])
   @@index([created_at(sort: Desc)])
   @@map("orders")
 }

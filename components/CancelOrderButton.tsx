@@ -15,9 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 
 interface CancelOrderButtonProps {
   orderId: string;
+  userPhone: string;
 }
 
-export function CancelOrderButton({ orderId }: CancelOrderButtonProps) {
+export function CancelOrderButton({ orderId, userPhone }: CancelOrderButtonProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -29,7 +30,10 @@ export function CancelOrderButton({ orderId }: CancelOrderButtonProps) {
       const res = await fetch("/api/cancel-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId }),
+        body: JSON.stringify({
+          orderId,
+          phone_last4: userPhone.replace(/\D/g, "").slice(-4),
+        }),
       });
 
       const data = await res.json();

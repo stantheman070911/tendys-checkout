@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { listByRound } from "@/lib/db/orders";
+import { ORDER_STATUS } from "@/constants";
+
+const VALID_STATUSES: Set<string> = new Set(Object.values(ORDER_STATUS));
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +21,13 @@ export async function GET(request: NextRequest) {
     }
 
     const status = request.nextUrl.searchParams.get("status") || undefined;
+    if (status && !VALID_STATUSES.has(status)) {
+      return NextResponse.json(
+        { error: "Invalid status filter" },
+        { status: 400 },
+      );
+    }
+
     const orders = await listByRound(roundId.trim(), status);
     return NextResponse.json({ orders });
   } catch {

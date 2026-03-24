@@ -1,25 +1,76 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db/prisma";
-import { formatCurrency, formatOrderItems } from "@/lib/utils";
+"use client";
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
+import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
+import { useAdminSession } from "@/hooks/use-admin-session";
+import { useAdminFetch } from "@/hooks/use-admin-fetch";
+import { formatCurrency } from "@/lib/utils";
+import type { Order, OrderItem, User } from "@/types";
 
-export default async function PrintOrderPage({ params }: Props) {
-  const { id } = await params;
+type OrderWithDetails = Order & {
+  order_items: OrderItem[];
+  user: User | null;
+};
 
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: {
-      user: true,
-      order_items: true,
-    },
-  });
+export default function PrintOrderPage() {
+  const { id } = useParams<{ id: string }>();
+  const { session, authorized, loading: authLoading } = useAdminSession();
+  const { adminFetch } = useAdminFetch();
+  const [order, setOrder] = useState<OrderWithDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  if (!order) {
-    return notFound();
+  const fetchOrder = useCallback(async () => {
+    try {
+      const data = await adminFetch<{ order: OrderWithDetails }>(
+        `/api/orders/${id}`,
+      );
+      setOrder(data.order);
+    } catch {
+      setErrorMsg("Failed to load order");
+    } finally {
+      setLoading(false);
+    }
+  }, [id, adminFetch]);
+
+  useEffect(() => {
+    if (!authLoading && session && authorized) {
+      fetchOrder();
+    }
+  }, [authLoading, session, authorized, fetchOrder]);
+
+  useEffect(() => {
+    if (order) {
+      window.print();
+    }
+  }, [order]);
+
+  if (authLoading || loading) {
+    return <div className="p-8 text-center text-gray-400">載入中...</div>;
   }
+
+  if (!session || !authorized) {
+    return <div className="p-8 text-center text-red-500">Unauthorized</div>;
+  }
+
+  if (errorMsg || !order) {
+    return (
+      <div className="p-8 text-center text-red-500">
+        {errorMsg ?? "Order not found"}
+      </div>
+    );
+  }
+
+  const statusLabel =
+    order.status === "pending_payment"
+      ? "待匯款"
+      : order.status === "pending_confirm"
+        ? "待確認"
+        : order.status === "confirmed"
+          ? "待出貨"
+          : order.status === "shipped"
+            ? "已出貨"
+            : "已取消";
 
   return (
     <div className="p-8 max-w-2xl mx-auto bg-white min-h-screen text-black">
@@ -54,18 +105,7 @@ export default async function PrintOrderPage({ params }: Props) {
           <p className="text-gray-700 mb-1">
             訂購人：{order.user?.nickname ?? "—"}
           </p>
-          <p className="text-gray-700 mb-1">
-            狀態：
-            {order.status === "pending_payment"
-              ? "待匯款"
-              : order.status === "pending_confirm"
-                ? "待確認"
-                : order.status === "confirmed"
-                  ? "待出貨"
-                  : order.status === "shipped"
-                    ? "已出貨"
-                    : "已取消"}
-          </p>
+          <p className="text-gray-700 mb-1">狀態：{statusLabel}</p>
           {order.note && (
             <p className="text-orange-600 font-medium">備註：{order.note}</p>
           )}
@@ -102,12 +142,6 @@ export default async function PrintOrderPage({ params }: Props) {
           總計：{formatCurrency(order.total_amount)}
         </div>
       </div>
-
-      <script
-        dangerouslySetInnerHTML={{
-          __html: "window.onload = function() { window.print(); }",
-        }}
-      />
     </div>
   );
 }

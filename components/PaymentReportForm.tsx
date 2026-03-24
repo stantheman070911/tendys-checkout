@@ -8,11 +8,13 @@ import { useToast } from "@/hooks/use-toast";
 interface PaymentReportFormProps {
   orderId: string;
   orderTotal: number;
+  userPhone: string;
 }
 
 export function PaymentReportForm({
   orderId,
   orderTotal,
+  userPhone,
 }: PaymentReportFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -46,6 +48,7 @@ export function PaymentReportForm({
           order_id: orderId,
           payment_amount: parseInt(amount, 10),
           payment_last5: last5.trim(),
+          phone_last4: userPhone.replace(/\D/g, "").slice(-4),
         }),
       });
 

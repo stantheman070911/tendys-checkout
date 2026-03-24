@@ -13,7 +13,18 @@ export async function GET(request: NextRequest) {
     }
 
     const user = await findByNickname(nickname);
-    return NextResponse.json({ user });
+
+    // Return only auto-fill fields — strip id, timestamps, nickname
+    const safeUser = user
+      ? {
+          recipient_name: user.recipient_name,
+          phone: user.phone,
+          address: user.address,
+          email: user.email,
+        }
+      : null;
+
+    return NextResponse.json({ user: safeUser });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
