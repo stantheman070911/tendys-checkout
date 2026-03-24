@@ -213,7 +213,8 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                   <span className="block">被好好吃的人看見。</span>
                 </h1>
                 <p className="lux-subtitle max-w-2xl">
-                  一個連結優質農民與消費者的生鮮品牌。為消費者策展優質蔬果，一次完成下單與匯款回報。
+                  <span className="block">一個連結優質農民與消費者的生鮮品牌。</span>
+                  <span className="block">為消費者策展優質蔬果，一次完成下單與匯款回報。</span>
                 </p>
               </div>
 
