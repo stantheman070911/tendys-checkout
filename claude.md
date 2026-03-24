@@ -479,6 +479,11 @@ Keep max 15 entries. When full, drop oldest.
 
 #### Entries
 
+### [2026-03-24] Prisma include inference drift caused build-only route type failure
+**Mistake:** `findOrderByNumberAndAccessCode()` relied on inferred Prisma return types. Local runtime behavior was correct, but the production build treated the result as a base `Order` without included relations, so `/api/lookup` failed on `order.order_items`.
+**Fix:** Defined explicit Prisma include constants and `OrderGetPayload` types for order queries with relations, and returned those concrete payload shapes from `lib/db/orders.ts`.
+**Rule:** For shared Prisma query helpers used across routes/pages, make relation-bearing payload types explicit instead of relying on cross-file inference during Next.js builds.
+
 ### [2026-03-23] return { error } inside $transaction commits instead of rolling back
 **Mistake:** Converted `throw` to `return { error }` inside Prisma interactive transaction. Prisma commits on return, only rolls back on throw. Stock decremented for earlier items was permanently lost when a later item failed.
 **Fix:** Introduced `OrderValidationError` thrown inside transaction (triggers rollback), caught outside and converted to `{ error }` return.

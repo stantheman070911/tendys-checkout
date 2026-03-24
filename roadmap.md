@@ -567,6 +567,13 @@ npm run build        # must pass
 - [x] **Live verification**: Migration 006 was verified against Supabase. Anonymous direct reads/writes to `users`, `orders`, and `order_items` are blocked. Public reads on `rounds` and `products` still work.
 - [x] **Verification**: `npx vitest run` (99 tests / 21 files), `npm run lint`, `npm run build`, and `npx tsc --noEmit` all pass.
 
+### Post-Deploy Follow-Up (2026-03-24 Session 9)
+
+- [x] **Route naming cleanup**: Renamed the public order page segment from `app/order/[id]/page.tsx` to `app/order/[orderNumber]/page.tsx` so the filesystem route matches the real parameter semantics.
+- [x] **Build-only Prisma payload fix**: `findOrderByNumberAndAccessCode()` in `lib/db/orders.ts` now uses explicit Prisma `OrderGetPayload` include types for `order_items`, `user`, and `round`, fixing a production-only TypeScript build failure where `/api/lookup` saw the base `Order` shape instead of the included relations.
+- [x] **Docs synced**: Updated `claude.md` and the Phase 4 route references so future sessions use `[orderNumber]` terminology consistently.
+- [x] **Verification**: `npm run build`, `npx tsc --noEmit`, `npm run lint`, and `npx vitest run` all pass after the follow-up fix.
+
 ---
 
 ## Phase 6: Admin Pages — Shipments & Suppliers
