@@ -313,6 +313,11 @@ All must pass. Fix failures before continuing.
 
 **When to log:** After fixing mistakes caught by user, build, or runtime. Max 15 entries.
 
+### [2026-03-24] submit-order partial user writes + stale access_code schema drift
+**Mistake:** `/api/submit-order` created or updated `users` before the order transaction. If order creation failed, checkout left partial user state behind. A stale database still requiring `orders.access_code` also surfaced as a generic `500`.
+**Fix:** Moved nickname resolution + user persistence into the same transaction as order creation in `lib/db/orders.ts`. `/api/submit-order` now maps known `P2011 access_code` drift to `503` and names `migration_007_remove_access_code.sql`.
+**Rule:** Public/admin checkout user writes must be atomic with order creation. When Prisma exposes schema drift through typed errors/meta, return an explicit operator-facing failure instead of a generic `500`.
+
 ### [2026-03-24] Prisma include inference drift
 **Mistake:** Inferred Prisma return types worked at runtime but production build treated result as base `Order` without relations.
 **Fix:** Explicit include constants + `OrderGetPayload` types in `lib/db/orders.ts`.

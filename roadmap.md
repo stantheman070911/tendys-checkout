@@ -66,6 +66,11 @@
   - Loaded `Noto Sans TC` + `Noto Serif TC` in `app/layout.tsx`
   - Added local package dependencies: `@fontsource/noto-sans-tc`, `@fontsource/noto-serif-tc`
   - Raised CartBar secondary text contrast for accessibility
+- [x] **7.9** Submit-order hardening
+  - Moved public/admin nickname resolution and user persistence into one transactional checkout helper in `lib/db/orders.ts`
+  - Preserved `submission_key` dedup while preventing failed order creation from leaving partial user rows behind
+  - Added explicit `/api/submit-order` handling for stale `orders.access_code` schema drift, returning `503` with migration guidance instead of opaque `500`
+  - Added focused route + DB tests for dedup, nickname conflicts, concurrent nickname reuse, and schema-drift detection
 
 ### Checkpoint 7 (Final)
 
