@@ -174,6 +174,42 @@ export function PublicOrderPage({
     await unlockOrder(nextIdentity);
   }
 
+  if (!autoUnlockChecked && !order) {
+    return (
+      <div className="lux-shell">
+        <header className="sticky top-0 z-20 border-b border-[rgba(177,140,92,0.18)] bg-[rgba(246,241,233,0.72)] backdrop-blur-xl">
+          <div className="lux-page flex items-center justify-between gap-3 py-3">
+            <div>
+              <div className="lux-kicker">Order Access</div>
+              <span className="font-display text-xl text-[hsl(var(--ink))]">
+                訂單詳情
+              </span>
+            </div>
+            <span className="rounded-full border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.88)] px-3 py-1.5 font-mono text-xs text-[hsl(var(--muted-foreground))]">
+              {orderNumber}
+            </span>
+          </div>
+        </header>
+        <main className="lux-page">
+          <section className="mx-auto max-w-3xl">
+            <div className="lux-panel-strong flex flex-col items-center justify-center gap-4 p-10 text-center md:p-14">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
+              <div className="space-y-2">
+                <div className="lux-kicker">Opening Order</div>
+                <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
+                  正在開啟你的訂單
+                </h1>
+                <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                  正在驗證剛才送出的訂單資訊，完成後會直接帶你進入訂單頁。
+                </p>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   if (!order) {
     return (
       <div className="lux-shell">
