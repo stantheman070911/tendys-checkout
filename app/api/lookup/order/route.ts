@@ -95,6 +95,8 @@ export async function POST(request: NextRequest) {
         user: order.user
           ? {
               recipient_name: order.user.recipient_name,
+              phone: order.user.phone,
+              address: order.user.address,
               masked_phone: maskPhone(order.user.phone),
             }
           : null,

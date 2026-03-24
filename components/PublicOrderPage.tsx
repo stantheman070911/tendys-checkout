@@ -17,6 +17,8 @@ import {
 } from "@/lib/utils";
 import type { OrderStatus } from "@/types";
 
+const LINE_OA_URL = "https://lin.ee/Q1Ma43N";
+
 interface PublicOrderItem {
   id: string;
   product_id: string | null;
@@ -45,6 +47,8 @@ interface PublicOrder {
   created_at: string;
   user: {
     recipient_name: string | null;
+    phone: string | null;
+    address: string | null;
     masked_phone: string;
   } | null;
   order_items: PublicOrderItem[];
@@ -174,6 +178,22 @@ export function PublicOrderPage({
     await unlockOrder(nextIdentity);
   }
 
+  function handleCopyLineBindMessage(message: string) {
+    if (!navigator.clipboard) {
+      toast({ title: "複製失敗", variant: "destructive" });
+      return;
+    }
+
+    navigator.clipboard.writeText(message).then(
+      () => {
+        toast({ title: "已複製綁定內容" });
+      },
+      () => {
+        toast({ title: "複製失敗", variant: "destructive" });
+      },
+    );
+  }
+
   if (!autoUnlockChecked && !order) {
     return (
       <div className="lux-shell">
@@ -236,11 +256,11 @@ export function PublicOrderPage({
                     先驗證收件人，再查看這筆訂單。
                   </h1>
                   <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                    請輸入訂購人姓名與手機末三碼。舊的
+                    請輸入訂購人姓名與手機末三碼。
                     <span className="mx-1 rounded bg-[rgba(236,224,205,0.5)] px-1.5 py-0.5 font-mono text-xs text-[hsl(var(--ink))]">
                       ?code=
                     </span>
-                    連結不再作為驗證方式。
+                
                   </p>
                 </div>
 
@@ -426,6 +446,16 @@ export function PublicOrderPage({
             </div>
 
             <div className="mt-6 space-y-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              {order.user?.phone && (
+                <div className="lux-panel-muted p-3">
+                  聯絡電話：{order.user.phone}
+                </div>
+              )}
+              {order.user?.address && (
+                <div className="lux-panel-muted p-3">
+                  收貨地址：{order.user.address}
+                </div>
+              )}
               {order.pickup_location ? (
                 <div className="lux-panel-muted p-3">面交地點：{order.pickup_location}</div>
               ) : (
@@ -482,6 +512,23 @@ export function PublicOrderPage({
                 </p>
                 <div className="mt-4 rounded-[1.35rem] border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.92)] px-4 py-4 text-center font-mono text-sm font-semibold tracking-[0.12em] text-[hsl(var(--ink))]">
                   <span className="select-all cursor-text">{lineBindMessage}</span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyLineBindMessage(lineBindMessage)}
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] px-4 py-2.5 text-sm font-semibold text-[hsl(var(--ink))]"
+                  >
+                    一鍵複製綁定內容
+                  </button>
+                  <a
+                    href={LINE_OA_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[hsl(var(--forest))] px-4 py-2.5 text-sm font-semibold text-[hsl(var(--mist))]"
+                  >
+                    前往官方 LINE
+                  </a>
                 </div>
               </div>
             )}

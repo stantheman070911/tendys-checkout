@@ -47,6 +47,7 @@ describe("POST /api/lookup/order", () => {
       user: {
         recipient_name: "王小美",
         phone: "0912-345-678",
+        address: "台北市信義區測試路 1 號",
       },
       order_items: [
         {
@@ -72,6 +73,8 @@ describe("POST /api/lookup/order", () => {
     const data = await res.json();
     expect(data.order.order_number).toBe("ORD-001");
     expect(data.order.user.masked_phone).toContain("***");
+    expect(data.order.user.phone).toBe("0912-345-678");
+    expect(data.order.user.address).toBe("台北市信義區測試路 1 號");
   });
 
   it("returns 404 when the order cannot be resolved", async () => {
