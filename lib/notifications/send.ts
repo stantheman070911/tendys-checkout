@@ -1,4 +1,8 @@
-import { sendLinePush, sendLineMulticast, type NotifyResult } from "@/lib/line/push";
+import {
+  sendLinePush,
+  sendLineMulticast,
+  type NotifyResult,
+} from "@/lib/line/push";
 import {
   sendOrderConfirmationEmail,
   sendShipmentEmail,
@@ -38,7 +42,7 @@ interface ArrivalRecipients {
 
 export async function sendPaymentConfirmedNotifications(
   order: OrderForNotify,
-  items: ItemForNotify[]
+  items: ItemForNotify[],
 ): Promise<{ line: NotifyResult; email: NotifyResult | null }> {
   // LINE — push to the specific user (skip if no line_user_id)
   const lineMsg = `\n訂單 ${order.order_number} 付款已確認\n${formatOrderItems(items)}\n金額: ${formatCurrency(order.total_amount)}`;
@@ -82,7 +86,7 @@ export async function sendPaymentConfirmedNotifications(
 
 export async function sendShipmentNotifications(
   order: OrderForNotify,
-  items: ItemForNotify[]
+  items: ItemForNotify[],
 ): Promise<{ line: NotifyResult; email: NotifyResult | null }> {
   // LINE — push to the specific user
   const lineMsg = `\n訂單 ${order.order_number} 已出貨\n${formatOrderItems(items)}`;
@@ -127,7 +131,7 @@ export async function sendShipmentNotifications(
 export async function sendOrderCancelledNotifications(
   order: OrderForNotify,
   items: ItemForNotify[],
-  cancelReason?: string | null
+  cancelReason?: string | null,
 ): Promise<{ line: NotifyResult; email: NotifyResult | null }> {
   // LINE — push to the specific user
   const reasonText = cancelReason ? `\n原因: ${cancelReason}` : "";
@@ -158,7 +162,7 @@ export async function sendOrderCancelledNotifications(
       email,
       order,
       items,
-      cancelReason
+      cancelReason,
     );
     await logNotification({
       orderId: order.id,
@@ -179,7 +183,7 @@ export async function sendProductArrivalNotifications(
   productId: string,
   productName: string,
   roundId: string,
-  recipients: ArrivalRecipients
+  recipients: ArrivalRecipients,
 ): Promise<{
   line: NotifyResult;
   emailResults: Array<{ email: string; result: NotifyResult }>;
@@ -193,7 +197,10 @@ export async function sendProductArrivalNotifications(
     lineResult = await sendLineMulticast(recipients.lineUserIds, lineMsg);
     lineStatus = lineResult.success ? "success" : "failed";
   } else {
-    lineResult = { success: false, error: "No customers have linked LINE accounts" };
+    lineResult = {
+      success: false,
+      error: "No customers have linked LINE accounts",
+    };
     lineStatus = "skipped";
   }
   await logNotification({
@@ -218,7 +225,7 @@ export async function sendProductArrivalNotifications(
         errorMessage: result.error,
       });
       return { email, result };
-    })
+    }),
   );
   const emailResults: Array<{ email: string; result: NotifyResult }> = [];
   for (const entry of settled) {

@@ -16,7 +16,9 @@ export async function create(data: {
   name: string;
   deadline?: Date | string | null;
   shipping_fee?: number | null;
-}): Promise<{ error: string } | Awaited<ReturnType<typeof prisma.round.create>>> {
+}): Promise<
+  { error: string } | Awaited<ReturnType<typeof prisma.round.create>>
+> {
   try {
     // Atomic: close existing open rounds + create new one in a single transaction
     return await prisma.$transaction(async (tx) => {
@@ -66,7 +68,7 @@ export async function update(
     is_open: boolean;
     deadline: Date | string | null;
     shipping_fee: number | null;
-  }>
+  }>,
 ): Promise<{ error: string } | ReturnType<typeof prisma.round.update>> {
   // Enforce single-open-round: friendly precheck before DB write
   if (data.is_open === true) {
@@ -74,7 +76,9 @@ export async function update(
       where: { is_open: true, id: { not: id } },
     });
     if (existing) {
-      return { error: `另一個團「${existing.name}」正在開團中，請先截單再開啟此團` };
+      return {
+        error: `另一個團「${existing.name}」正在開團中，請先截單再開啟此團`,
+      };
     }
   }
   try {

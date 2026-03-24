@@ -20,8 +20,7 @@ export function ProductCard({
   onRemove,
   disabled,
 }: ProductCardProps) {
-  const atStockLimit =
-    product.stock !== null && cartQty >= product.stock;
+  const atStockLimit = product.stock !== null && cartQty >= product.stock;
   const outOfStock = product.stock !== null && product.stock <= 0;
   const remainingStock =
     product.stock !== null ? product.stock - cartQty : null;

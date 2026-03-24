@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
-import {
-  confirmShipment,
-  batchConfirmShipment,
-} from "@/lib/db/orders";
+import { confirmShipment, batchConfirmShipment } from "@/lib/db/orders";
 import { sendShipmentNotifications } from "@/lib/notifications/send";
 
 export async function POST(request: NextRequest) {
@@ -31,12 +28,12 @@ export async function POST(request: NextRequest) {
       if (!order) {
         return NextResponse.json(
           { error: "Order not found or not in confirmed status" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       const notifications = await sendShipmentNotifications(
         order,
-        order.order_items
+        order.order_items,
       );
       return NextResponse.json({ order, notifications });
     }
@@ -57,7 +54,7 @@ export async function POST(request: NextRequest) {
         shippedOrders.map(async (order) => {
           const notifications = await sendShipmentNotifications(
             order,
-            order.order_items
+            order.order_items,
           );
           return {
             success: true,
@@ -65,11 +62,20 @@ export async function POST(request: NextRequest) {
             orderNumber: order.order_number,
             notifications,
           };
-        })
+        }),
       );
       const notificationResults = settled
         .filter((r) => r.status === "fulfilled")
-        .map((r) => (r as PromiseFulfilledResult<{ orderId: string; orderNumber: string; notifications: unknown }>).value);
+        .map(
+          (r) =>
+            (
+              r as PromiseFulfilledResult<{
+                orderId: string;
+                orderNumber: string;
+                notifications: unknown;
+              }>
+            ).value,
+        );
 
       return NextResponse.json({
         shipped: shippedOrders.length,
@@ -80,9 +86,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Provide orderId (string) or orderIds (string[])" },
-      { status: 400 }
+      { status: 400 },
     );
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

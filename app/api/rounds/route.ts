@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
-import {
-  getOpenRound,
-  create,
-  update,
-  listRecent,
-} from "@/lib/db/rounds";
+import { getOpenRound, create, update, listRecent } from "@/lib/db/rounds";
 
 // Public — storefront needs open round
 export async function GET(request: NextRequest) {
@@ -26,7 +21,10 @@ export async function GET(request: NextRequest) {
     const round = await getOpenRound();
     return NextResponse.json({ round });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -64,7 +62,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "shipping_fee must be a non-negative integer or null" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -80,7 +78,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ round: result }, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -123,7 +124,7 @@ export async function PUT(request: NextRequest) {
       ) {
         return NextResponse.json(
           { error: "shipping_fee must be a non-negative integer or null" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       data.shipping_fee = fields.shipping_fee;
@@ -132,16 +133,22 @@ export async function PUT(request: NextRequest) {
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "At least one field to update is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const result = await update(id.trim(), data as Parameters<typeof update>[1]);
+    const result = await update(
+      id.trim(),
+      data as Parameters<typeof update>[1],
+    );
     if (result && typeof result === "object" && "error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     return NextResponse.json({ round: result });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

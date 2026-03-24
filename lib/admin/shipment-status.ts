@@ -20,7 +20,7 @@ export interface NotificationPayload {
 }
 
 export function mapNotifyStatus(
-  notifications: NotificationPayload | undefined
+  notifications: NotificationPayload | undefined,
 ): ShipmentNotifyResult {
   const line: NotifyStatus = !notifications?.line
     ? "skipped"

@@ -38,7 +38,10 @@ describe("getCustomersForArrivalNotification dedup", () => {
       },
     ]);
 
-    const result = await getCustomersForArrivalNotification("prod-1", "round-1");
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
 
     expect(result.lineUserIds).toEqual(["LINE-user-1"]);
     expect(result.emails).toEqual(["user1@test.com"]);
@@ -74,7 +77,10 @@ describe("getCustomersForArrivalNotification dedup", () => {
       },
     ]);
 
-    const result = await getCustomersForArrivalNotification("prod-1", "round-1");
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
 
     expect(result.lineUserIds).toHaveLength(2);
     expect(result.lineUserIds).toContain("LINE-A");
@@ -89,7 +95,10 @@ describe("getCustomersForArrivalNotification dedup", () => {
   it("returns zero customerCount and empty arrays when no orders match", async () => {
     prismaMock.orderItem.findMany.mockResolvedValue([]);
 
-    const result = await getCustomersForArrivalNotification("prod-1", "round-1");
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
 
     expect(result.customerCount).toBe(0);
     expect(result.lineUserIds).toEqual([]);
@@ -108,7 +117,10 @@ describe("getCustomersForArrivalNotification dedup", () => {
       },
     ]);
 
-    const result = await getCustomersForArrivalNotification("prod-1", "round-1");
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
 
     expect(result.customerCount).toBe(1);
     expect(result.lineUserIds).toEqual([]);
@@ -127,7 +139,10 @@ describe("getCustomersForArrivalNotification dedup", () => {
       },
     ]);
 
-    const result = await getCustomersForArrivalNotification("prod-1", "round-1");
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
 
     // 1 customer, even though 2 delivery endpoints
     expect(result.customerCount).toBe(1);
@@ -155,7 +170,10 @@ describe("getCustomersForArrivalNotification dedup", () => {
       },
     ]);
 
-    const result = await getCustomersForArrivalNotification("prod-1", "round-1");
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
 
     // Two distinct orders with no user_id → 2 customers (by order.id)
     expect(result.customerCount).toBe(2);

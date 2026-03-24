@@ -25,7 +25,7 @@ type ProductWithProgressRow = {
 
 async function listByRound(
   roundId: string,
-  activeOnly: boolean
+  activeOnly: boolean,
 ): Promise<ProductWithProgressRow[]> {
   if (activeOnly) {
     return prisma.$queryRaw<ProductWithProgressRow[]>`
@@ -59,13 +59,12 @@ async function listByRound(
 
 export const listActiveByRound = (roundId: string) =>
   listByRound(roundId, true);
-export const listAllByRound = (roundId: string) =>
-  listByRound(roundId, false);
+export const listAllByRound = (roundId: string) => listByRound(roundId, false);
 
 export async function decrementStock(
   productId: string,
   qty: number,
-  tx?: TxClient
+  tx?: TxClient,
 ) {
   const client = tx ?? prisma;
   const result = await client.$executeRaw`
@@ -79,7 +78,7 @@ export async function decrementStock(
 export async function restoreStock(
   productId: string,
   qty: number,
-  tx?: TxClient
+  tx?: TxClient,
 ) {
   const client = tx ?? prisma;
   await client.$executeRaw`
@@ -120,7 +119,7 @@ export async function update(
     stock: number | null;
     goal_qty: number | null;
     image_url: string | null;
-  }>
+  }>,
 ) {
   return prisma.product.update({ where: { id }, data });
 }

@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
-import {
-  list,
-  create,
-  update,
-  deleteSupplier,
-} from "@/lib/db/suppliers";
+import { list, create, update, deleteSupplier } from "@/lib/db/suppliers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +12,10 @@ export async function GET(request: NextRequest) {
     const suppliers = await list();
     return NextResponse.json({ suppliers });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -50,7 +48,10 @@ export async function POST(request: NextRequest) {
 
     const supplier = await create({
       name: trimmedName,
-      contact_name: typeof contact_name === "string" ? contact_name.trim() || undefined : undefined,
+      contact_name:
+        typeof contact_name === "string"
+          ? contact_name.trim() || undefined
+          : undefined,
       phone: typeof phone === "string" ? phone.trim() || undefined : undefined,
       email: typeof email === "string" ? email.trim() || undefined : undefined,
       note: typeof note === "string" ? note.trim() || undefined : undefined,
@@ -58,7 +59,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ supplier }, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -93,7 +97,10 @@ export async function PUT(request: NextRequest) {
     if (typeof fields.name === "string") {
       const trimmedName = fields.name.trim();
       if (!trimmedName) {
-        return NextResponse.json({ error: "name cannot be blank" }, { status: 400 });
+        return NextResponse.json(
+          { error: "name cannot be blank" },
+          { status: 400 },
+        );
       }
       data.name = trimmedName;
     }
@@ -110,14 +117,17 @@ export async function PUT(request: NextRequest) {
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "At least one field to update is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const supplier = await update(id.trim(), data);
     return NextResponse.json({ supplier });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -141,6 +151,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

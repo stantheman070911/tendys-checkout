@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "orderIds must be a non-empty array of strings" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       confirmedOrders.map(async (order) => {
         const notifications = await sendPaymentConfirmedNotifications(
           order,
-          order.order_items
+          order.order_items,
         );
         return {
           success: true,
@@ -48,11 +48,20 @@ export async function POST(request: NextRequest) {
           orderNumber: order.order_number,
           notifications,
         };
-      })
+      }),
     );
     const notificationResults = settled
       .filter((r) => r.status === "fulfilled")
-      .map((r) => (r as PromiseFulfilledResult<{ orderId: string; orderNumber: string; notifications: unknown }>).value);
+      .map(
+        (r) =>
+          (
+            r as PromiseFulfilledResult<{
+              orderId: string;
+              orderNumber: string;
+              notifications: unknown;
+            }>
+          ).value,
+      );
 
     return NextResponse.json({
       confirmed: confirmedOrders.length,
@@ -60,6 +69,9 @@ export async function POST(request: NextRequest) {
       results: notificationResults,
     });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

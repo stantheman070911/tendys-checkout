@@ -8,7 +8,7 @@ describe("buildAdminPath", () => {
 
   it("normalizes relative paths", () => {
     expect(buildAdminPath("orders/123/print")).toBe(
-      "/bitchassnigga/orders/123/print"
+      "/bitchassnigga/orders/123/print",
     );
   });
 

@@ -29,7 +29,9 @@ export default function RoundsPage() {
   const fetchData = useCallback(async () => {
     setError(null);
     try {
-      const data = await adminFetch<{ rounds: Round[] }>("/api/rounds?all=true");
+      const data = await adminFetch<{ rounds: Round[] }>(
+        "/api/rounds?all=true",
+      );
       setRounds(data.rounds);
     } catch (error) {
       setError(error instanceof Error ? error.message : "資料載入失敗");
@@ -45,7 +47,11 @@ export default function RoundsPage() {
   const currentRound = rounds.find((r) => r.is_open);
   const pastRounds = rounds.filter((r) => !r.is_open).slice(0, 5);
 
-  const updateRound = async (id: string, fields: Record<string, unknown>, msg: string) => {
+  const updateRound = async (
+    id: string,
+    fields: Record<string, unknown>,
+    msg: string,
+  ) => {
     try {
       await adminFetch("/api/rounds", {
         method: "PUT",
@@ -79,7 +85,7 @@ export default function RoundsPage() {
     updateRound(
       currentRound.id,
       { deadline: new Date(deadlineInput).toISOString() },
-      "截止時間已更新"
+      "截止時間已更新",
     );
     setEditingDeadline(false);
   };
@@ -209,9 +215,7 @@ export default function RoundsPage() {
                     </span>
                     <button
                       onClick={() => {
-                        setFeeInput(
-                          String(currentRound.shipping_fee ?? 0)
-                        );
+                        setFeeInput(String(currentRound.shipping_fee ?? 0));
                         setEditingFee(true);
                       }}
                       className="text-xs text-gray-400 hover:text-blue-500 underline"
@@ -236,9 +240,7 @@ export default function RoundsPage() {
             <button
               onClick={() => {
                 const dl = currentRound.deadline
-                  ? new Date(currentRound.deadline)
-                      .toISOString()
-                      .slice(0, 16)
+                  ? new Date(currentRound.deadline).toISOString().slice(0, 16)
                   : "";
                 setDeadlineInput(dl);
                 setEditingDeadline(true);
@@ -321,9 +323,7 @@ export default function RoundsPage() {
       {/* History */}
       {pastRounds.length > 0 && (
         <div className="bg-white rounded-xl border p-3">
-          <div className="font-medium text-sm mb-2 text-gray-700">
-            歷史記錄
-          </div>
+          <div className="font-medium text-sm mb-2 text-gray-700">歷史記錄</div>
           {pastRounds.map((r) => (
             <div
               key={r.id}

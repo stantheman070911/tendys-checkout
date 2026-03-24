@@ -12,7 +12,10 @@ export async function GET(request: NextRequest) {
   try {
     const roundId = request.nextUrl.searchParams.get("roundId");
     if (!roundId || !roundId.trim()) {
-      return NextResponse.json({ error: "roundId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "roundId is required" },
+        { status: 400 },
+      );
     }
 
     const all = request.nextUrl.searchParams.get("all") === "true";
@@ -28,7 +31,10 @@ export async function GET(request: NextRequest) {
     const products = await listActiveByRound(roundId.trim());
     return NextResponse.json({ products });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -46,17 +52,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { name, price, unit, round_id, supplier_id, stock, goal_qty, image_url } =
-      body as {
-        name?: string;
-        price?: number;
-        unit?: string;
-        round_id?: string;
-        supplier_id?: string | null;
-        stock?: number | null;
-        goal_qty?: number | null;
-        image_url?: string | null;
-      };
+    const {
+      name,
+      price,
+      unit,
+      round_id,
+      supplier_id,
+      stock,
+      goal_qty,
+      image_url,
+    } = body as {
+      name?: string;
+      price?: number;
+      unit?: string;
+      round_id?: string;
+      supplier_id?: string | null;
+      stock?: number | null;
+      goal_qty?: number | null;
+      image_url?: string | null;
+    };
 
     const trimmedName = typeof name === "string" ? name.trim() : "";
     if (!trimmedName) {
@@ -71,7 +85,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "price must be a positive integer" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -81,7 +95,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!round_id || typeof round_id !== "string" || !round_id.trim()) {
-      return NextResponse.json({ error: "round_id is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "round_id is required" },
+        { status: 400 },
+      );
     }
 
     if (
@@ -91,18 +108,20 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "stock must be a non-negative integer or null" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (
       goal_qty !== undefined &&
       goal_qty !== null &&
-      (typeof goal_qty !== "number" || !Number.isInteger(goal_qty) || goal_qty <= 0)
+      (typeof goal_qty !== "number" ||
+        !Number.isInteger(goal_qty) ||
+        goal_qty <= 0)
     ) {
       return NextResponse.json(
         { error: "goal_qty must be a positive integer or null" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -125,7 +144,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ product }, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -165,43 +187,84 @@ export async function PUT(request: NextRequest) {
 
     if (typeof fields.name === "string") {
       const v = fields.name.trim();
-      if (!v) return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
+      if (!v)
+        return NextResponse.json(
+          { error: "name cannot be empty" },
+          { status: 400 },
+        );
       data.name = v;
     }
     if (typeof fields.price === "number") {
       if (!Number.isInteger(fields.price) || fields.price <= 0) {
-        return NextResponse.json({ error: "price must be a positive integer" }, { status: 400 });
+        return NextResponse.json(
+          { error: "price must be a positive integer" },
+          { status: 400 },
+        );
       }
       data.price = fields.price;
     }
     if (typeof fields.unit === "string") {
       const v = fields.unit.trim();
-      if (!v) return NextResponse.json({ error: "unit cannot be empty" }, { status: 400 });
+      if (!v)
+        return NextResponse.json(
+          { error: "unit cannot be empty" },
+          { status: 400 },
+        );
       data.unit = v;
     }
-    if (typeof fields.round_id === "string") data.round_id = fields.round_id.trim();
+    if (typeof fields.round_id === "string")
+      data.round_id = fields.round_id.trim();
     if (fields.supplier_id !== undefined) {
-      if (fields.supplier_id !== null && (typeof fields.supplier_id !== "string" || !fields.supplier_id.trim())) {
-        return NextResponse.json({ error: "supplier_id must be a non-empty string or null" }, { status: 400 });
+      if (
+        fields.supplier_id !== null &&
+        (typeof fields.supplier_id !== "string" || !fields.supplier_id.trim())
+      ) {
+        return NextResponse.json(
+          { error: "supplier_id must be a non-empty string or null" },
+          { status: 400 },
+        );
       }
       data.supplier_id = fields.supplier_id ? fields.supplier_id.trim() : null;
     }
-    if (typeof fields.is_active === "boolean") data.is_active = fields.is_active;
+    if (typeof fields.is_active === "boolean")
+      data.is_active = fields.is_active;
     if (fields.stock !== undefined) {
-      if (fields.stock !== null && (typeof fields.stock !== "number" || !Number.isInteger(fields.stock) || fields.stock < 0)) {
-        return NextResponse.json({ error: "stock must be a non-negative integer or null" }, { status: 400 });
+      if (
+        fields.stock !== null &&
+        (typeof fields.stock !== "number" ||
+          !Number.isInteger(fields.stock) ||
+          fields.stock < 0)
+      ) {
+        return NextResponse.json(
+          { error: "stock must be a non-negative integer or null" },
+          { status: 400 },
+        );
       }
       data.stock = fields.stock;
     }
     if (fields.goal_qty !== undefined) {
-      if (fields.goal_qty !== null && (typeof fields.goal_qty !== "number" || !Number.isInteger(fields.goal_qty) || fields.goal_qty <= 0)) {
-        return NextResponse.json({ error: "goal_qty must be a positive integer or null" }, { status: 400 });
+      if (
+        fields.goal_qty !== null &&
+        (typeof fields.goal_qty !== "number" ||
+          !Number.isInteger(fields.goal_qty) ||
+          fields.goal_qty <= 0)
+      ) {
+        return NextResponse.json(
+          { error: "goal_qty must be a positive integer or null" },
+          { status: 400 },
+        );
       }
       data.goal_qty = fields.goal_qty;
     }
     if (fields.image_url !== undefined) {
-      if (fields.image_url !== null && (typeof fields.image_url !== "string" || !fields.image_url.trim())) {
-        return NextResponse.json({ error: "image_url must be a non-empty string or null" }, { status: 400 });
+      if (
+        fields.image_url !== null &&
+        (typeof fields.image_url !== "string" || !fields.image_url.trim())
+      ) {
+        return NextResponse.json(
+          { error: "image_url must be a non-empty string or null" },
+          { status: 400 },
+        );
       }
       data.image_url = fields.image_url ? fields.image_url.trim() : null;
     }
@@ -209,13 +272,19 @@ export async function PUT(request: NextRequest) {
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "At least one field to update is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const product = await update(id.trim(), data as Parameters<typeof update>[1]);
+    const product = await update(
+      id.trim(),
+      data as Parameters<typeof update>[1],
+    );
     return NextResponse.json({ product });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

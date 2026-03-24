@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
     };
 
     if (!orderId || typeof orderId !== "string" || !orderId.trim()) {
-      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "orderId is required" },
+        { status: 400 },
+      );
     }
 
     // Determine mode by auth — don't 401 if not admin, just use user mode
@@ -44,12 +47,15 @@ export async function POST(request: NextRequest) {
       notifications = await sendOrderCancelledNotifications(
         result.order,
         result.order.order_items,
-        reason
+        reason,
       );
     }
 
     return NextResponse.json({ order: result.order, notifications });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

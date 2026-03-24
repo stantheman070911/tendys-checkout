@@ -61,33 +61,30 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const itemsTotal = cartItems.reduce((sum, i) => sum + i.subtotal, 0);
   const orderTotal = calcOrderTotal(cartItems, shippingFee);
   const anyUnderGoal = products.some(
-    (p) => p.goal_qty !== null && p.current_qty < p.goal_qty
+    (p) => p.goal_qty !== null && p.current_qty < p.goal_qty,
   );
   const roundClosed =
     !round.is_open ||
     (round.deadline !== null && new Date(round.deadline) < new Date());
 
   // Cart actions
-  const addToCart = useCallback(
-    (product: ProductWithProgress) => {
-      setCart((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(product.id);
-        const currentQty = existing?.quantity ?? 0;
-        if (product.stock !== null && currentQty >= product.stock) return prev;
-        const newQty = currentQty + 1;
-        next.set(product.id, {
-          product_id: product.id,
-          product_name: product.name,
-          unit_price: product.price,
-          quantity: newQty,
-          subtotal: product.price * newQty,
-        });
-        return next;
+  const addToCart = useCallback((product: ProductWithProgress) => {
+    setCart((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(product.id);
+      const currentQty = existing?.quantity ?? 0;
+      if (product.stock !== null && currentQty >= product.stock) return prev;
+      const newQty = currentQty + 1;
+      next.set(product.id, {
+        product_id: product.id,
+        product_name: product.name,
+        unit_price: product.price,
+        quantity: newQty,
+        subtotal: product.price * newQty,
       });
-    },
-    []
-  );
+      return next;
+    });
+  }, []);
 
   const removeFromCart = useCallback((productId: string) => {
     setCart((prev) => {
@@ -114,12 +111,13 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     if (!trimmed) return;
     try {
       const res = await fetch(
-        `/api/users/lookup?nickname=${encodeURIComponent(trimmed)}`
+        `/api/users/lookup?nickname=${encodeURIComponent(trimmed)}`,
       );
       if (!res.ok) return;
       const data = await res.json();
       if (data.user) {
-        if (data.user.recipient_name) setRecipientName(data.user.recipient_name);
+        if (data.user.recipient_name)
+          setRecipientName(data.user.recipient_name);
         if (data.user.phone) setPhone(data.user.phone);
         if (data.user.address) setAddress(data.user.address);
         if (data.user.email) setEmail(data.user.email);
@@ -233,9 +231,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         </div>
 
         {products.length === 0 && (
-          <p className="text-center text-muted-foreground py-8">
-            目前沒有商品
-          </p>
+          <p className="text-center text-muted-foreground py-8">目前沒有商品</p>
         )}
 
         {/* Checkout Form */}
@@ -243,10 +239,17 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
           <div ref={checkoutRef} className="space-y-4">
             {/* Order Details Card */}
             <div className="bg-white rounded-xl border p-4">
-              <div className="font-medium text-gray-600 mb-2 text-sm">訂單明細</div>
+              <div className="font-medium text-gray-600 mb-2 text-sm">
+                訂單明細
+              </div>
               {cartItems.map((item) => (
-                <div key={item.product_id} className="flex justify-between text-sm py-0.5">
-                  <span>{item.product_name} x{item.quantity}</span>
+                <div
+                  key={item.product_id}
+                  className="flex justify-between text-sm py-0.5"
+                >
+                  <span>
+                    {item.product_name} x{item.quantity}
+                  </span>
                   <span>{formatCurrency(item.subtotal)}</span>
                 </div>
               ))}
@@ -284,7 +287,10 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                   <div className="relative">
                     <Input
                       value={nickname}
-                      onChange={(e) => { setNickname(e.target.value); setNickFound(false); }}
+                      onChange={(e) => {
+                        setNickname(e.target.value);
+                        setNickFound(false);
+                      }}
                       onBlur={handleNicknameBlur}
                       placeholder="你在群組的暱稱"
                       className={`pr-24 transition ${nickFound ? "border-green-400 bg-green-50" : ""}`}
@@ -299,7 +305,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">收貨人 *</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    收貨人 *
+                  </label>
                   <Input
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
@@ -309,7 +317,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">電話 *</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    電話 *
+                  </label>
                   <Input
                     type="tel"
                     inputMode="tel"
@@ -322,8 +332,13 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">取貨方式</label>
-                  <Select value={pickupLocation} onValueChange={setPickupLocation}>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    取貨方式
+                  </label>
+                  <Select
+                    value={pickupLocation}
+                    onValueChange={setPickupLocation}
+                  >
                     <SelectTrigger className="h-11">
                       <SelectValue />
                     </SelectTrigger>
@@ -342,7 +357,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
 
                 {isDelivery && (
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">收貨地址</label>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      收貨地址
+                    </label>
                     <Input
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
@@ -353,7 +370,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                 )}
 
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Email（選填）</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Email（選填）
+                  </label>
                   <Input
                     type="email"
                     value={email}
@@ -363,7 +382,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">備註（選填）</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    備註（選填）
+                  </label>
                   <Input
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
@@ -373,13 +394,22 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
 
                 <button
                   type="submit"
-                  disabled={submitting || cartItems.length === 0 || roundClosed || (isDelivery && !address.trim())}
+                  disabled={
+                    submitting ||
+                    cartItems.length === 0 ||
+                    roundClosed ||
+                    (isDelivery && !address.trim())
+                  }
                   className="w-full bg-green-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-50 hover:bg-green-700 transition"
                 >
-                  {submitting ? "送出中..." : `送出訂單 · ${formatCurrency(orderTotal)}`}
+                  {submitting
+                    ? "送出中..."
+                    : `送出訂單 · ${formatCurrency(orderTotal)}`}
                 </button>
                 {isDelivery && !address.trim() && (
-                  <p className="text-xs text-center text-gray-400">宅配請填寫收貨地址</p>
+                  <p className="text-xs text-center text-gray-400">
+                    宅配請填寫收貨地址
+                  </p>
                 )}
               </form>
             </div>

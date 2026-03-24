@@ -29,7 +29,7 @@ describe("single-open-round enforcement", () => {
     vi.clearAllMocks();
     // Default: $transaction runs the callback with txMock
     prismaMock.$transaction.mockImplementation(
-      async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock)
+      async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock),
     );
   });
 
@@ -55,14 +55,19 @@ describe("single-open-round enforcement", () => {
   it("create() rolls back close if insert fails", async () => {
     prismaMock.$transaction.mockRejectedValue(new Error("insert failed"));
 
-    await expect(create({ name: "Bad Round" })).rejects.toThrow("insert failed");
+    await expect(create({ name: "Bad Round" })).rejects.toThrow(
+      "insert failed",
+    );
   });
 
   it("create() catches P2002 from concurrent creates and returns { error }", async () => {
-    const p2002 = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-      code: "P2002",
-      clientVersion: "0.0.0",
-    });
+    const p2002 = new Prisma.PrismaClientKnownRequestError(
+      "Unique constraint failed",
+      {
+        code: "P2002",
+        clientVersion: "0.0.0",
+      },
+    );
     prismaMock.$transaction.mockRejectedValue(p2002);
 
     const result = await create({ name: "Concurrent Round" });
@@ -115,10 +120,13 @@ describe("single-open-round enforcement", () => {
   it("update() catches DB unique-index conflict from concurrent requests", async () => {
     prismaMock.round.findFirst.mockResolvedValue(null);
     // Simulate a P2002 unique constraint violation (concurrent open)
-    const p2002 = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-      code: "P2002",
-      clientVersion: "0.0.0",
-    });
+    const p2002 = new Prisma.PrismaClientKnownRequestError(
+      "Unique constraint failed",
+      {
+        code: "P2002",
+        clientVersion: "0.0.0",
+      },
+    );
     prismaMock.round.update.mockRejectedValue(p2002);
 
     const result = await update("target-round", { is_open: true });

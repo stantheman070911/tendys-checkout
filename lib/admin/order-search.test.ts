@@ -29,7 +29,13 @@ describe("groupOrdersByPickup", () => {
     ]);
 
     expect(groups).toEqual([
-      { label: "宅配", orders: [{ pickup_location: null, id: "1" }, { pickup_location: "", id: "3" }] },
+      {
+        label: "宅配",
+        orders: [
+          { pickup_location: null, id: "1" },
+          { pickup_location: "", id: "3" },
+        ],
+      },
       { label: "面交點 A", orders: [{ pickup_location: "面交點 A", id: "2" }] },
     ]);
   });

@@ -32,7 +32,7 @@ export async function update(
     phone: string | null;
     email: string | null;
     note: string | null;
-  }>
+  }>,
 ) {
   return prisma.supplier.update({ where: { id }, data });
 }

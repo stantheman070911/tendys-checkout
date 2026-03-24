@@ -34,7 +34,7 @@ export type ValidationResult = ValidationSuccess | ValidationFailure;
  */
 export async function validateOrderNumber(
   orderNumber: string,
-  lineUserId: string
+  lineUserId: string,
 ): Promise<ValidationResult> {
   const order = await prisma.order.findUnique({
     where: { order_number: orderNumber },

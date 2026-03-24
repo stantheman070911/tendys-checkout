@@ -10,7 +10,7 @@ interface SearchableOrder {
 
 export function matchesOrderSearch(
   order: SearchableOrder,
-  query: string
+  query: string,
 ): boolean {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
@@ -25,9 +25,9 @@ export function matchesOrderSearch(
   );
 }
 
-export function groupOrdersByPickup<T extends { pickup_location: string | null }>(
-  orders: T[]
-): Array<{ label: string; orders: T[] }> {
+export function groupOrdersByPickup<
+  T extends { pickup_location: string | null },
+>(orders: T[]): Array<{ label: string; orders: T[] }> {
   const groups = new Map<string, T[]>();
 
   for (const order of orders) {

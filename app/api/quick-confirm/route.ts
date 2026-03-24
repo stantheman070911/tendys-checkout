@@ -23,7 +23,10 @@ export async function POST(request: NextRequest) {
     };
 
     if (!orderId || typeof orderId !== "string" || !orderId.trim()) {
-      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "orderId is required" },
+        { status: 400 },
+      );
     }
 
     if (
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "paymentAmount must be a positive integer" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -43,17 +46,20 @@ export async function POST(request: NextRequest) {
     if (!order) {
       return NextResponse.json(
         { error: "Order not found or not in pending_payment status" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     const notifications = await sendPaymentConfirmedNotifications(
       order,
-      order.order_items
+      order.order_items,
     );
 
     return NextResponse.json({ order, notifications });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

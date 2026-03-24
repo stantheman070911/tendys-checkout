@@ -51,7 +51,7 @@ export function OrderCard({
   const doAction = async (
     url: string,
     body: Record<string, unknown>,
-    successMsg: string
+    successMsg: string,
   ) => {
     setActing(true);
     try {
@@ -73,24 +73,20 @@ export function OrderCard({
   };
 
   const confirmPayment = () =>
-    doAction(
-      "/api/confirm-order",
-      { orderId: o.id },
-      "已確認付款"
-    );
+    doAction("/api/confirm-order", { orderId: o.id }, "已確認付款");
 
   const quickConfirm = () =>
     doAction(
       "/api/quick-confirm",
       { orderId: o.id, paymentAmount: o.total_amount },
-      "已現場收款"
+      "已現場收款",
     );
 
   const confirmShipment = () =>
     doAction(
       "/api/confirm-shipment",
       { orderId: o.id },
-      o.pickup_location ? "已確認取貨" : "已確認寄出"
+      o.pickup_location ? "已確認取貨" : "已確認寄出",
     );
 
   const handleCancel = async () => {
@@ -321,7 +317,10 @@ export function OrderCard({
               {o.status !== "cancelled" && (
                 <button
                   onClick={() =>
-                    window.open(buildAdminPath(`/orders/${o.id}/print`), "_blank")
+                    window.open(
+                      buildAdminPath(`/orders/${o.id}/print`),
+                      "_blank",
+                    )
                   }
                   className="px-3 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
                 >

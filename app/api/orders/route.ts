@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     if (!roundId || !roundId.trim()) {
       return NextResponse.json(
         { error: "roundId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -6,9 +6,7 @@ export default function GtfoPage() {
         <h1 className="text-white text-2xl font-bold">
           bro tryna be a hacker and shit
         </h1>
-        <p className="text-red-500 text-xl font-bold">
-          get the fuck out
-        </p>
+        <p className="text-red-500 text-xl font-bold">get the fuck out</p>
         <div className="text-gray-600 text-sm pt-8">
           there&apos;s nothing here for you
         </div>

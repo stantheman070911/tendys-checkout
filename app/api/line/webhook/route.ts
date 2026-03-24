@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
         e.type === "message" &&
         e.message?.type === "text" &&
         e.message.text &&
-        e.source?.userId
+        e.source?.userId,
     );
     if (messageEvents.length > 0) {
       // Don't await — process in background so we return 200 immediately
@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
           handleMessage(
             event.source!.userId!,
             event.message!.text!,
-            event.replyToken
-          )
-        )
+            event.replyToken,
+          ),
+        ),
       );
     }
 

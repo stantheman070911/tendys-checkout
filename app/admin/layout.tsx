@@ -29,8 +29,7 @@ export default function AdminLayout({
   const [pendingCount, setPendingCount] = useState(0);
 
   // Detect login page: pathname is exactly /admin (file system path from rewrite)
-  const isLoginPage =
-    pathname === "/admin" || pathname === ADMIN_BASE;
+  const isLoginPage = pathname === "/admin" || pathname === ADMIN_BASE;
 
   // Fetch current round + pending count for nav
   useEffect(() => {
@@ -42,8 +41,9 @@ export default function AdminLayout({
           setRound(open);
           // Fetch pending confirm count for badge
           adminFetch<{ orders: Array<{ status: string }> }>(
-            `/api/orders?roundId=${open.id}&status=pending_confirm`
-          ).then(({ orders }) => setPendingCount(orders.length))
+            `/api/orders?roundId=${open.id}&status=pending_confirm`,
+          )
+            .then(({ orders }) => setPendingCount(orders.length))
             .catch(() => {});
         }
       })
@@ -79,9 +79,8 @@ export default function AdminLayout({
   if (!session || !authorized) return null;
 
   // Active tab detection
-  const activeTab = TABS.find(([key]) =>
-    pathname.includes(`/${key}`)
-  )?.[0] ?? "dashboard";
+  const activeTab =
+    TABS.find(([key]) => pathname.includes(`/${key}`))?.[0] ?? "dashboard";
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -114,7 +113,7 @@ export default function AdminLayout({
                 router.push(
                   key === "dashboard"
                     ? `${ADMIN_BASE}/dashboard`
-                    : `${ADMIN_BASE}/${key}`
+                    : `${ADMIN_BASE}/${key}`,
                 )
               }
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition ${

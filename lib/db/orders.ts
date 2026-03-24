@@ -26,7 +26,7 @@ class OrderValidationError extends Error {
 export async function createWithItems(
   data: CreateOrderData,
   items: CreateOrderItem[],
-  submissionKey: string
+  submissionKey: string,
 ) {
   try {
     return await prisma.$transaction(async (tx) => {
@@ -58,13 +58,19 @@ export async function createWithItems(
       for (const item of items) {
         const product = productMap.get(item.product_id);
         if (!product) {
-          throw new OrderValidationError(`Product not found: ${item.product_id}`);
+          throw new OrderValidationError(
+            `Product not found: ${item.product_id}`,
+          );
         }
         if (product.round_id !== data.round_id) {
-          throw new OrderValidationError(`Product ${product.name} does not belong to this round`);
+          throw new OrderValidationError(
+            `Product ${product.name} does not belong to this round`,
+          );
         }
         if (!product.is_active) {
-          throw new OrderValidationError(`Product ${product.name} is no longer available`);
+          throw new OrderValidationError(
+            `Product ${product.name} is no longer available`,
+          );
         }
       }
 
@@ -81,7 +87,9 @@ export async function createWithItems(
           WHERE id = ${item.product_id}::uuid AND (stock IS NULL OR stock >= ${item.quantity})
         `;
         if (updated === 0) {
-          throw new OrderValidationError(`Insufficient stock for ${product.name}`);
+          throw new OrderValidationError(
+            `Insufficient stock for ${product.name}`,
+          );
         }
 
         const subtotal = product.price * item.quantity;
@@ -208,7 +216,7 @@ export async function getOrdersByProduct(productId: string, roundId: string) {
 
 export async function getCustomersForArrivalNotification(
   productId: string,
-  roundId: string
+  roundId: string,
 ): Promise<{
   customerCount: number;
   lineUserIds: string[];
@@ -253,7 +261,7 @@ export async function getCustomersForArrivalNotification(
 export async function reportPayment(
   orderId: string,
   amount: number,
-  last5: string
+  last5: string,
 ) {
   try {
     return await prisma.order.update({
@@ -363,7 +371,7 @@ export async function batchConfirmShipment(orderIds: string[]) {
 export async function cancelOrder(
   orderId: string,
   isAdmin?: boolean,
-  cancelReason?: string
+  cancelReason?: string,
 ) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
@@ -401,7 +409,11 @@ export async function cancelOrder(
       }
     }
 
-    const cancelled = { ...order, status: "cancelled" as const, cancel_reason: cancelReason || null };
+    const cancelled = {
+      ...order,
+      status: "cancelled" as const,
+      cancel_reason: cancelReason || null,
+    };
     return { order: cancelled, changed: true as const };
   });
 }

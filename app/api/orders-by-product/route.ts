@@ -13,16 +13,28 @@ export async function GET(request: NextRequest) {
     const roundId = request.nextUrl.searchParams.get("roundId");
 
     if (!productId || !productId.trim()) {
-      return NextResponse.json({ error: "productId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "productId is required" },
+        { status: 400 },
+      );
     }
     if (!roundId || !roundId.trim()) {
-      return NextResponse.json({ error: "roundId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "roundId is required" },
+        { status: 400 },
+      );
     }
 
-    const customers = await getOrdersByProduct(productId.trim(), roundId.trim());
+    const customers = await getOrdersByProduct(
+      productId.trim(),
+      roundId.trim(),
+    );
 
     return NextResponse.json({ customers });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

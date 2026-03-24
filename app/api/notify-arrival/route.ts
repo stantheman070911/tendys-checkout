@@ -24,10 +24,16 @@ export async function POST(request: NextRequest) {
     };
 
     if (!productId || typeof productId !== "string" || !productId.trim()) {
-      return NextResponse.json({ error: "productId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "productId is required" },
+        { status: 400 },
+      );
     }
     if (!roundId || typeof roundId !== "string" || !roundId.trim()) {
-      return NextResponse.json({ error: "roundId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "roundId is required" },
+        { status: 400 },
+      );
     }
 
     const product = await findProductById(productId.trim());
@@ -37,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     const recipients = await getCustomersForArrivalNotification(
       productId.trim(),
-      roundId.trim()
+      roundId.trim(),
     );
 
     if (recipients.customerCount === 0) {
@@ -52,7 +58,7 @@ export async function POST(request: NextRequest) {
       product.id,
       product.name,
       roundId.trim(),
-      recipients
+      recipients,
     );
 
     return NextResponse.json({
@@ -61,6 +67,9 @@ export async function POST(request: NextRequest) {
       emailResults: result.emailResults,
     });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

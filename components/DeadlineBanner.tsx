@@ -8,7 +8,11 @@ interface DeadlineBannerProps {
   roundName?: string;
 }
 
-export function DeadlineBanner({ deadline, isOpen, roundName }: DeadlineBannerProps) {
+export function DeadlineBanner({
+  deadline,
+  isOpen,
+  roundName,
+}: DeadlineBannerProps) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -52,13 +56,13 @@ export function DeadlineBanner({ deadline, isOpen, roundName }: DeadlineBannerPr
     : "bg-amber-50 border-amber-200 text-amber-800";
 
   return (
-    <div className={`${bannerColor} border rounded-xl p-2.5 text-sm text-center`}>
+    <div
+      className={`${bannerColor} border rounded-xl p-2.5 text-sm text-center`}
+    >
       {roundName && <span className="font-medium">{roundName}</span>}
       {roundName && "\u3000"}截止 {dateStr} {timeStr}
       {isUrgent ? (
-        <span className="ml-2 text-red-600 font-bold">
-          剩 {mins} 分鐘
-        </span>
+        <span className="ml-2 text-red-600 font-bold">剩 {mins} 分鐘</span>
       ) : hrs < 48 ? (
         <span className="ml-2 text-orange-600 font-bold">
           剩 {hrs}h {mins}m

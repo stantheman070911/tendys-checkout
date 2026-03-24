@@ -36,7 +36,7 @@ export default function ShipmentsPage() {
   const [batchSel, setBatchSel] = useState<Set<string>>(new Set());
   const [batchActing, setBatchActing] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [recentResults, setRecentResults] = useState<RecentResult[]>([]);
 
@@ -48,7 +48,7 @@ export default function ShipmentsPage() {
     setError(null);
     try {
       const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true"
+        "/api/rounds?all=true",
       );
       const openRound = roundsData.rounds.find((r) => r.is_open);
       if (!openRound) {
@@ -58,7 +58,7 @@ export default function ShipmentsPage() {
       setRound(openRound);
 
       const ordersData = await adminFetch<{ orders: OrderWithItems[] }>(
-        `/api/orders?roundId=${openRound.id}&status=confirmed`
+        `/api/orders?roundId=${openRound.id}&status=confirmed`,
       );
       setOrders(ordersData.orders);
     } catch (error) {
@@ -204,7 +204,7 @@ export default function ShipmentsPage() {
             ${o.order_items
               .map(
                 (item) =>
-                  `<tr><td>${escapeHtml(item.product_name)}</td><td>${item.quantity}</td><td>$${item.subtotal}</td></tr>`
+                  `<tr><td>${escapeHtml(item.product_name)}</td><td>${item.quantity}</td><td>$${item.subtotal}</td></tr>`,
               )
               .join("")}
             ${o.shipping_fee ? `<tr><td>宅配運費</td><td></td><td>$${o.shipping_fee}</td></tr>` : ""}
@@ -212,7 +212,7 @@ export default function ShipmentsPage() {
           <tfoot><tr><td colspan="2"><b>合計</b></td><td><b>$${o.total_amount}</b></td></tr></tfoot>
         </table>
       </div>
-    `
+    `,
       )
       .join("");
 
@@ -350,8 +350,8 @@ export default function ShipmentsPage() {
             <div key={i} className="text-xs text-green-700 flex gap-2">
               <span className="font-mono">{r.orderNumber}</span>
               <span>
-                LINE {renderNotifyIcon(r.line)} ·
-                Email {renderNotifyIcon(r.email)}
+                LINE {renderNotifyIcon(r.line)} · Email{" "}
+                {renderNotifyIcon(r.email)}
               </span>
             </div>
           ))}

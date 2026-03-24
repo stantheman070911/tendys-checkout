@@ -27,7 +27,7 @@ export default async function OrderPage({
   if (order.round_id) {
     const products = await listActiveByRound(order.round_id);
     anyUnderGoal = products.some(
-      (p) => p.goal_qty !== null && Number(p.current_qty) < Number(p.goal_qty)
+      (p) => p.goal_qty !== null && Number(p.current_qty) < Number(p.goal_qty),
     );
   }
 
@@ -259,25 +259,27 @@ export default async function OrderPage({
         )}
 
         {/* Share + continue shopping (non-cancelled, non-pending_payment) */}
-        {status !== "cancelled" && status !== "pending_payment" && order.round_id && (
-          <div className="space-y-3">
-            <SharePanel roundId={order.round_id} show={anyUnderGoal} />
-            <div className="flex gap-3">
-              <a
-                href={buildShareUrl(order.round_id)}
-                className="flex-1 bg-green-600 text-white rounded-xl py-3 font-bold text-center"
-              >
-                繼續選購
-              </a>
-              <Link
-                href="/"
-                className="flex-1 border-2 rounded-xl py-3 text-sm text-gray-600 text-center"
-              >
-                返回首頁
-              </Link>
+        {status !== "cancelled" &&
+          status !== "pending_payment" &&
+          order.round_id && (
+            <div className="space-y-3">
+              <SharePanel roundId={order.round_id} show={anyUnderGoal} />
+              <div className="flex gap-3">
+                <a
+                  href={buildShareUrl(order.round_id)}
+                  className="flex-1 bg-green-600 text-white rounded-xl py-3 font-bold text-center"
+                >
+                  繼續選購
+                </a>
+                <Link
+                  href="/"
+                  className="flex-1 border-2 rounded-xl py-3 text-sm text-gray-600 text-center"
+                >
+                  返回首頁
+                </Link>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </main>
     </div>
   );

@@ -34,7 +34,7 @@ export async function sendOrderConfirmationEmail(
     total_amount: number;
     shipping_fee?: number | null;
   },
-  items: Array<{ product_name: string; quantity: number; subtotal: number }>
+  items: Array<{ product_name: string; quantity: number; subtotal: number }>,
 ): Promise<NotifyResult> {
   try {
     const resend = getResend();
@@ -45,7 +45,7 @@ export async function sendOrderConfirmationEmail(
     const itemRows = items
       .map(
         (i) =>
-          `<tr><td style="padding:4px 8px">${escapeHtml(i.product_name)}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`
+          `<tr><td style="padding:4px 8px">${escapeHtml(i.product_name)}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`,
       )
       .join("");
 
@@ -94,7 +94,7 @@ export async function sendOrderConfirmationEmail(
 export async function sendShipmentEmail(
   to: string,
   order: { order_number: string },
-  items: Array<{ product_name: string; quantity: number }>
+  items: Array<{ product_name: string; quantity: number }>,
 ): Promise<NotifyResult> {
   try {
     const resend = getResend();
@@ -142,7 +142,7 @@ export async function sendOrderCancelledEmail(
     shipping_fee?: number | null;
   },
   items: Array<{ product_name: string; quantity: number; subtotal: number }>,
-  cancelReason?: string | null
+  cancelReason?: string | null,
 ): Promise<NotifyResult> {
   try {
     const resend = getResend();
@@ -153,7 +153,7 @@ export async function sendOrderCancelledEmail(
     const itemRows = items
       .map(
         (i) =>
-          `<tr><td style="padding:4px 8px">${escapeHtml(i.product_name)}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`
+          `<tr><td style="padding:4px 8px">${escapeHtml(i.product_name)}</td><td style="padding:4px 8px">${i.quantity}</td><td style="padding:4px 8px">$${i.subtotal}</td></tr>`,
       )
       .join("");
 
@@ -207,7 +207,7 @@ export async function sendOrderCancelledEmail(
 
 export async function sendProductArrivalEmail(
   to: string,
-  productName: string
+  productName: string,
 ): Promise<NotifyResult> {
   try {
     const resend = getResend();

@@ -20,7 +20,10 @@ export async function POST(request: NextRequest) {
     const { orderId } = body as { orderId?: string };
 
     if (!orderId || typeof orderId !== "string" || !orderId.trim()) {
-      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "orderId is required" },
+        { status: 400 },
+      );
     }
 
     const order = await confirmOrder(orderId.trim());
@@ -28,18 +31,21 @@ export async function POST(request: NextRequest) {
     if (!order) {
       return NextResponse.json(
         { error: "Order not found or not in pending_confirm status" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // Send notifications (fire-and-forget — failure doesn't affect response)
     const notifications = await sendPaymentConfirmedNotifications(
       order,
-      order.order_items
+      order.order_items,
     );
 
     return NextResponse.json({ order, notifications });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

@@ -55,7 +55,7 @@ export function ShipmentCard({
       });
 
       const { line: lineStatus, email: emailStatus } = mapNotifyStatus(
-        res.notifications
+        res.notifications,
       );
 
       setShipped(true);
@@ -118,10 +118,8 @@ export function ShipmentCard({
       {/* Customer info */}
       <div className="text-xs text-gray-500 bg-gray-50 rounded-xl p-2.5 space-y-0.5">
         <div>
-          <span className="font-medium">
-            {o.user?.recipient_name ?? "—"}
-          </span>{" "}
-          · {o.user?.phone ?? "—"}
+          <span className="font-medium">{o.user?.recipient_name ?? "—"}</span> ·{" "}
+          {o.user?.phone ?? "—"}
         </div>
         {isPickup ? (
           <div className="text-purple-600">📍 {o.pickup_location}</div>
@@ -133,10 +131,7 @@ export function ShipmentCard({
       {/* Items */}
       <div className="space-y-1 text-sm">
         {o.order_items.map((item) => (
-          <div
-            key={item.id}
-            className="flex justify-between text-gray-600"
-          >
+          <div key={item.id} className="flex justify-between text-gray-600">
             <span>
               {item.product_name} ×{item.quantity}
             </span>
@@ -162,11 +157,7 @@ export function ShipmentCard({
           disabled={acting}
           className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50"
         >
-          {acting
-            ? "處理中…"
-            : isPickup
-              ? "確認取貨 📍"
-              : "確認寄出 🚚"}
+          {acting ? "處理中…" : isPickup ? "確認取貨 📍" : "確認寄出 🚚"}
         </button>
         <button
           onClick={() =>

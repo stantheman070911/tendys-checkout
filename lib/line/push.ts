@@ -8,12 +8,15 @@ function getToken(): string | null {
 
 async function linePost(
   endpoint: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
 ): Promise<NotifyResult> {
   try {
     const token = getToken();
     if (!token) {
-      return { success: false, error: "LINE_CHANNEL_ACCESS_TOKEN not configured" };
+      return {
+        success: false,
+        error: "LINE_CHANNEL_ACCESS_TOKEN not configured",
+      };
     }
 
     const res = await fetch(`${LINE_API_BASE}/${endpoint}`, {
@@ -45,7 +48,7 @@ async function linePost(
  */
 export async function sendLinePush(
   lineUserId: string,
-  message: string
+  message: string,
 ): Promise<NotifyResult> {
   return linePost("push", {
     to: lineUserId,
@@ -59,7 +62,7 @@ export async function sendLinePush(
  */
 export async function sendLineMulticast(
   lineUserIds: string[],
-  message: string
+  message: string,
 ): Promise<NotifyResult> {
   if (lineUserIds.length === 0) {
     return { success: true };
@@ -77,7 +80,7 @@ export async function sendLineMulticast(
         await linePost("multicast", {
           to: chunk,
           messages: [{ type: "text", text: message }],
-        })
+        }),
       );
     }
     const failed = results.filter((r) => !r.success);
@@ -98,7 +101,7 @@ export async function sendLineMulticast(
  */
 export async function sendLineReply(
   replyToken: string,
-  message: string
+  message: string,
 ): Promise<NotifyResult> {
   return linePost("reply", {
     replyToken,
@@ -113,7 +116,7 @@ export async function sendLineReply(
 export async function sendLineMessage(
   lineUserId: string,
   text: string,
-  replyToken?: string
+  replyToken?: string,
 ): Promise<NotifyResult> {
   if (replyToken) {
     const replyResult = await sendLineReply(replyToken, text);

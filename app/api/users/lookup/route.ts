@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     if (!nickname) {
       return NextResponse.json(
         { error: "nickname is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -94,9 +94,7 @@ export function SupplierForm({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "編輯供應商" : "新增供應商"}
-          </DialogTitle>
+          <DialogTitle>{isEdit ? "編輯供應商" : "新增供應商"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
@@ -122,9 +120,7 @@ export function SupplierForm({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
-                電話
-              </label>
+              <label className="text-sm font-medium text-gray-700">電話</label>
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -142,9 +138,7 @@ export function SupplierForm({
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
-              備註
-            </label>
+            <label className="text-sm font-medium text-gray-700">備註</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}

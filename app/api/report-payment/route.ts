@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
 
     // Validate order_id
     if (!order_id || typeof order_id !== "string" || !order_id.trim()) {
-      return NextResponse.json({ error: "order_id is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "order_id is required" },
+        { status: 400 },
+      );
     }
 
     // Validate payment_amount
@@ -30,7 +33,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "payment_amount must be a positive integer" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -43,25 +46,28 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "payment_last5 must be exactly 5 digits" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const order = await reportPayment(
       order_id.trim(),
       payment_amount,
-      payment_last5.trim()
+      payment_last5.trim(),
     );
 
     if (!order) {
       return NextResponse.json(
         { error: "Order not found or not in pending_payment status" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     return NextResponse.json({ order });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

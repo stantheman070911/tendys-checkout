@@ -5,10 +5,7 @@ import { getSupabaseBrowser } from "@/lib/auth/supabase-browser";
 
 export function useAdminFetch() {
   const adminFetch = useCallback(
-    async <T = unknown>(
-      url: string,
-      options?: RequestInit
-    ): Promise<T> => {
+    async <T = unknown>(url: string, options?: RequestInit): Promise<T> => {
       const supabase = getSupabaseBrowser();
       const {
         data: { session },
@@ -43,12 +40,16 @@ export function useAdminFetch() {
         ) {
           throw new Error(payload.error);
         }
-        throw new Error(res.status === 401 ? "Unauthorized" : `Request failed (${res.status})`);
+        throw new Error(
+          res.status === 401
+            ? "Unauthorized"
+            : `Request failed (${res.status})`,
+        );
       }
 
       return payload as T;
     },
-    []
+    [],
   );
 
   return { adminFetch };

@@ -22,8 +22,7 @@ const MSG_ORDER_ALREADY_LINKED_OTHER =
 const MSG_UNKNOWN =
   "嗨！請把訂單編號貼給我，我幫你綁定出貨通知 📦\n（訂單編號在下單後的頁面上，格式如：ORD-20260318-001）";
 
-const MSG_ERROR =
-  "系統有點問題，等一下再試試看 🙏";
+const MSG_ERROR = "系統有點問題，等一下再試試看 🙏";
 
 // ─── Handler ─────────────────────────────────────────────────
 
@@ -37,7 +36,7 @@ const MSG_ERROR =
 export async function handleMessage(
   lineUserId: string,
   text: string,
-  replyToken?: string
+  replyToken?: string,
 ): Promise<void> {
   const trimmed = text.trim().toUpperCase();
   const orderNumber = extractOrderNumber(text);
@@ -51,11 +50,7 @@ export async function handleMessage(
         const replyText = result.alreadyLinked
           ? MSG_ALREADY_LINKED(result.orderNumber, result.status)
           : MSG_LINKED_SUCCESS(result.orderNumber);
-        await sendLineMessage(
-          lineUserId,
-          replyText,
-          replyToken
-        );
+        await sendLineMessage(lineUserId, replyText, replyToken);
         return;
       }
 
@@ -67,7 +62,7 @@ export async function handleMessage(
       await sendLineMessage(
         lineUserId,
         errorMessages[result.error] ?? MSG_ERROR,
-        replyToken
+        replyToken,
       );
       return;
     } catch {
@@ -85,7 +80,7 @@ export async function handleMessage(
     await sendLineMessage(
       lineUserId,
       MSG_ALREADY_LINKED(existingOrder.order_number, existingOrder.status),
-      replyToken
+      replyToken,
     );
     return;
   }

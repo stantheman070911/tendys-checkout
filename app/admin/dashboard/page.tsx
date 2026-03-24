@@ -34,7 +34,9 @@ export default function DashboardPage() {
     setError(null);
     try {
       // Get open round first
-      const roundsData = await adminFetch<{ rounds: Round[] }>("/api/rounds?all=true");
+      const roundsData = await adminFetch<{ rounds: Round[] }>(
+        "/api/rounds?all=true",
+      );
       const openRound = roundsData.rounds.find((r) => r.is_open);
       if (!openRound) {
         setLoading(false);
@@ -45,13 +47,13 @@ export default function DashboardPage() {
       // Fetch orders, products, logs in parallel
       const [ordersData, productsData, logsData] = await Promise.all([
         adminFetch<{ orders: OrderWithItems[] }>(
-          `/api/orders?roundId=${openRound.id}`
+          `/api/orders?roundId=${openRound.id}`,
         ),
         adminFetch<{ products: ProductWithProgress[] }>(
-          `/api/products?roundId=${openRound.id}&all=true`
+          `/api/products?roundId=${openRound.id}&all=true`,
         ),
         adminFetch<{ logs: NotificationLog[] }>(
-          `/api/notification-logs?roundId=${openRound.id}`
+          `/api/notification-logs?roundId=${openRound.id}`,
         ),
       ]);
 
@@ -97,18 +99,34 @@ export default function DashboardPage() {
   const nonCancelled = orders.filter((o) => o.status !== "cancelled");
   const totalOrders = orders.length;
   const totalRevenue = nonCancelled.reduce((s, o) => s + o.total_amount, 0);
-  const pendingConfirm = orders.filter((o) => o.status === "pending_confirm").length;
-  const pendingPayment = orders.filter((o) => o.status === "pending_payment").length;
+  const pendingConfirm = orders.filter(
+    (o) => o.status === "pending_confirm",
+  ).length;
+  const pendingPayment = orders.filter(
+    (o) => o.status === "pending_payment",
+  ).length;
   const confirmed = orders.filter((o) => o.status === "confirmed").length;
   const shipped = orders.filter((o) => o.status === "shipped").length;
 
   const stats: Array<[string, string, (() => void) | null]> = [
     ["總訂單", `${totalOrders}`, null],
     ["總營收", formatCurrency(totalRevenue), null],
-    ["待確認", `${pendingConfirm}`, () => router.push(`${ADMIN_BASE}/orders?status=pending_confirm`)],
-    ["待付款", `${pendingPayment}`, () => router.push(`${ADMIN_BASE}/orders?status=pending_payment`)],
+    [
+      "待確認",
+      `${pendingConfirm}`,
+      () => router.push(`${ADMIN_BASE}/orders?status=pending_confirm`),
+    ],
+    [
+      "待付款",
+      `${pendingPayment}`,
+      () => router.push(`${ADMIN_BASE}/orders?status=pending_payment`),
+    ],
     ["待出貨", `${confirmed}`, () => router.push(`${ADMIN_BASE}/shipments`)],
-    ["已出貨", `${shipped}`, () => router.push(`${ADMIN_BASE}/orders?status=shipped`)],
+    [
+      "已出貨",
+      `${shipped}`,
+      () => router.push(`${ADMIN_BASE}/orders?status=shipped`),
+    ],
   ];
 
   // Flatten order items from non-cancelled orders for aggregation
@@ -118,7 +136,7 @@ export default function DashboardPage() {
       product_name: item.product_name,
       quantity: item.quantity,
       unit_price: item.unit_price,
-    }))
+    })),
   );
 
   const notificationSummary = summarizeNotificationLogs(logs);
@@ -127,7 +145,8 @@ export default function DashboardPage() {
     <div className="space-y-3">
       <h3 className="font-bold text-gray-700 text-sm">
         {round.name}
-        {round.shipping_fee != null && ` · 宅配運費 ${formatCurrency(round.shipping_fee)}`}
+        {round.shipping_fee != null &&
+          ` · 宅配運費 ${formatCurrency(round.shipping_fee)}`}
       </h3>
 
       {/* Stat Cards */}
@@ -158,26 +177,45 @@ export default function DashboardPage() {
       {/* Notification Summary */}
       {notificationSummary.length > 0 && (
         <div className="bg-white rounded-xl border p-4">
-          <div className="font-medium text-sm mb-3 text-gray-700">通知發送統計 (本團)</div>
+          <div className="font-medium text-sm mb-3 text-gray-700">
+            通知發送統計 (本團)
+          </div>
           <div className="space-y-3">
             {notificationSummary.map((entry) => (
-              <div key={entry.type} className="border-b last:border-0 pb-3 last:pb-0">
-                <div className="text-xs font-bold text-gray-600 mb-1">{entry.type}</div>
+              <div
+                key={entry.type}
+                className="border-b last:border-0 pb-3 last:pb-0"
+              >
+                <div className="text-xs font-bold text-gray-600 mb-1">
+                  {entry.type}
+                </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
                     <span className="font-medium text-gray-500">LINE</span>
                     <span>
-                      <span className="text-green-600 font-medium mr-2">✓ {entry.line.success}</span>
-                      <span className="text-red-500 font-medium mr-2">✗ {entry.line.failed}</span>
-                      <span className="text-gray-400 font-medium">— {entry.line.skipped}</span>
+                      <span className="text-green-600 font-medium mr-2">
+                        ✓ {entry.line.success}
+                      </span>
+                      <span className="text-red-500 font-medium mr-2">
+                        ✗ {entry.line.failed}
+                      </span>
+                      <span className="text-gray-400 font-medium">
+                        — {entry.line.skipped}
+                      </span>
                     </span>
                   </div>
                   <div className="bg-gray-50 rounded p-1.5 flex justify-between items-center">
                     <span className="font-medium text-gray-500">Email</span>
                     <span>
-                      <span className="text-green-600 font-medium mr-2">✓ {entry.email.success}</span>
-                      <span className="text-red-500 font-medium mr-2">✗ {entry.email.failed}</span>
-                      <span className="text-gray-400 font-medium">— {entry.email.skipped}</span>
+                      <span className="text-green-600 font-medium mr-2">
+                        ✓ {entry.email.success}
+                      </span>
+                      <span className="text-red-500 font-medium mr-2">
+                        ✗ {entry.email.failed}
+                      </span>
+                      <span className="text-gray-400 font-medium">
+                        — {entry.email.skipped}
+                      </span>
                     </span>
                   </div>
                 </div>

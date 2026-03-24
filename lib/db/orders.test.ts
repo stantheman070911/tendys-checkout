@@ -10,7 +10,7 @@ const { txMock, prismaMock } = vi.hoisted(() => {
 
   const prismaMock = {
     $transaction: vi.fn(async (callback: (tx: typeof txMock) => unknown) =>
-      callback(txMock)
+      callback(txMock),
     ),
   };
 
@@ -64,7 +64,10 @@ describe("batch order mutations", () => {
       ]);
     txMock.order.updateMany.mockResolvedValue({ count: 1 });
 
-    const result = await batchConfirmShipment(["already-shipped", "confirmed-1"]);
+    const result = await batchConfirmShipment([
+      "already-shipped",
+      "confirmed-1",
+    ]);
 
     expect(txMock.order.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["confirmed-1"] }, status: "confirmed" },

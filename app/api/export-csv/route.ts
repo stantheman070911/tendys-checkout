@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession, getSupabaseAdmin } from "@/lib/auth/supabase-admin";
+import {
+  verifyAdminSession,
+  getSupabaseAdmin,
+} from "@/lib/auth/supabase-admin";
 import { listByRound } from "@/lib/db/orders";
 import { STATUS_LABELS } from "@/constants";
 import type { OrderStatus } from "@/types";
@@ -13,7 +16,10 @@ export async function GET(request: NextRequest) {
 
     const roundId = request.nextUrl.searchParams.get("roundId");
     if (!roundId || !roundId.trim()) {
-      return NextResponse.json({ error: "roundId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "roundId is required" },
+        { status: 400 },
+      );
     }
 
     const orders = await listByRound(roundId.trim());
@@ -47,7 +53,7 @@ export async function GET(request: NextRequest) {
         .join(", ");
       const itemsSubtotal = order.order_items.reduce(
         (sum, i) => sum + i.subtotal,
-        0
+        0,
       );
 
       return [
@@ -81,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     // Build CSV string with UTF-8 BOM for Excel
     const csvLines = [headers, ...rows].map((row) =>
-      row.map(escapeCsvField).join(",")
+      row.map(escapeCsvField).join(","),
     );
     const csv = "\uFEFF" + csvLines.join("\r\n");
 
@@ -92,7 +98,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 

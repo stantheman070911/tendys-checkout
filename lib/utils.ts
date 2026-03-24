@@ -12,7 +12,7 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatOrderItems(
-  items: Array<{ product_name: string; quantity: number }>
+  items: Array<{ product_name: string; quantity: number }>,
 ): string {
   return items.map((i) => `${i.product_name}x${i.quantity}`).join("、");
 }
@@ -36,7 +36,7 @@ export function generateSubmissionKey(): string {
 
 export function calcOrderTotal(
   items: Array<{ subtotal: number }>,
-  shippingFee?: number | null
+  shippingFee?: number | null,
 ): number {
   const itemsTotal = items.reduce((sum, i) => sum + i.subtotal, 0);
   return itemsTotal + (shippingFee ?? 0);

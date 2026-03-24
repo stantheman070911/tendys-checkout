@@ -8,7 +8,7 @@ describe("extractOrderNumber", () => {
 
   it("extracts an order number from prefixed text", () => {
     expect(extractOrderNumber("綁定 ORD-20260322-001")).toBe(
-      "ORD-20260322-001"
+      "ORD-20260322-001",
     );
   });
 

@@ -39,7 +39,7 @@ export default function SuppliersPage() {
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<SupplierWithCount | null>(
-    null
+    null,
   );
   const [deleting, setDeleting] = useState(false);
 
@@ -66,7 +66,7 @@ export default function SuppliersPage() {
 
       // Try to get open round + products
       const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true"
+        "/api/rounds?all=true",
       );
       const openRound = roundsData.rounds.find((r) => r.is_open);
       setRound(openRound ?? null);
@@ -120,7 +120,7 @@ export default function SuppliersPage() {
     setLoadingProductId(productId);
     try {
       const data = await adminFetch<{ customers: OrderByProduct[] }>(
-        `/api/orders-by-product?productId=${productId}&roundId=${round.id}`
+        `/api/orders-by-product?productId=${productId}&roundId=${round.id}`,
       );
       setCustomersByProduct((prev) => ({
         ...prev,
@@ -133,7 +133,7 @@ export default function SuppliersPage() {
       });
     } finally {
       setLoadingProductId((current) =>
-        current === productId ? null : current
+        current === productId ? null : current,
       );
     }
   };
@@ -164,7 +164,7 @@ export default function SuppliersPage() {
       });
 
       const emailSuccesses = result.emailResults.filter(
-        (entry) => entry.result.success
+        (entry) => entry.result.success,
       ).length;
       const emailFailures = result.emailResults.length - emailSuccesses;
       const lineStatus = result.line.success
@@ -252,9 +252,7 @@ export default function SuppliersPage() {
               >
                 {/* Supplier header */}
                 <div
-                  onClick={() =>
-                    setExpandedSupplier(isExpanded ? null : s.id)
-                  }
+                  onClick={() => setExpandedSupplier(isExpanded ? null : s.id)}
                   className="flex items-center gap-2 p-3 cursor-pointer select-none"
                 >
                   <div className="flex-1 min-w-0">
@@ -316,7 +314,10 @@ export default function SuppliersPage() {
                         const isSending = arrivalSending === p.id;
 
                         return (
-                          <div key={p.id} className="border-b last:border-0 pb-2">
+                          <div
+                            key={p.id}
+                            className="border-b last:border-0 pb-2"
+                          >
                             <div className="flex justify-between items-center gap-2">
                               <button
                                 onClick={() => toggleProduct(p.id)}
@@ -345,9 +346,9 @@ export default function SuppliersPage() {
                                   onClick={() =>
                                     window.open(
                                       buildAdminPath(
-                                        `/shipments?productId=${p.id}&productName=${encodeURIComponent(p.name)}`
+                                        `/shipments?productId=${p.id}&productName=${encodeURIComponent(p.name)}`,
                                       ),
-                                      "_self"
+                                      "_self",
                                     )
                                   }
                                   className="text-xs px-2 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100"
@@ -392,9 +393,7 @@ export default function SuppliersPage() {
                                       <span className="font-medium">
                                         {c.nickname}
                                       </span>
-                                      <span>
-                                        {c.recipient_name ?? "—"}
-                                      </span>
+                                      <span>{c.recipient_name ?? "—"}</span>
                                       <span className="text-gray-400 truncate">
                                         {c.phone ?? "—"}
                                       </span>
@@ -454,7 +453,8 @@ export default function SuppliersPage() {
             確定要刪除供應商「{deleteTarget?.name}」嗎？
             {(deleteTarget?._count.products ?? 0) > 0 && (
               <span className="text-red-500 block mt-1">
-                此供應商有 {deleteTarget?._count.products} 個關聯商品，無法刪除。
+                此供應商有 {deleteTarget?._count.products}{" "}
+                個關聯商品，無法刪除。
               </span>
             )}
           </p>

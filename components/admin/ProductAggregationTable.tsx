@@ -43,7 +43,7 @@ export function ProductAggregationTable({
 
   const productById = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
-    [products]
+    [products],
   );
 
   const rows = useMemo(() => {
@@ -87,7 +87,9 @@ export function ProductAggregationTable({
     return Array.from(aggMap.values());
   }, [orderItems, productById, products]);
 
-  const loadCustomers = async (productId: string): Promise<OrderByProduct[]> => {
+  const loadCustomers = async (
+    productId: string,
+  ): Promise<OrderByProduct[]> => {
     const existingCustomers = customersByProduct[productId];
     if (existingCustomers) {
       return existingCustomers;
@@ -96,7 +98,7 @@ export function ProductAggregationTable({
     setLoadingProductId(productId);
     try {
       const data = await adminFetch<{ customers: OrderByProduct[] }>(
-        `/api/orders-by-product?productId=${productId}&roundId=${roundId}`
+        `/api/orders-by-product?productId=${productId}&roundId=${roundId}`,
       );
       setCustomersByProduct((prev) => ({
         ...prev,
@@ -111,7 +113,7 @@ export function ProductAggregationTable({
       return [];
     } finally {
       setLoadingProductId((current) =>
-        current === productId ? null : current
+        current === productId ? null : current,
       );
     }
   };
@@ -142,7 +144,7 @@ export function ProductAggregationTable({
       });
 
       const emailSuccesses = result.emailResults.filter(
-        (entry) => entry.result.success
+        (entry) => entry.result.success,
       ).length;
       const emailFailures = result.emailResults.length - emailSuccesses;
       const lineStatus = result.line.success
@@ -209,7 +211,7 @@ export function ProductAggregationTable({
             <td>${escapeHtml(customer.order_number)}</td>
             <td>${customer.quantity}${escapeHtml(row.unit)}</td>
           </tr>
-        `
+        `,
       )
       .join("");
 
@@ -250,8 +252,12 @@ export function ProductAggregationTable({
   if (rows.length === 0) {
     return (
       <div className="bg-white rounded-xl border p-4">
-        <div className="font-medium text-sm mb-2 text-gray-700">商品需求彙總</div>
-        <div className="text-sm text-gray-400 text-center py-4">尚無訂單資料</div>
+        <div className="font-medium text-sm mb-2 text-gray-700">
+          商品需求彙總
+        </div>
+        <div className="text-sm text-gray-400 text-center py-4">
+          尚無訂單資料
+        </div>
       </div>
     );
   }
@@ -301,9 +307,9 @@ export function ProductAggregationTable({
                   onClick={() =>
                     window.open(
                       buildAdminPath(
-                        `/shipments?productId=${row.productId}&productName=${encodeURIComponent(row.name)}`
+                        `/shipments?productId=${row.productId}&productName=${encodeURIComponent(row.name)}`,
                       ),
-                      "_self"
+                      "_self",
                     )
                   }
                   className="text-xs px-2 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100"
@@ -332,16 +338,27 @@ export function ProductAggregationTable({
             {isExpanded && (
               <div className="mt-2 ml-4 bg-gray-50 rounded-xl p-2.5 space-y-1">
                 {isLoadingCustomers ? (
-                  <div className="text-xs text-gray-400 text-center py-2">載入中…</div>
+                  <div className="text-xs text-gray-400 text-center py-2">
+                    載入中…
+                  </div>
                 ) : customers.length === 0 ? (
-                  <div className="text-xs text-gray-400 text-center py-2">無客戶資料</div>
+                  <div className="text-xs text-gray-400 text-center py-2">
+                    無客戶資料
+                  </div>
                 ) : (
                   customers.map((c, i) => (
-                    <div key={i} className="grid grid-cols-[4.5rem,5rem,1fr,7.5rem,4rem] text-xs gap-2">
+                    <div
+                      key={i}
+                      className="grid grid-cols-[4.5rem,5rem,1fr,7.5rem,4rem] text-xs gap-2"
+                    >
                       <span className="font-medium">{c.nickname}</span>
                       <span>{c.recipient_name ?? "—"}</span>
-                      <span className="text-gray-400 truncate">{c.phone ?? "—"}</span>
-                      <span className="font-mono text-gray-500">{c.order_number}</span>
+                      <span className="text-gray-400 truncate">
+                        {c.phone ?? "—"}
+                      </span>
+                      <span className="font-mono text-gray-500">
+                        {c.order_number}
+                      </span>
                       <span className="font-bold text-indigo-600 text-right">
                         {c.quantity}
                         {row.unit}

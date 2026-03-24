@@ -26,14 +26,22 @@ export default function AdminLoginPage() {
       });
 
       if (error) {
-        toast({ title: "登入失敗", description: error.message, variant: "destructive" });
+        toast({
+          title: "登入失敗",
+          description: error.message,
+          variant: "destructive",
+        });
         setSubmitting(false);
         return;
       }
 
       router.replace(`${ADMIN_BASE}/dashboard`);
     } catch {
-      toast({ title: "登入失敗", description: "網路錯誤，請稍後再試", variant: "destructive" });
+      toast({
+        title: "登入失敗",
+        description: "網路錯誤，請稍後再試",
+        variant: "destructive",
+      });
       setSubmitting(false);
     }
   };

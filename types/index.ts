@@ -174,4 +174,3 @@ export type OrderWithItems = Order & {
   order_items: OrderItem[];
   user: User | null;
 };
-

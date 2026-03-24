@@ -11,7 +11,7 @@ export async function upsertByNickname(
     phone?: string;
     address?: string;
     email?: string;
-  }
+  },
 ) {
   return prisma.user.upsert({
     where: { nickname },

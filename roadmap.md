@@ -628,52 +628,36 @@ npx vitest run           # must pass
   - Lookup by nickname → verify history with all statuses
   - Export CSV → verify shipping fee column + Chinese encoding
   - Close round → verify 已截單
-- [ ] **7.2** Edge cases:
-  - Submit order stock = 0 → error
-  - Submit order round closed → blocked
-  - Double-click submit → same order (submission_key)
-  - Payment report wrong format → validation error
-  - Cancel `pending_confirm` → should fail
-  - Cancel `confirmed` (by admin) → should succeed + restore stock + send cancellation notification
-  - Cancel `shipped` (by admin) → should succeed + NO stock restore + send cancellation notification
-  - Quick confirm (POS) on pending_payment → confirmed directly (skip pending_confirm)
-  - Quick confirm on non-pending_payment → should fail
-  - Admin create order on behalf of customer → order created as pending_payment
-  - Batch confirm mix of valid/already-confirmed → partial success
-  - Batch ship mix of confirmed/already-shipped → partial success
-  - 通知到貨 when no one ordered that product → graceful "0 位客戶" message
-  - Delete supplier with linked products → blocked with error message
-  - **Shipping fee = null (round has no fee) + 宅配 → total has no shipping line**
-  - **Change round shipping fee → existing orders unaffected**
-  - Progress bar at 100% → 🎉
-  - Product with no goal_qty → no bar
-  - Product with stock = null → unlimited
-- [ ] **7.3** Mobile polish:
-  - All user pages in LINE in-app browser (iOS + Android)
-  - Sticky CartBar doesn't overlap
-  - Share panel copy + LINE share work on mobile
-  - Touch targets ≥ 44px
-  - **Shipping fee note readable on small screens**
-- [ ] **7.4** Error + loading states:
-  - Loading spinners on all buttons
-  - Network error handling (toast or inline, not blank screen)
-  - Empty states: no products, no orders, no suppliers, no pending shipments
-- [ ] **7.5** Final cleanup:
-  - Remove `console.log` / `debugger` / commented-out code
-  - Prettier all files
-  - No secrets in code
+- [x] **7.2** Edge cases (92 tests / 19 files):
+  - Route-level tests for submit-order, cancel-order, confirm-order, quick-confirm, report-payment, notify-arrival, batch-confirm, confirm-shipment, export-csv, lookup
+  - Extended suppliers DELETE coverage
+  - Covers: stock exhaustion, round closed, submission_key dedup, invalid fields, duplicate products, negative quantity, delivery without address, user vs admin cancel modes, batch partial success, CSV BOM/header/Chinese, zero-customer arrival
+- [x] **7.3** Mobile polish:
+  - ShippingFeeNote contrast improved (text-muted-foreground → text-gray-600)
+  - SharePanel clipboard error handling added
+- [x] **7.4** Error + loading states:
+  - Lookup page: error toasts on fetch failure
+  - CSV export: loading state + disabled button during export
+  - Product toggle: per-product disabled state during toggle
+  - POS form: client-side delivery address validation for 宅配
+  - SharePanel: clipboard .catch() with failure toast
+- [x] **7.5** Final cleanup:
+  - Prettier all source files
+  - No `console.log` / `debugger` / commented-out code
   - `.env.local` in `.gitignore`
-- [ ] **7.6** Write `prisma/seed.ts`:
-  - 2 suppliers, 1 round (with shipping_fee: 60), 5 products linked to suppliers, 2-3 test users
-  - Matches prototype mock data feel
+  - Checkpoint order fixed (build before tsc)
+- [x] **7.6** Rewrite `prisma/seed.ts`:
+  - Deterministic + rerunnable (cleans named fixtures only)
+  - 2 suppliers, 1 round (shipping_fee: 60), 5 products, 3 test users
+  - No ad-hoc console.log
 
 ### Checkpoint 7 (Final)
 
 ```bash
-npx tsc --noEmit     # must pass
+npm run build        # must pass (generates .next/types for tsc)
+npx tsc --noEmit     # must pass (requires prior build)
 npm run lint         # must pass
-npm run build        # must pass
-npx vitest run       # must pass (if tests exist)
+npx vitest run       # must pass
 ```
 
 **Verify:**

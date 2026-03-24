@@ -66,22 +66,28 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "submission_key must be a valid UUID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!round_id || typeof round_id !== "string" || !round_id.trim()) {
-      return NextResponse.json({ error: "round_id is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "round_id is required" },
+        { status: 400 },
+      );
     }
 
     const trimmedNickname = typeof nickname === "string" ? nickname.trim() : "";
     if (!trimmedNickname) {
-      return NextResponse.json({ error: "nickname is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "nickname is required" },
+        { status: 400 },
+      );
     }
     if (trimmedNickname.length > MAX_LEN.nickname) {
       return NextResponse.json(
         { error: `nickname must be ≤ ${MAX_LEN.nickname} chars` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -90,13 +96,13 @@ export async function POST(request: NextRequest) {
     if (!trimmedRecipientName) {
       return NextResponse.json(
         { error: "recipient_name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (trimmedRecipientName.length > MAX_LEN.recipient_name) {
       return NextResponse.json(
         { error: `recipient_name must be ≤ ${MAX_LEN.recipient_name} chars` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -107,7 +113,7 @@ export async function POST(request: NextRequest) {
     if (!PHONE_RE.test(trimmedPhone)) {
       return NextResponse.json(
         { error: "phone format is invalid" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -117,14 +123,14 @@ export async function POST(request: NextRequest) {
     if (!validPickupValues.has(pickupValue)) {
       return NextResponse.json(
         { error: "Invalid pickup_location" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "items must be a non-empty array" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -138,13 +144,13 @@ export async function POST(request: NextRequest) {
       ) {
         return NextResponse.json(
           { error: "Each item must have a product_id" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (seenProducts.has(item.product_id)) {
         return NextResponse.json(
           { error: "Duplicate products in order items" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       seenProducts.add(item.product_id);
@@ -156,7 +162,7 @@ export async function POST(request: NextRequest) {
       ) {
         return NextResponse.json(
           { error: "Each item must have a positive integer quantity" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -164,19 +170,20 @@ export async function POST(request: NextRequest) {
     // ─── Optional/conditional field checks ────────────────────
 
     const isDelivery = pickupValue === "";
-    const trimmedAddress = typeof address === "string" ? address.trim() : undefined;
-    
+    const trimmedAddress =
+      typeof address === "string" ? address.trim() : undefined;
+
     if (isDelivery && !trimmedAddress) {
       return NextResponse.json(
         { error: "address is required for delivery" },
-        { status: 400 }
+        { status: 400 },
       );
     }
-    
+
     if (trimmedAddress && trimmedAddress.length > MAX_LEN.address) {
       return NextResponse.json(
         { error: `address must be ≤ ${MAX_LEN.address} chars` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -184,15 +191,16 @@ export async function POST(request: NextRequest) {
     if (trimmedEmail && trimmedEmail.length > MAX_LEN.email) {
       return NextResponse.json(
         { error: `email must be ≤ ${MAX_LEN.email} chars` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const trimmedNote = typeof note === "string" ? note.trim() || undefined : undefined;
+    const trimmedNote =
+      typeof note === "string" ? note.trim() || undefined : undefined;
     if (trimmedNote && trimmedNote.length > MAX_LEN.note) {
       return NextResponse.json(
         { error: `note must be ≤ ${MAX_LEN.note} chars` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -220,7 +228,7 @@ export async function POST(request: NextRequest) {
         note: trimmedNote,
       },
       orderItems,
-      submission_key
+      submission_key,
     );
 
     if ("error" in result) {
@@ -229,9 +237,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { order: result.order },
-      { status: result.deduplicated ? 200 : 201 }
+      { status: result.deduplicated ? 200 : 201 },
     );
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

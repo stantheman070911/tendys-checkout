@@ -17,7 +17,7 @@ function createChannelSummary(): NotificationChannelSummary {
 }
 
 export function summarizeNotificationLogs(
-  logs: NotificationLog[]
+  logs: NotificationLog[],
 ): NotificationTypeSummary[] {
   const summaryByType = new Map<NotificationType, NotificationTypeSummary>();
 
