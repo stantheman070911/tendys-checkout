@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
-import { createUser, findByNickname, upsertByNickname } from "@/lib/db/users";
-import { createWithItems } from "@/lib/db/orders";
+import { createCheckoutOrder } from "@/lib/db/orders";
 import { PICKUP_OPTIONS } from "@/constants";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -19,50 +18,6 @@ const MAX_LEN = {
 } as const;
 
 const validPickupValues = new Set(PICKUP_OPTIONS.map((o) => o.value));
-
-function normalizePhone(value: string | null | undefined): string {
-  return (value ?? "").replace(/\D/g, "");
-}
-
-function normalizeText(value: string | null | undefined): string {
-  return (value ?? "").trim();
-}
-
-function normalizeEmail(value: string | null | undefined): string {
-  return normalizeText(value).toLowerCase();
-}
-
-function isUniqueConstraintError(error: unknown): error is { code: string } {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "P2002"
-  );
-}
-
-function hasPublicProfileConflict(
-  existingUser: {
-    phone?: string | null;
-    recipient_name?: string | null;
-    address?: string | null;
-    email?: string | null;
-  },
-  nextUser: {
-    phone?: string | undefined;
-    recipient_name?: string | undefined;
-    address?: string | undefined;
-    email?: string | undefined;
-  },
-): boolean {
-  return (
-    normalizePhone(existingUser.phone) !== normalizePhone(nextUser.phone) ||
-    normalizeText(existingUser.recipient_name) !==
-      normalizeText(nextUser.recipient_name) ||
-    normalizeText(existingUser.address) !== normalizeText(nextUser.address) ||
-    normalizeEmail(existingUser.email) !== normalizeEmail(nextUser.email)
-  );
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -282,52 +237,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ─── Upsert user ────────────────────────────────────────
-
-    const existingUser = await findByNickname(trimmedNickname);
-    const userData = {
-      recipient_name: trimmedRecipientName,
-      phone: trimmedPhone,
-      address: trimmedAddress,
-      email: trimmedEmail,
-    };
-
-    const user = existingUser
-      ? isAdmin
-        ? await upsertByNickname(trimmedNickname, userData)
-        : (() => {
-            if (hasPublicProfileConflict(existingUser, userData)) {
-              throw new Error("NICKNAME_CONFLICT");
-            }
-
-            return existingUser;
-          })()
-      : await (async () => {
-          try {
-            return await createUser({
-              nickname: trimmedNickname,
-              ...userData,
-            });
-          } catch (error) {
-            if (isUniqueConstraintError(error)) {
-              const concurrentUser = await findByNickname(trimmedNickname);
-              if (!concurrentUser) throw error;
-
-              if (isAdmin) {
-                return upsertByNickname(trimmedNickname, userData);
-              }
-
-              if (hasPublicProfileConflict(concurrentUser, userData)) {
-                throw new Error("NICKNAME_CONFLICT");
-              }
-
-              return concurrentUser;
-            }
-
-            throw error;
-          }
-        })();
-
     // ─── Create order ───────────────────────────────────────
 
     const orderItems = items.map((item) => ({
@@ -335,35 +244,51 @@ export async function POST(request: NextRequest) {
       quantity: item.quantity!,
     }));
 
-    const result = await createWithItems(
-      {
-        round_id: trimmedRoundId,
-        user_id: user.id,
-        pickup_location: pickupValue,
-        note: trimmedNote,
-      },
-      orderItems,
+    const result = await createCheckoutOrder({
+      round_id: trimmedRoundId,
+      pickup_location: pickupValue,
+      note: trimmedNote,
       submission_key,
-    );
+      items: orderItems,
+      is_admin: isAdmin,
+      user: {
+        nickname: trimmedNickname,
+        recipient_name: trimmedRecipientName,
+        phone: trimmedPhone,
+        address: trimmedAddress,
+        email: trimmedEmail,
+      },
+    });
 
-    if ("error" in result) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+    switch (result.kind) {
+      case "success":
+        return NextResponse.json(
+          { order: result.order },
+          { status: result.deduplicated ? 200 : 201 },
+        );
+      case "validation_error":
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      case "nickname_conflict":
+        return NextResponse.json(
+          {
+            error:
+              "This nickname already exists with different saved details. Use a different nickname or contact the organizer.",
+          },
+          { status: 409 },
+        );
+      case "schema_drift_access_code":
+        console.error(
+          "POST /api/submit-order blocked by schema drift: apply prisma/migration_007_remove_access_code.sql to the target database.",
+        );
+        return NextResponse.json(
+          {
+            error:
+              "Ordering is temporarily unavailable while the database migration is being applied. Please try again shortly.",
+          },
+          { status: 503 },
+        );
     }
-
-    return NextResponse.json(
-      { order: result.order },
-      { status: result.deduplicated ? 200 : 201 },
-    );
   } catch (error) {
-    if (error instanceof Error && error.message === "NICKNAME_CONFLICT") {
-      return NextResponse.json(
-        {
-          error:
-            "This nickname already exists with different saved details. Use a different nickname or contact the organizer.",
-        },
-        { status: 409 },
-      );
-    }
     console.error("POST /api/submit-order failed", error);
     return NextResponse.json(
       { error: "Internal server error" },

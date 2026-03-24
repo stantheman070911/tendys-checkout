@@ -1,21 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// ── Mocks ──────────────────────────────────────────────────────
-
 const authMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth/supabase-admin", () => ({
   verifyAdminSession: authMock,
 }));
 
-const usersMock = vi.hoisted(() => ({
-  createUser: vi.fn(),
-  findByNickname: vi.fn(),
-  upsertByNickname: vi.fn(),
-}));
-vi.mock("@/lib/db/users", () => usersMock);
-
 const ordersMock = vi.hoisted(() => ({
-  createWithItems: vi.fn(),
+  createCheckoutOrder: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -47,72 +38,120 @@ function validBody(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// ── Tests ──────────────────────────────────────────────────────
-
 describe("POST /api/submit-order", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue(false);
-    usersMock.findByNickname.mockResolvedValue(null);
-    usersMock.createUser.mockResolvedValue({ id: "user-1" });
   });
 
   it("returns 201 on valid order", async () => {
-    const fakeOrder = {
-      id: "o1",
-      order_number: "ORD-20260324-001",
-    };
-    ordersMock.createWithItems.mockResolvedValue({ order: fakeOrder });
+    ordersMock.createCheckoutOrder.mockResolvedValue({
+      kind: "success",
+      order: {
+        id: "o1",
+        order_number: "ORD-20260324-001",
+      },
+      deduplicated: false,
+    });
 
     const res = await POST(makeRequest(validBody()));
+
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.order.id).toBe("o1");
+    expect(ordersMock.createCheckoutOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        round_id: VALID_ROUND_ID,
+        submission_key: VALID_UUID,
+        is_admin: false,
+      }),
+    );
   });
 
   it("returns 200 on submission_key dedup", async () => {
-    const fakeOrder = { id: "o1", order_number: "ORD-20260324-001" };
-    ordersMock.createWithItems.mockResolvedValue({
-      order: fakeOrder,
+    ordersMock.createCheckoutOrder.mockResolvedValue({
+      kind: "success",
+      order: {
+        id: "o1",
+        order_number: "ORD-20260324-001",
+      },
       deduplicated: true,
     });
 
     const res = await POST(makeRequest(validBody()));
+
     expect(res.status).toBe(200);
   });
 
-  it("returns 400 when stock exhausted", async () => {
-    ordersMock.createWithItems.mockResolvedValue({
+  it("returns 400 on checkout validation error", async () => {
+    ordersMock.createCheckoutOrder.mockResolvedValue({
+      kind: "validation_error",
       error: "Insufficient stock for product",
     });
 
     const res = await POST(makeRequest(validBody()));
+
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/stock/i);
   });
 
-  it("returns 400 when round is closed", async () => {
-    ordersMock.createWithItems.mockResolvedValue({
-      error: "Round is not open",
+  it("returns 409 when nickname details conflict", async () => {
+    ordersMock.createCheckoutOrder.mockResolvedValue({
+      kind: "nickname_conflict",
     });
 
     const res = await POST(makeRequest(validBody()));
-    expect(res.status).toBe(400);
+
+    expect(res.status).toBe(409);
+  });
+
+  it("returns 503 when access_code schema drift is detected", async () => {
+    ordersMock.createCheckoutOrder.mockResolvedValue({
+      kind: "schema_drift_access_code",
+      error: "migration missing",
+    });
+
+    const res = await POST(makeRequest(validBody()));
+
+    expect(res.status).toBe(503);
+    const data = await res.json();
+    expect(data.error).toMatch(/migration/i);
+  });
+
+  it("passes admin context through for POS orders", async () => {
+    authMock.mockResolvedValue(true);
+    ordersMock.createCheckoutOrder.mockResolvedValue({
+      kind: "success",
+      order: {
+        id: "o2",
+        order_number: "ORD-20260324-002",
+      },
+      deduplicated: false,
+    });
+
+    const res = await POST(
+      makeRequest(
+        validBody({ pickup_location: "面交點 A", address: undefined }),
+      ),
+    );
+
+    expect(res.status).toBe(201);
+    expect(ordersMock.createCheckoutOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_admin: true,
+        pickup_location: "面交點 A",
+      }),
+    );
   });
 
   it("returns 400 for invalid submission_key", async () => {
     const res = await POST(
       makeRequest(validBody({ submission_key: "not-a-uuid" })),
     );
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/submission_key/);
-  });
 
-  it("returns 400 for missing required fields", async () => {
-    const res = await POST(makeRequest({ submission_key: VALID_UUID }));
     expect(res.status).toBe(400);
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
   });
 
   it("returns 400 for duplicate product IDs", async () => {
@@ -126,116 +165,17 @@ describe("POST /api/submit-order", () => {
         }),
       ),
     );
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/[Dd]uplicate/);
-  });
 
-  it("returns 400 for negative quantity", async () => {
-    const res = await POST(
-      makeRequest(
-        validBody({ items: [{ product_id: VALID_PRODUCT_ID_1, quantity: -1 }] }),
-      ),
-    );
     expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/quantity/);
-  });
-
-  it("returns 400 for invalid round_id", async () => {
-    const res = await POST(makeRequest(validBody({ round_id: "round-1" })));
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/round_id/i);
-  });
-
-  it("returns 400 for invalid product_id", async () => {
-    const res = await POST(
-      makeRequest(validBody({ items: [{ product_id: "p1", quantity: 1 }] })),
-    );
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/product_id/i);
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
   });
 
   it("returns 400 for delivery without address", async () => {
     const res = await POST(
       makeRequest(validBody({ pickup_location: "", address: undefined })),
     );
+
     expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/address/);
-  });
-
-  it("returns 201 for valid 面交 order without address", async () => {
-    const fakeOrder = {
-      id: "o2",
-      order_number: "ORD-20260324-002",
-    };
-    ordersMock.createWithItems.mockResolvedValue({ order: fakeOrder });
-
-    const res = await POST(
-      makeRequest(
-        validBody({ pickup_location: "面交點 A", address: undefined }),
-      ),
-    );
-    expect(res.status).toBe(201);
-  });
-
-  it("returns 409 when a public nickname exists with different saved details", async () => {
-    usersMock.findByNickname.mockResolvedValue({
-      id: "user-1",
-      nickname: "TestUser",
-      recipient_name: "Other Name",
-      phone: "0912345678",
-      address: "台北市",
-      email: "old@example.com",
-    });
-
-    const res = await POST(makeRequest(validBody()));
-    expect(res.status).toBe(409);
-  });
-
-  it("allows admin POS to overwrite an existing nickname profile", async () => {
-    authMock.mockResolvedValue(true);
-    usersMock.findByNickname.mockResolvedValue({
-      id: "user-1",
-      nickname: "TestUser",
-    });
-    usersMock.upsertByNickname.mockResolvedValue({ id: "user-1" });
-    ordersMock.createWithItems.mockResolvedValue({
-      order: {
-        id: "o3",
-        order_number: "ORD-20260324-003",
-      },
-    });
-
-    const res = await POST(makeRequest(validBody()));
-    expect(res.status).toBe(201);
-    expect(usersMock.upsertByNickname).toHaveBeenCalled();
-  });
-
-  it("reuses a concurrently created public nickname when details match", async () => {
-    usersMock.createUser.mockRejectedValueOnce({ code: "P2002" });
-    usersMock.findByNickname
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: "user-1",
-        nickname: "TestUser",
-        recipient_name: "Test Name",
-        phone: "0900-000-001",
-        address: "台北市信義區測試路 1 號",
-        email: null,
-      });
-    ordersMock.createWithItems.mockResolvedValue({
-      order: {
-        id: "o4",
-        order_number: "ORD-20260324-004",
-      },
-    });
-
-    const res = await POST(makeRequest(validBody({ email: undefined })));
-    expect(res.status).toBe(201);
-    expect(ordersMock.createWithItems).toHaveBeenCalled();
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
   });
 });

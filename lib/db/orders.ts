@@ -2,6 +2,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { normalizePhoneDigits } from "@/lib/utils";
 
+type TxClient = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
+
 const orderWithItemsInclude = {
   order_items: true,
 } as const satisfies Prisma.OrderInclude;
@@ -20,7 +25,94 @@ type OrderWithRelations = Prisma.OrderGetPayload<{
   include: typeof orderWithRelationsInclude;
 }>;
 
+type CheckoutUserRecord = {
+  id: string;
+  nickname: string;
+  recipient_name: string | null;
+  phone: string | null;
+  address: string | null;
+  email: string | null;
+};
+
+interface CheckoutUserInput {
+  nickname: string;
+  recipient_name: string;
+  phone: string;
+  address?: string;
+  email?: string;
+}
+
+interface CreateOrderData {
+  round_id: string;
+  user_id: string;
+  pickup_location: string;
+  note?: string;
+}
+
+interface CreateOrderItem {
+  product_id: string;
+  quantity: number;
+}
+
+export interface CreateCheckoutOrderInput {
+  round_id: string;
+  pickup_location: string;
+  note?: string;
+  submission_key: string;
+  items: CreateOrderItem[];
+  is_admin: boolean;
+  user: CheckoutUserInput;
+}
+
+export type CreateCheckoutOrderResult =
+  | {
+      kind: "success";
+      order: OrderWithItems;
+      deduplicated: boolean;
+    }
+  | {
+      kind: "validation_error";
+      error: string;
+    }
+  | {
+      kind: "nickname_conflict";
+    }
+  | {
+      kind: "schema_drift_access_code";
+      error: string;
+    };
+
+type CreateWithItemsResult =
+  | {
+      order: OrderWithItems;
+      deduplicated: boolean;
+    }
+  | {
+      error: string;
+    };
+
+type ResolveUserResult =
+  | {
+      kind: "success";
+      user: CheckoutUserRecord;
+    }
+  | {
+      kind: "nickname_conflict";
+    };
+
+// Thrown inside $transaction to trigger rollback while carrying a user-facing message
+class OrderValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OrderValidationError";
+  }
+}
+
 function normalizeRecipientName(value: string | null | undefined): string {
+  return (value ?? "").trim().toLocaleLowerCase();
+}
+
+function normalizeEmail(value: string | null | undefined): string {
   return (value ?? "").trim().toLocaleLowerCase();
 }
 
@@ -41,149 +133,346 @@ function orderMatchesPublicIdentity(
   );
 }
 
-// ─── Order Creation ──────────────────────────────────────────
-
-interface CreateOrderData {
-  round_id: string;
-  user_id: string;
-  pickup_location: string;
-  note?: string;
+function hasPublicProfileConflict(
+  existingUser: {
+    phone?: string | null;
+    recipient_name?: string | null;
+    address?: string | null;
+    email?: string | null;
+  },
+  nextUser: {
+    phone?: string | undefined;
+    recipient_name?: string | undefined;
+    address?: string | undefined;
+    email?: string | undefined;
+  },
+): boolean {
+  return (
+    normalizePhoneDigits(existingUser.phone) !==
+      normalizePhoneDigits(nextUser.phone) ||
+    normalizeRecipientName(existingUser.recipient_name) !==
+      normalizeRecipientName(nextUser.recipient_name) ||
+    (existingUser.address ?? "").trim() !== (nextUser.address ?? "").trim() ||
+    normalizeEmail(existingUser.email) !== normalizeEmail(nextUser.email)
+  );
 }
 
-interface CreateOrderItem {
-  product_id: string;
-  quantity: number;
-}
-
-// Thrown inside $transaction to trigger rollback while carrying a user-facing message
-class OrderValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "OrderValidationError";
+function errorMetaIncludesField(value: unknown, field: string): boolean {
+  if (typeof value === "string") return value.includes(field);
+  if (Array.isArray(value)) {
+    return value.some((entry) => errorMetaIncludesField(entry, field));
   }
+  if (value && typeof value === "object") {
+    return Object.values(value).some((entry) =>
+      errorMetaIncludesField(entry, field),
+    );
+  }
+  return false;
+}
+
+function isSchemaDriftAccessCodeError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2011" &&
+    errorMetaIncludesField(error.meta, "access_code")
+  );
+}
+
+function isUniqueConstraintError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
+async function findBySubmissionKeyTx(
+  tx: TxClient,
+  key: string,
+): Promise<OrderWithItems | null> {
+  return tx.order.findUnique({
+    where: { submission_key: key },
+    include: orderWithItemsInclude,
+  });
+}
+
+async function insertPublicUserIfMissing(
+  tx: TxClient,
+  nickname: string,
+  data: Omit<CheckoutUserInput, "nickname">,
+): Promise<CheckoutUserRecord | null> {
+  const users = await tx.$queryRaw<CheckoutUserRecord[]>`
+    INSERT INTO public.users (nickname, recipient_name, phone, address, email)
+    VALUES (
+      ${nickname},
+      ${data.recipient_name},
+      ${data.phone},
+      ${data.address ?? null},
+      ${data.email ?? null}
+    )
+    ON CONFLICT (nickname) DO NOTHING
+    RETURNING id, nickname, recipient_name, phone, address, email
+  `;
+
+  return users[0] ?? null;
+}
+
+async function upsertAdminUser(
+  tx: TxClient,
+  nickname: string,
+  data: Omit<CheckoutUserInput, "nickname">,
+): Promise<CheckoutUserRecord> {
+  const users = await tx.$queryRaw<CheckoutUserRecord[]>`
+    INSERT INTO public.users (nickname, recipient_name, phone, address, email)
+    VALUES (
+      ${nickname},
+      ${data.recipient_name},
+      ${data.phone},
+      ${data.address ?? null},
+      ${data.email ?? null}
+    )
+    ON CONFLICT (nickname) DO UPDATE
+    SET
+      recipient_name = EXCLUDED.recipient_name,
+      phone = EXCLUDED.phone,
+      address = EXCLUDED.address,
+      email = EXCLUDED.email
+    RETURNING id, nickname, recipient_name, phone, address, email
+  `;
+
+  return users[0]!;
+}
+
+async function resolveCheckoutUser(
+  tx: TxClient,
+  input: CreateCheckoutOrderInput,
+): Promise<ResolveUserResult> {
+  const userData = {
+    recipient_name: input.user.recipient_name,
+    phone: input.user.phone,
+    address: input.user.address,
+    email: input.user.email,
+  };
+
+  const existingUser = await tx.user.findUnique({
+    where: { nickname: input.user.nickname },
+  });
+
+  if (existingUser) {
+    if (input.is_admin) {
+      return {
+        kind: "success",
+        user: await upsertAdminUser(tx, input.user.nickname, userData),
+      };
+    }
+
+    return hasPublicProfileConflict(existingUser, userData)
+      ? { kind: "nickname_conflict" }
+      : { kind: "success", user: existingUser };
+  }
+
+  if (input.is_admin) {
+    return {
+      kind: "success",
+      user: await upsertAdminUser(tx, input.user.nickname, userData),
+    };
+  }
+
+  const insertedUser = await insertPublicUserIfMissing(
+    tx,
+    input.user.nickname,
+    userData,
+  );
+  if (insertedUser) {
+    return { kind: "success", user: insertedUser };
+  }
+
+  const concurrentUser = await tx.user.findUnique({
+    where: { nickname: input.user.nickname },
+  });
+  if (!concurrentUser) {
+    throw new Error(
+      `Failed to resolve nickname after insert conflict: ${input.user.nickname}`,
+    );
+  }
+
+  return hasPublicProfileConflict(concurrentUser, userData)
+    ? { kind: "nickname_conflict" }
+    : { kind: "success", user: concurrentUser };
+}
+
+async function createOrderInTx(
+  tx: TxClient,
+  data: CreateOrderData,
+  items: CreateOrderItem[],
+  submissionKey: string,
+): Promise<OrderWithItems> {
+  const round = await tx.round.findUnique({
+    where: { id: data.round_id },
+  });
+  if (!round || !round.is_open) {
+    throw new OrderValidationError("Round is not open");
+  }
+  if (round.deadline && new Date() > new Date(round.deadline)) {
+    throw new OrderValidationError("This round has closed");
+  }
+
+  const canonicalProducts = await tx.product.findMany({
+    where: { id: { in: items.map((item) => item.product_id) } },
+  });
+  const productMap = new Map(canonicalProducts.map((product) => [product.id, product]));
+
+  for (const item of items) {
+    const product = productMap.get(item.product_id);
+    if (!product) {
+      throw new OrderValidationError(`Product not found: ${item.product_id}`);
+    }
+    if (product.round_id !== data.round_id) {
+      throw new OrderValidationError(
+        `Product ${product.name} does not belong to this round`,
+      );
+    }
+    if (!product.is_active) {
+      throw new OrderValidationError(
+        `Product ${product.name} is no longer available`,
+      );
+    }
+  }
+
+  const resolvedItems = [];
+  let itemsTotal = 0;
+
+  for (const item of items) {
+    const product = productMap.get(item.product_id)!;
+
+    const updated = await tx.$executeRaw`
+      UPDATE products
+      SET stock = CASE WHEN stock IS NOT NULL THEN stock - ${item.quantity} ELSE stock END
+      WHERE id = ${item.product_id}::uuid AND (stock IS NULL OR stock >= ${item.quantity})
+    `;
+    if (updated === 0) {
+      throw new OrderValidationError(`Insufficient stock for ${product.name}`);
+    }
+
+    const subtotal = product.price * item.quantity;
+    itemsTotal += subtotal;
+    resolvedItems.push({
+      product_id: product.id,
+      product_name: product.name,
+      unit_price: product.price,
+      quantity: item.quantity,
+      subtotal,
+    });
+  }
+
+  const isDelivery = !data.pickup_location;
+  const shippingFee = isDelivery && round.shipping_fee ? round.shipping_fee : null;
+  const totalAmount = itemsTotal + (shippingFee ?? 0);
+
+  return tx.order.create({
+    data: {
+      user_id: data.user_id,
+      round_id: data.round_id,
+      total_amount: totalAmount,
+      shipping_fee: shippingFee,
+      pickup_location: data.pickup_location || null,
+      note: data.note || null,
+      submission_key: submissionKey,
+      order_items: {
+        create: resolvedItems,
+      },
+    },
+    include: orderWithItemsInclude,
+  });
 }
 
 export async function createWithItems(
   data: CreateOrderData,
   items: CreateOrderItem[],
   submissionKey: string,
-) {
+): Promise<CreateWithItemsResult> {
   try {
     return await prisma.$transaction(async (tx) => {
-      // 1. Dedup check
-      const existing = await tx.order.findUnique({
-        where: { submission_key: submissionKey },
-        include: { order_items: true },
-      });
+      const existing = await findBySubmissionKeyTx(tx, submissionKey);
       if (existing) return { order: existing, deduplicated: true };
 
-      // 2. Validate round is open + check deadline + get shipping fee
-      const round = await tx.round.findUnique({
-        where: { id: data.round_id },
-      });
-      if (!round || !round.is_open) {
-        throw new OrderValidationError("Round is not open");
-      }
-      if (round.deadline && new Date() > new Date(round.deadline)) {
-        throw new OrderValidationError("This round has closed");
-      }
-
-      // 2.5 Load canonical products for authoritative pricing/validation
-      const canonicalProducts = await tx.product.findMany({
-        where: { id: { in: items.map((i) => i.product_id) } },
-      });
-      const productMap = new Map(canonicalProducts.map((p) => [p.id, p]));
-
-      // 3a. Validate ALL products before any stock mutation
-      for (const item of items) {
-        const product = productMap.get(item.product_id);
-        if (!product) {
-          throw new OrderValidationError(
-            `Product not found: ${item.product_id}`,
-          );
-        }
-        if (product.round_id !== data.round_id) {
-          throw new OrderValidationError(
-            `Product ${product.name} does not belong to this round`,
-          );
-        }
-        if (!product.is_active) {
-          throw new OrderValidationError(
-            `Product ${product.name} is no longer available`,
-          );
-        }
-      }
-
-      // 3b. Atomic stock decrements + resolve line items
-      const resolvedItems = [];
-      let itemsTotal = 0;
-
-      for (const item of items) {
-        const product = productMap.get(item.product_id)!;
-
-        const updated = await tx.$executeRaw`
-          UPDATE products
-          SET stock = CASE WHEN stock IS NOT NULL THEN stock - ${item.quantity} ELSE stock END
-          WHERE id = ${item.product_id}::uuid AND (stock IS NULL OR stock >= ${item.quantity})
-        `;
-        if (updated === 0) {
-          throw new OrderValidationError(
-            `Insufficient stock for ${product.name}`,
-          );
-        }
-
-        const subtotal = product.price * item.quantity;
-        itemsTotal += subtotal;
-        resolvedItems.push({
-          product_id: product.id,
-          product_name: product.name,
-          unit_price: product.price,
-          quantity: item.quantity,
-          subtotal,
-        });
-      }
-
-      // 4. Calculate shipping fee (宅配 = empty pickup_location)
-      const isDelivery = !data.pickup_location;
-      const shippingFee =
-        isDelivery && round.shipping_fee ? round.shipping_fee : null;
-
-      // 5. Calculate total
-      const totalAmount = itemsTotal + (shippingFee ?? 0);
-
-      // 6. Create order + items
-      const order = await tx.order.create({
-        data: {
-          user_id: data.user_id,
-          round_id: data.round_id,
-          total_amount: totalAmount,
-          shipping_fee: shippingFee,
-          pickup_location: data.pickup_location || null,
-          note: data.note || null,
-          submission_key: submissionKey,
-          order_items: {
-            create: resolvedItems,
-          },
-        },
-        include: { order_items: true },
-      });
-
+      const order = await createOrderInTx(tx, data, items, submissionKey);
       return { order, deduplicated: false };
     });
   } catch (err) {
-    // Validation errors → { error } return (transaction already rolled back)
     if (err instanceof OrderValidationError) {
       return { error: err.message };
     }
-    // Safety net: submission_key unique violation (concurrent request)
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002"
-    ) {
+    if (isUniqueConstraintError(err)) {
       const existing = await findBySubmissionKey(submissionKey);
       if (existing) return { order: existing, deduplicated: true };
     }
     throw err;
+  }
+}
+
+export async function createCheckoutOrder(
+  input: CreateCheckoutOrderInput,
+): Promise<CreateCheckoutOrderResult> {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const existing = await findBySubmissionKeyTx(tx, input.submission_key);
+      if (existing) {
+        return {
+          kind: "success",
+          order: existing,
+          deduplicated: true,
+        };
+      }
+
+      const resolvedUser = await resolveCheckoutUser(tx, input);
+      if (resolvedUser.kind === "nickname_conflict") {
+        return resolvedUser;
+      }
+
+      const order = await createOrderInTx(
+        tx,
+        {
+          round_id: input.round_id,
+          user_id: resolvedUser.user.id,
+          pickup_location: input.pickup_location,
+          note: input.note,
+        },
+        input.items,
+        input.submission_key,
+      );
+
+      return {
+        kind: "success",
+        order,
+        deduplicated: false,
+      };
+    });
+  } catch (error) {
+    if (error instanceof OrderValidationError) {
+      return { kind: "validation_error", error: error.message };
+    }
+    if (isSchemaDriftAccessCodeError(error)) {
+      return {
+        kind: "schema_drift_access_code",
+        error:
+          "Order creation is temporarily unavailable because the database is missing migration_007_remove_access_code.sql.",
+      };
+    }
+    if (isUniqueConstraintError(error)) {
+      const existing = await findBySubmissionKey(input.submission_key);
+      if (existing) {
+        return {
+          kind: "success",
+          order: existing,
+          deduplicated: true,
+        };
+      }
+    }
+    throw error;
   }
 }
 
