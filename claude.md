@@ -18,7 +18,14 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 - Cart-bar secondary copy contrast was raised in `components/CartBar.tsx` to avoid marginal readability on weaker screens.
 - The redesign was visual only. Business logic and public/admin flows were intentionally preserved.
 - `/api/submit-order` now uses an atomic checkout path in `lib/db/orders.ts`: nickname resolution + user persistence + order creation happen in one transaction, and stale `orders.access_code` schema drift is surfaced as `503` instead of opaque `500`.
-- `components/PublicOrderPage.tsx` no longer flashes the manual verification form immediately after checkout redirect; it waits for the stored access auto-unlock attempt to finish first.
+- Admin auth is now a two-step model: Supabase still handles login, but `/api/admin/session` validates the access token once and establishes a signed `tendy_admin_session` cookie. Admin pages and routes now trust that cookie instead of re-checking Supabase on every request.
+- Admin pages now render server-first through `components/admin/AdminShell.tsx` and `lib/admin/server.ts`; the old client-only auth/round bootstrap waterfall was removed.
+- Admin dashboard/orders/shipments were reworked around backend aggregation and paginated list loaders instead of downloading full round datasets into the browser.
+- Public order access is now token/cookie based instead of `sessionStorage` based:
+  - `/api/submit-order` returns a signed detail URL for the created order
+  - `/api/lookup` returns signed detail URLs for each matched result
+  - `/api/public-order/access` validates the token or posted identity, sets an order-scoped httpOnly cookie, and redirects to clean `/order/[orderNumber]`
+  - `app/order/[orderNumber]/page.tsx` now renders server-first when that cookie is present
 - Public product progress now distinguishes **goal** from **sellout** for finite-stock items:
   - shared helper: `lib/progress-bar.ts`
   - finite-stock bars use stock ceiling as the track and render `成團目標` as a marker instead of filling to 100% at goal hit
@@ -32,7 +39,7 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
   - saved contact phone + shipping address after successful public verification
 - Public lookup no longer forces a second verification step before opening a matched order:
   - shared helper: `lib/public-order-access.ts`
-  - a verified `/lookup` search now caches session access for every matched order in that browser session
+  - `/api/lookup` now returns signed detail URLs for each matched order
   - direct `/order/[orderNumber]` visits still fall back to manual `purchaser_name + phone_last3` verification
   - lookup CTA copy now includes Chinese (`view detail / 查詢細節`) for lower-English users
 - Public checkout and public identity now use a stored-profile model instead of nickname-conflict rejection:
@@ -55,7 +62,10 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
   - `npx tsc --noEmit`
   - `npm run lint`
   - `npm run build`
-  - focused `npx vitest run ...` coverage for submit-order, round pickup config, public lookup/order detail flows, stock-cap progress math, and public-order access session handling
+  - focused `npx vitest run ...` coverage for submit-order, round pickup config, public lookup/order detail flows, stock-cap progress math, and public-order access token handling
+- Verified after the performance remediation follow-up:
+  - `npm run build`
+  - focused `vitest run` coverage for submit-order, lookup, public-order access, notify-arrival, and export-csv
 
 ### Primary Redesign Files
 
@@ -116,7 +126,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 ```
 app/
   page.tsx                      # Storefront
-  order/[orderNumber]/page.tsx  # Public order detail (auto-unlocks from checkout or verified lookup session; direct access still gated by order_number + purchaser_name + phone_last3)
+  order/[orderNumber]/page.tsx  # Public order detail (server-renders when the order-scoped access cookie exists; direct access still gated by order_number + purchaser_name + phone_last3)
   lookup/page.tsx               # Order lookup (purchaser_name + phone_last3)
   gtfo/page.tsx                 # Troll page for /admin snoopers
   admin/                        # ⚠️ NOT /admin (redirects to /gtfo). Real URL: /bitchassnigga (next.config.ts rewrites)
@@ -130,7 +140,7 @@ app/
     rounds/page.tsx             # Round management
     suppliers/page.tsx          # Supplier CRUD
   api/
-    admin/session/route.ts      # Auth probe (allowlist check)
+    admin/session/route.ts      # Validate Supabase token once, set/clear signed admin session cookie
     submit-order/route.ts       # Create order (dedup, stock check, shipping calc)
     report-payment/route.ts     # pending_payment → pending_confirm
     cancel-order/route.ts       # User cancel (pending_payment only) OR admin cancel (any status)
@@ -150,17 +160,19 @@ app/
     checkout-profile/lookup/route.ts # Public autofill: nickname + full phone
     users/lookup/route.ts       # Admin-only POS autofill
     lookup/route.ts             # Public: purchaser_name + phone_last3
-    lookup/order/route.ts       # Public: order_number + purchaser_name + phone_last3
+    public-order/access/route.ts # Public: signed order access handoff / manual unlock form
     line/webhook/route.ts       # LINE webhook (signature verify → order linking)
 lib/                            # Pure TypeScript — NO React/Next imports
   db/prisma.ts                  # globalThis singleton PrismaClient
   db/users.ts, orders.ts, products.ts, rounds.ts, suppliers.ts, notification-logs.ts
+  perf.ts                       # Opt-in slow-query logging helpers
   rate-limit.ts
   pickup-options.ts             # Round pickup option defaults + validation
   line/push.ts, webhook.ts, extract-order-number.ts, extract-order-binding.ts
   line/validate-order-code.ts, message-handler.ts
   notifications/email.ts, send.ts
-  auth/supabase-admin.ts, supabase-browser.ts
+  auth/signed-token.ts, auth/supabase-admin.ts, supabase-browser.ts
+  admin/server.ts               # Server-only admin session + chrome loaders
   admin/paths.ts, notification-summary.ts, order-search.ts, shipment-status.ts
   utils.ts                      # cn(), formatting, share URLs, calcOrderTotal
 components/
@@ -168,15 +180,15 @@ components/
   StorefrontClient.tsx, PublicOrderPage.tsx, ProductCard.tsx, ProgressBar.tsx
   CartBar.tsx, SharePanel.tsx, DeadlineBanner.tsx, OrderStatusBadge.tsx
   PaymentReportForm.tsx, CancelOrderButton.tsx, ShippingFeeNote.tsx
-  admin/OrderCard.tsx, POSForm.tsx, ProductAggregationTable.tsx
+  admin/AdminShell.tsx, OrderCard.tsx, POSForm.tsx, ProductAggregationTable.tsx
   admin/ProductForm.tsx, SupplierForm.tsx, ShipmentCard.tsx
-hooks/use-toast.ts, use-admin-session.ts, use-admin-fetch.ts
+hooks/use-toast.ts, use-admin-fetch.ts
 types/index.ts
 constants/index.ts              # Status enums, bank info keys
 prisma/
   schema.prisma                 # 8 models
   migration.sql                 # Initial (tables, triggers, RLS, views)
-  migration_002–009             # Incremental (line_user_id, notif context, single-open-round, line index, RLS hardening, remove access_code, round pickup labels, saved checkout profiles)
+  migration_002–011             # Incremental (line_user_id, notif context, single-open-round, line index, RLS hardening, remove access_code, round pickup labels, saved checkout profiles, public lookup indexes)
   seed.ts
 ```
 
@@ -188,7 +200,7 @@ prisma/
 Round               → id, name, is_open, deadline, shipping_fee, pickup_option_a, pickup_option_b, created_at
 Supplier            → id, name, contact_name, phone, email, note, created_at, updated_at
 Product             → id, round_id(FK), supplier_id(FK), name, price, unit, is_active, stock, goal_qty, image_url, created_at
-User                → id, nickname(INDEX), purchaser_name, recipient_name, phone, address, email, created_at, updated_at
+User                → id, nickname(INDEX), purchaser_name, purchaser_name_lower, recipient_name, phone, phone_digits, phone_last3, address, email, created_at, updated_at
 SavedCheckoutProfile → id, nickname(UNIQUE), purchaser_name, recipient_name, phone, address, email, created_at, updated_at
 Order               → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), line_user_id, created_at
 OrderItem           → id, order_id(FK), product_id(FK), product_name, unit_price, quantity, subtotal
@@ -229,11 +241,12 @@ Cancel stock restore: yes except `shipped`.
 - **Shipping fee**: `submit-order` snapshots `round.shipping_fee` on 宅配 orders. Never recalculate after creation.
 - **Pickup options**: `pickup_option_a` / `pickup_option_b` live on `Round`. `pickup_location` must be empty string (宅配) or match that round’s configured labels.
 - **Saved checkout profiles**: `saved_checkout_profiles` is the reusable autofill store keyed by `nickname`; `users` is now a per-order snapshot and is never reused across orders.
-- **Public access**: `/api/lookup` requires `purchaser_name + phone_last3`. A successful lookup may cache per-order session access client-side, but server truth for single-order actions remains `order_number + purchaser_name + phone_last3`. No internal UUIDs on public routes.
-- **Public order detail payload**: After public verification succeeds, `/api/lookup/order` may return saved phone + address for that order’s user so the customer can verify delivery details.
+- **Admin auth**: Supabase verifies identity once at login; the app then uses a signed `tendy_admin_session` cookie for admin page loads and admin API calls.
+- **Public access**: `/api/lookup` requires `purchaser_name + phone_last3` and returns signed order detail URLs. `/api/public-order/access` converts a valid token or manual identity submission into an order-scoped httpOnly cookie so `/order/[orderNumber]` can render server-first. No internal UUIDs on public routes.
+- **Public lookup columns**: `users.purchaser_name_lower`, `users.phone_digits`, and `users.phone_last3` are computed/write-time normalized fields used by public identity lookups and should stay in sync with `purchaser_name` / `phone`.
 - **LINE linking**: Per-order (not per-user). Webhook verifies all three fields. Idempotent. One order = one LINE account.
 - **Single-open-round**: Partial unique index. `create()` atomically closes existing open rounds. `update()` catches `P2002`.
-- **Order creation**: Two-phase — validate all products first, then decrement stock. `OrderValidationError` thrown inside `$transaction` triggers rollback.
+- **Order creation**: Two-phase — validate all products first, then decrement stock. Stock updates sort `product_id` first to reduce deadlock risk. `OrderValidationError` thrown inside `$transaction` triggers rollback.
 - **Arrival notifications**: Target customers by product, count by logical purchaser identity (`purchaser_name + normalized phone`, with legacy `recipient_name` fallback), not by nickname or delivery endpoints.
 
 ### RLS Policies
@@ -275,7 +288,7 @@ Public operations go through server-side API routes + Prisma, not direct anon ac
 - `cancel-order`: User mode (pending_payment, public auth) or admin mode (any status, with reason + notification). Restore stock except shipped.
 - `quick-confirm`: POS shortcut, `orderId` → confirmed + auto-fill payment fields.
 - `users/lookup`: **Admin-only**. Never expose to anonymous callers.
-- `lookup/order`: After successful public verification, returning the saved phone/address is acceptable; before verification, expose nothing.
+- `public-order/access`: Accept signed detail-token GET handoff or manual unlock POST, then set an order-scoped access cookie and redirect to `/order/[orderNumber]`.
 - `line/webhook`: Always returns 200. HMAC verify → `handleMessage()`.
 
 ### Git
@@ -363,10 +376,10 @@ All must pass. Fix failures before continuing.
 **Fix:** Moved nickname resolution + user persistence into the same transaction as order creation in `lib/db/orders.ts`. `/api/submit-order` now maps known `P2011 access_code` drift to `503` and names `migration_007_remove_access_code.sql`.
 **Rule:** Public/admin checkout user writes must be atomic with order creation. When Prisma exposes schema drift through typed errors/meta, return an explicit operator-facing failure instead of a generic `500`.
 
-### [2026-03-24] Public order page flashed verification UI before auto-unlock
-**Mistake:** Immediately after checkout redirect to `/order/[orderNumber]`, the page briefly rendered the manual verification form before consuming the just-saved sessionStorage access payload.
-**Fix:** `components/PublicOrderPage.tsx` now holds the page in a loading state until the stored access attempt succeeds or fails.
-**Rule:** If a page auto-consumes stored public access state, do not render fallback verification UI until that attempt has resolved.
+### [2026-03-25] Admin/public performance remediation changed auth and unlock flows
+**Mistake:** Admin routes re-validated Supabase on every request, admin pages booted from a client hydration/auth waterfall, and public order detail depended on a client-side `sessionStorage` unlock handoff.
+**Fix:** Admin now establishes a signed app-session cookie once and loads pages server-first. Public order detail now uses signed detail URLs plus order-scoped httpOnly cookies, so checkout/lookup can open `/order/[orderNumber]` server-first without a client unlock round-trip.
+**Rule:** Avoid client-only auth/bootstrap on hot paths. If the server can establish durable access context once, prefer cookie-backed server rendering over repeated client round-trips.
 
 ### [2026-03-24] Prisma include inference drift
 **Mistake:** Inferred Prisma return types worked at runtime but production build treated result as base `Order` without relations.

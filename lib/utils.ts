@@ -45,10 +45,6 @@ export function getPhoneLast3(phone: string | null | undefined): string {
   return digits.length >= 3 ? digits.slice(-3) : "";
 }
 
-export function getPublicOrderAccessSessionKey(orderNumber: string): string {
-  return `public-order-access:${orderNumber.toUpperCase()}`;
-}
-
 export function maskPhone(phone: string | null | undefined): string {
   if (!phone) return "";
   const digits = normalizePhoneDigits(phone);

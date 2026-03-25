@@ -173,13 +173,13 @@
   - `@fontsource/noto-sans-tc`
   - `@fontsource/noto-serif-tc`
 - 最近補強的流程細節：
-  - 訂單送出後導向 `/order/[orderNumber]` 時，先顯示 loading，不再短暫閃出手動驗證表單
+  - 訂單送出後與 `/lookup` 點入結果時，會走 signed detail URL → httpOnly cookie 的解鎖流程，`/order/[orderNumber]` 可直接 server-render，不再依賴 client-side 暫存解鎖資料
   - 公開訂單頁的 LINE 綁定區塊已加入「一鍵複製綁定內容」與直達官方 LINE OA 按鈕
   - 解鎖後的公開訂單頁會顯示聯絡電話與收貨地址
   - 面交點 A/B 已改為 round-level 設定，公開 checkout 與 admin POS 會同步反映
   - 有限庫存商品的進度條已改成以庫存上限為整條長度，`成團目標` 只作標記；達標不再等於視覺上「整條滿格」
   - 商品卡的 `剩餘` badge 已放大並提升對比，降低被忽略的機率
-  - `/lookup` 驗證一次後即可直接打開匹配訂單，不再在單筆訂單頁重複驗證；只有直接進入 `/order/[orderNumber]` 時才顯示手動驗證表單
+  - `/lookup` 驗證後收到的是可直接開啟詳情的 signed detail links，不再在單筆訂單頁重複驗證；只有直接進入 `/order/[orderNumber]` 時才顯示手動驗證表單
   - 查詢結果 CTA 已加上中文文案 `查詢細節`，避免只顯示英文 `view detail`
   - 公開 checkout 已改成 `暱稱 / 訂購人 / 收貨人` 三欄位，並加入 opt-in 的 `儲存資料，下次結帳自動帶入`
   - 公開 autofill 只有在 `暱稱 + 完整電話` 同時存在時才會觸發，資料源是 `saved_checkout_profiles`；完整電話門檻為 normalize 後至少 10 碼，未達門檻時不查詢也不顯示 phone mismatch
@@ -189,6 +189,9 @@
   - 首頁 hero pills 會顯示本團實際運費、`面交取貨免運`，以及跟隨 round 設定的面交點名稱
   - 商品卡的累計文案已改成 `已有 x被預訂，共有 y`，公開進度條同步改用 `庫存` / `已被預訂`
   - 商品卡圖面標題已移到圖片垂直中段；round window 的 `開放中` badge 改為固定單行
+  - admin dashboard / 訂單 / 待出貨 / 商品 / 開團 / 供應商頁已改成 server-first 載入，初始 round chrome 與 badge 不再卡在 client-side auth / hydration waterfall
+  - admin 訂單與待出貨已改成 server-side pagination + URL filter state，不再一次抓整團所有訂單再在瀏覽器過濾
+  - `通知到貨` 已改成背景派送，CSV 匯出改成分批串流，商品卡圖片改用 `next/image`
 - 這輪 UI 重構沒有改動核心流程或 API 契約；如果出現行為問題，先假設是既有邏輯問題，不是這次設計重構刻意改規格。
 
 ---

@@ -72,8 +72,8 @@
   - Added explicit `/api/submit-order` handling for stale `orders.access_code` schema drift, returning `503` with migration guidance instead of opaque `500`
   - Added focused route + DB tests for dedup, saved-profile phone mismatches, concurrent nickname reuse, and schema-drift detection
 - [x] **7.10** Public order redirect polish
-  - Replaced the post-checkout verification-form flash with a loading state while stored order access is being auto-consumed
-  - This later evolved into the current `purchaser_name + phone_last3` public auth rule; the core UX goal stayed the same in `components/PublicOrderPage.tsx`
+  - Replaced the post-checkout/client-side unlock handoff with signed public access links + order-scoped cookies
+  - `/order/[orderNumber]` now renders server-first after checkout or lookup access, while direct visits still fall back to manual `purchaser_name + phone_last3` verification
 - [x] **7.11** Configurable pickup points per round
   - Added `pickup_option_a` + `pickup_option_b` to `Round` in Prisma, shared types, seed data, and Supabase SQL
   - Added manual migration file `prisma/migration_008_round_pickup_options.sql` for live databases
@@ -81,14 +81,14 @@
   - Updated order creation validation so `pickup_location` must match the round’s configured pickup labels
 - [x] **7.12** Public order detail polish
   - Added one-click LINE binding copy and a direct official LINE OA button on the public order detail page
-  - Extended `/api/lookup/order` to return saved contact phone + shipping address after successful public verification, and surfaced both on the unlocked order detail view
+  - Unlocked order detail now renders saved contact phone + shipping address directly on the server after access verification
 - [x] **7.13** Stock-cap progress bar clarification
   - Added shared progress-bar math helper in `lib/progress-bar.ts`
   - Finite-stock products now use stock ceiling as the bar length and render `成團目標` as a marker instead of filling the whole bar at goal hit
   - Raised storefront `餘量` badge size/contrast for urgency and updated admin products/suppliers to share the same stock-cap logic
 - [x] **7.14** Lookup single-verification flow
-  - Added shared public-order session helper in `lib/public-order-access.ts`
-  - A verified `/lookup` search now caches access for all matched orders in the current browser session, so opening a result no longer asks for the same identity twice
+  - Added signed public-order access helpers in `lib/public-order-access.ts`
+  - `/api/lookup` now returns signed detail URLs so opening a matched result no longer requires a second identity round-trip
   - Direct `/order/[orderNumber]` visits still fall back to manual verification, and lookup CTA/copy was localized with Chinese support (`查詢細節`)
 - [x] **7.15** Public checkout + storefront copy clarification
   - Storefront delivery wording now says `宅配到以下地址`
@@ -109,9 +109,16 @@
   - Added focused route and DB tests for incomplete-phone autofill requests, cross-nickname same-customer dedupe, and legacy purchaser-name fallback
 - [x] **7.19** Admin mutation refresh follow-up
   - Replaced the remaining `onRefresh()`-driven admin order/shipment mutation flows with parent-owned optimistic state updates
-  - Added debounced silent background revalidation for orders and shipments, keeping the last good UI visible if background sync fails
+  - Removed the old full-list background revalidation pattern in favor of paginated server refresh only when authoritative sync is still needed
   - Added shared admin order-state helpers and focused Vitest coverage for replacement, batch status transitions, skipped-id shipment removal, and pending badge math
   - Verified after follow-up review fixes with `npm run build`, `npx tsc --noEmit`, `npm run lint`, and `npx vitest run` (29 files / 145 tests)
+- [x] **7.20** Full-stack performance remediation
+  - Admin auth now establishes a signed app session cookie once via `/api/admin/session`, removing repeated Supabase validation from the hot path
+  - Admin dashboard, orders, shipments, products, rounds, and suppliers now render server-first; initial round chrome and badge counts load on the server instead of a client hydration waterfall
+  - Admin orders and shipments now use server-side pagination + URL state, and the dashboard uses backend aggregation helpers instead of downloading full round datasets into the browser
+  - Public lookup/order access now uses normalized indexed identity columns plus signed access tokens/cookies; `/api/lookup/order` and the old `sessionStorage` unlock path were removed
+  - Arrival notifications now dispatch in background with bounded concurrency, CSV export streams in batches, checkout stock updates acquire product locks in deterministic order, and storefront product cards use optimized `next/image`
+  - Added `prisma/migration_011_public_lookup_indexes.sql` for live databases and opt-in query timing logs around the remaining `product_progress` / under-goal checks
 
 ### Checkpoint 7 (Final)
 
