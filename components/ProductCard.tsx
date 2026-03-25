@@ -21,6 +21,7 @@ export function ProductCard({
   onRemove,
   disabled,
 }: ProductCardProps) {
+  const currentQty = product.current_qty + cartQty;
   const atStockLimit = product.stock !== null && cartQty >= product.stock;
   const outOfStock = product.stock !== null && product.stock <= 0;
   const remainingStock =
@@ -64,7 +65,7 @@ export function ProductCard({
             </div>
             {remainingStock !== null && !outOfStock && (
               <span className="rounded-full border border-[rgba(255,244,234,0.42)] bg-[rgba(116,48,28,0.9)] px-4 py-2 text-sm font-semibold tracking-[0.04em] text-[rgba(255,248,242,0.98)] shadow-[0_18px_36px_-18px_rgba(52,21,12,0.72)] backdrop-blur-sm">
-                餘量 {remainingStock}
+                剩餘 {remainingStock}
                 {product.unit}
               </span>
             )}
@@ -122,21 +123,26 @@ export function ProductCard({
             </div>
 
             <ProgressBar
-              currentQty={product.current_qty + cartQty}
+              currentQty={currentQty}
               goalQty={product.goal_qty}
               stockLimitQty={stockLimitQty}
               unit={product.unit}
+              copyVariant="storefront"
             />
           </div>
 
-          <div className="flex items-center justify-between gap-3 text-xs text-[hsl(var(--muted-foreground))]">
-            <span>已預訂 {product.current_qty + cartQty}{product.unit}</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+            <span className="min-w-0 flex-1">
+              {stockLimitQty !== null
+                ? `已有 ${currentQty}${product.unit}被預訂，共有 ${stockLimitQty}${product.unit}`
+                : `已被預訂 ${currentQty}${product.unit}`}
+            </span>
             {atStockLimit && !outOfStock ? (
-              <span className="rounded-full border border-[rgba(184,132,71,0.2)] bg-[rgba(242,228,203,0.8)] px-2.5 py-1 font-medium text-[rgb(120,84,39)]">
-                已達庫存上限
+              <span className="shrink-0 rounded-full border border-[rgba(184,132,71,0.2)] bg-[rgba(242,228,203,0.8)] px-2.5 py-1 font-medium text-[rgb(120,84,39)]">
+                已達庫存
               </span>
             ) : (
-              <span>新鮮直送</span>
+              <span className="shrink-0">新鮮直送</span>
             )}
           </div>
         </div>

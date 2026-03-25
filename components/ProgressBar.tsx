@@ -6,6 +6,7 @@ interface ProgressBarProps {
   goalQty: number | null;
   stockLimitQty?: number | null;
   unit?: string;
+  copyVariant?: "default" | "storefront";
 }
 
 export function ProgressBar({
@@ -13,6 +14,7 @@ export function ProgressBar({
   goalQty,
   stockLimitQty,
   unit = "份",
+  copyVariant = "default",
 }: ProgressBarProps) {
   const metrics = getProgressBarMetrics({ currentQty, goalQty, stockLimitQty });
 
@@ -60,7 +62,8 @@ export function ProgressBar({
     <div className="mt-3 space-y-2">
       <div className="flex items-center justify-between gap-3 text-[11px] tracking-[0.06em]">
         <span className="rounded-full border border-[rgba(177,140,92,0.22)] bg-[rgba(255,251,246,0.88)] px-2.5 py-1 font-semibold text-[hsl(var(--ink))]">
-          庫存上限 {metrics.stockLimitQty}
+          {copyVariant === "storefront" ? "庫存" : "庫存上限"}{" "}
+          {metrics.stockLimitQty}
           {unit}
         </span>
         <span
@@ -70,7 +73,8 @@ export function ProgressBar({
               : "text-[hsl(var(--muted-foreground))]"
           }`}
         >
-          已預訂 {metrics.currentQty}/{metrics.stockLimitQty}
+          {copyVariant === "storefront" ? "已被預訂" : "已預訂"}{" "}
+          {metrics.currentQty}/{metrics.stockLimitQty}
           {unit}
         </span>
       </div>

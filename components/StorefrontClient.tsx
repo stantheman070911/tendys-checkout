@@ -18,6 +18,8 @@ import { SharePanel } from "@/components/SharePanel";
 import { ShippingFeeNote } from "@/components/ShippingFeeNote";
 import {
   DELIVERY_SELECT_SENTINEL,
+  DELIVERY_PICKUP_VALUE,
+  getRoundPickupConfig,
   getRoundPickupOptions,
 } from "@/lib/pickup-options";
 import {
@@ -48,8 +50,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const [submissionKey, setSubmissionKey] = useState<string | null>(null);
 
   // Form state
-  const [nickname, setNickname] = useState("");
-  const [recipientName, setRecipientName] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
@@ -59,7 +60,16 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const [note, setNote] = useState("");
 
   // Derived
-  const pickupOptions = getRoundPickupOptions(round);
+  const pickupConfig = getRoundPickupConfig(round);
+  const pickupOptions = getRoundPickupOptions(round).map((option) =>
+    option.value === DELIVERY_PICKUP_VALUE
+      ? { ...option, label: "宅配到以下地址" }
+      : option,
+  );
+  const heroShippingLabel =
+    round.shipping_fee !== null
+      ? `本團運費 ${round.shipping_fee}元`
+      : "本團運費待設定";
   const isDelivery = pickupLocation === DELIVERY_SELECT_SENTINEL;
   const shippingFee =
     isDelivery && round.shipping_fee ? round.shipping_fee : null;
@@ -125,16 +135,11 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     e.preventDefault();
     if (submitting || cartItems.length === 0) return;
 
-    const trimmedNickname = nickname.trim();
-    const trimmedName = recipientName.trim();
+    const trimmedCustomerName = customerName.trim();
     const trimmedPhone = phone.trim();
 
-    if (!trimmedNickname) {
-      toast({ title: "請輸入暱稱", variant: "destructive" });
-      return;
-    }
-    if (!trimmedName) {
-      toast({ title: "請輸入收件人姓名", variant: "destructive" });
+    if (!trimmedCustomerName) {
+      toast({ title: "請輸入訂購人/收貨人", variant: "destructive" });
       return;
     }
     if (!trimmedPhone) {
@@ -152,8 +157,8 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           round_id: round.id,
-          nickname: trimmedNickname,
-          recipient_name: trimmedName,
+          nickname: trimmedCustomerName,
+          recipient_name: trimmedCustomerName,
           phone: trimmedPhone,
           address: address.trim() || undefined,
           email: email.trim() || undefined,
@@ -176,7 +181,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         getPublicOrderAccessSessionKey(orderNumber),
         serializePublicOrderAccess(
           {
-            recipient_name: trimmedName,
+            recipient_name: trimmedCustomerName,
             phone_last3: getPhoneLast3(trimmedPhone),
           },
           "checkout",
@@ -227,13 +232,11 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
 
               <div className="flex flex-wrap gap-2.5">
                 <span className="lux-pill">{products.length} 款商品</span>
+                <span className="lux-pill">{heroShippingLabel}</span>
+                <span className="lux-pill">面交取貨免運</span>
                 <span className="lux-pill">
-                  {round.shipping_fee
-                    ? `宅配運費 ${formatCurrency(round.shipping_fee)}`
-                    : "依團務設定運費"}
-                </span>
-                <span className="lux-pill">
-                  面交點：{round.pickup_option_a} / {round.pickup_option_b}
+                  面交點：{pickupConfig.pickup_option_a} /{" "}
+                  {pickupConfig.pickup_option_b}
                 </span>
                 {roundClosed && (
                   <span className="lux-pill border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] text-[rgb(140,67,56)]">
@@ -365,26 +368,14 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                 </div>
 
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
-                      LINE 暱稱
-                    </label>
-                    <Input
-                      value={nickname}
-                      onChange={(e) => setNickname(e.target.value)}
-                      placeholder="你在群組的暱稱"
-                      required
-                    />
-                  </div>
-
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
-                        收貨人
+                        訂購人/收貨人
                       </label>
                       <Input
-                        value={recipientName}
-                        onChange={(e) => setRecipientName(e.target.value)}
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
                         placeholder="真實姓名"
                         required
                       />
