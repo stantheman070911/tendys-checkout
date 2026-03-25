@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { getLogsByRound } from "@/lib/db/notification-logs";
+import {
+  parseSearchParams,
+  requiredTrimmedStringSchema,
+  z,
+} from "@/lib/validation";
+
+const notificationLogsQuerySchema = z.object({
+  roundId: requiredTrimmedStringSchema("roundId"),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,15 +18,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const roundId = request.nextUrl.searchParams.get("roundId");
-    if (!roundId || !roundId.trim()) {
-      return NextResponse.json(
-        { error: "roundId is required" },
-        { status: 400 },
-      );
+    const parsedQuery = parseSearchParams(
+      request.nextUrl.searchParams,
+      notificationLogsQuerySchema,
+    );
+    if (!parsedQuery.success) {
+      return parsedQuery.response;
     }
 
-    const logs = await getLogsByRound(roundId.trim());
+    const logs = await getLogsByRound(parsedQuery.data.roundId);
     return NextResponse.json({ logs });
   } catch {
     return NextResponse.json(

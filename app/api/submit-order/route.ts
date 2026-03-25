@@ -5,6 +5,10 @@ import {
   buildPublicOrderPath,
   createPublicOrderAccessCookie,
 } from "@/lib/public-order-access";
+import {
+  getPublicOrderAccessSecret,
+  isEnvironmentConfigurationError,
+} from "@/lib/server-env";
 import { getPhoneLast3 } from "@/lib/utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -33,7 +37,17 @@ export async function POST(request: NextRequest) {
     const isAdmin = await verifyAdminSession(request);
     if (!isAdmin) {
       const clientIp = getClientIp(request);
-      const rateLimit = checkRateLimit(`submit-order:${clientIp}`, 5, 60_000);
+      const rateLimit = await checkRateLimit(
+        `submit-order:${clientIp}`,
+        5,
+        60_000,
+      );
+      if (rateLimit.error === "backend_unavailable") {
+        return NextResponse.json(
+          { error: "Ordering is temporarily unavailable" },
+          { status: 503 },
+        );
+      }
       if (!rateLimit.allowed) {
         return NextResponse.json(
           { error: "Too many requests" },
@@ -272,6 +286,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    getPublicOrderAccessSecret();
+
     // ─── Create order ───────────────────────────────────────
 
     const orderItems = items.map((item) => ({
@@ -342,6 +358,13 @@ export async function POST(request: NextRequest) {
         );
     }
   } catch (error) {
+    if (isEnvironmentConfigurationError(error)) {
+      return NextResponse.json(
+        { error: "Ordering is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
     console.error("POST /api/submit-order failed", error);
     return NextResponse.json(
       { error: "Internal server error" },

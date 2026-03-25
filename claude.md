@@ -19,6 +19,8 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 - The redesign was visual only. Business logic and public/admin flows were intentionally preserved.
 - `/api/submit-order` now uses an atomic checkout path in `lib/db/orders.ts`: nickname resolution + user persistence + order creation happen in one transaction, and stale `orders.access_code` schema drift is surfaced as `503` instead of opaque `500`.
 - Admin auth is now a two-step model: Supabase still handles login, but `/api/admin/session` validates the access token once and establishes a signed `tendy_admin_session` cookie. Admin pages and routes now trust that cookie instead of re-checking Supabase on every request.
+- Admin session signing and public order-access signing now require separate secrets in production: `ADMIN_SESSION_SECRET` and `PUBLIC_ORDER_ACCESS_SECRET`. They no longer fall back to `SUPABASE_SERVICE_ROLE_KEY`.
+- Public abuse protection is now store-backed in production through Upstash Redis. Production deploys must provide `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, and optionally `RATE_LIMIT_PREFIX`.
 - Admin pages now render server-first through `components/admin/AdminShell.tsx` and `lib/admin/server.ts`; the old client-only auth/round bootstrap waterfall was removed.
 - Admin dashboard/orders/shipments were reworked around backend aggregation and paginated list loaders instead of downloading full round datasets into the browser.
 - Admin efficiency follow-up landed after review:
@@ -341,6 +343,10 @@ Public operations go through server-side API routes + Prisma, not direct anon ac
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client-side anon key (RLS-gated) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side service role (bypasses RLS) |
 | `ADMIN_EMAILS` | Comma-separated admin email allowlist |
+| `ADMIN_SESSION_SECRET` | Required in production; signs admin session cookies |
+| `PUBLIC_ORDER_ACCESS_SECRET` | Required in production; signs public order access tokens/cookies |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Required in production; shared rate-limit backend |
+| `RATE_LIMIT_PREFIX` | Optional Redis key prefix for rate-limit buckets |
 | `DATABASE_URL` | Supabase pooled connection (Prisma runtime) |
 | `DIRECT_URL` | Supabase direct connection (migrations) |
 | `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Email sending |
@@ -357,6 +363,7 @@ npm run build        # full build (generates .next/types needed by tsc)
 npx tsc --noEmit     # types (requires prior build)
 npm run lint         # eslint
 npx vitest run       # tests
+npm run test:e2e     # browser coverage for admin CSV + shipment print flows
 ```
 
 All must pass. Fix failures before continuing.

@@ -4,6 +4,42 @@ import { confirmShipment, batchConfirmShipment } from "@/lib/db/orders";
 import { mapWithConcurrency } from "@/lib/async";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendShipmentNotifications } from "@/lib/notifications/send";
+import { parseJsonBody, requiredTrimmedStringSchema, z } from "@/lib/validation";
+
+const confirmShipmentSingleSchema = z
+  .object({
+    orderId: requiredTrimmedStringSchema("orderId"),
+    orderIds: z.any().optional(),
+  })
+  .transform((value) => ({
+    mode: "single" as const,
+    orderId: value.orderId,
+  }));
+
+const confirmShipmentBatchSchema = z
+  .object({
+    orderId: z.any().optional(),
+    orderIds: z.array(z.string()).min(1, {
+      message: "Provide orderId (string) or orderIds (string[])",
+    }),
+  })
+  .transform((value) => ({
+    mode: "batch" as const,
+    orderIds: value.orderIds.map((id) => id.trim()),
+  }))
+  .superRefine((value, context) => {
+    if (value.orderIds.some((id) => !id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide orderId (string) or orderIds (string[])",
+      });
+    }
+  });
+
+const confirmShipmentSchema = z.union([
+  confirmShipmentSingleSchema,
+  confirmShipmentBatchSchema,
+]);
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,21 +48,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, confirmShipmentSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
-    const { orderId, orderIds } = body as {
-      orderId?: string;
-      orderIds?: string[];
-    };
-
-    // Single mode
-    if (orderId && typeof orderId === "string" && orderId.trim()) {
-      const order = await confirmShipment(orderId.trim());
+    if (parsedBody.data.mode === "single") {
+      const order = await confirmShipment(parsedBody.data.orderId);
       if (!order) {
         return NextResponse.json(
           { error: "Order not found or not in confirmed status" },
@@ -37,33 +65,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ order });
     }
 
-    // Batch mode
-    if (
-      Array.isArray(orderIds) &&
-      orderIds.length > 0 &&
-      orderIds.every((id) => typeof id === "string" && id.trim())
-    ) {
-      const trimmedIds = orderIds.map((id) => id.trim());
-      const shippedOrders = await batchConfirmShipment(trimmedIds);
-      const changedIds = new Set(shippedOrders.map((order) => order.id));
-      const skipped = trimmedIds.filter((id) => !changedIds.has(id));
+    const trimmedIds = parsedBody.data.orderIds;
+    const shippedOrders = await batchConfirmShipment(trimmedIds);
+    const changedIds = new Set(shippedOrders.map((order) => order.id));
+    const skipped = trimmedIds.filter((id) => !changedIds.has(id));
 
-      fireAndForget(() =>
-        mapWithConcurrency(shippedOrders, 10, (order) =>
-          sendShipmentNotifications(order, order.order_items),
-        ).then(() => undefined),
-      );
-
-      return NextResponse.json({
-        shipped: shippedOrders.length,
-        skipped,
-      });
-    }
-
-    return NextResponse.json(
-      { error: "Provide orderId (string) or orderIds (string[])" },
-      { status: 400 },
+    fireAndForget(() =>
+      mapWithConcurrency(shippedOrders, 10, (order) =>
+        sendShipmentNotifications(order, order.order_items),
+      ).then(() => undefined),
     );
+
+    return NextResponse.json({
+      shipped: shippedOrders.length,
+      skipped,
+    });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

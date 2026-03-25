@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyLineSignature } from "@/lib/line/webhook";
 import { handleMessage } from "@/lib/line/message-handler";
+import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 
 interface LineEvent {
   type: string;
@@ -32,15 +33,16 @@ export async function POST(request: NextRequest) {
         e.source?.userId,
     );
     if (messageEvents.length > 0) {
-      // Don't await — process in background so we return 200 immediately
-      void Promise.allSettled(
-        messageEvents.map((event) =>
-          handleMessage(
-            event.source!.userId!,
-            event.message!.text!,
-            event.replyToken,
+      fireAndForget(() =>
+        Promise.allSettled(
+          messageEvents.map((event) =>
+            handleMessage(
+              event.source!.userId!,
+              event.message!.text!,
+              event.replyToken,
+            ),
           ),
-        ),
+        ).then(() => undefined),
       );
     }
 

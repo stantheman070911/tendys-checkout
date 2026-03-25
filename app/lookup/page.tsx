@@ -13,6 +13,7 @@ interface OrderResult extends Pick<
   Order,
   "order_number" | "status" | "total_amount" | "shipping_fee" | "created_at"
 > {
+  detail_url: string;
   order_items: OrderItem[];
 }
 
@@ -21,10 +22,6 @@ export default function LookupPage() {
   const [purchaserName, setPurchaserName] = useState("");
   const [phoneLast3, setPhoneLast3] = useState("");
   const [results, setResults] = useState<OrderResult[]>([]);
-  const [lookupIdentity, setLookupIdentity] = useState<{
-    purchaserName: string;
-    phoneLast3: string;
-  } | null>(null);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
 
@@ -47,18 +44,12 @@ export default function LookupPage() {
       if (res.ok) {
         const data = await res.json();
         setResults(data.orders ?? []);
-        setLookupIdentity({
-          purchaserName: trimmedPurchaserName,
-          phoneLast3: trimmedPhoneLast3,
-        });
       } else {
         setResults([]);
-        setLookupIdentity(null);
         toast({ title: "查詢失敗", variant: "destructive" });
       }
     } catch {
       setResults([]);
-      setLookupIdentity(null);
       toast({ title: "網路錯誤，請稍後再試", variant: "destructive" });
     }
     setSearched(true);
@@ -136,63 +127,47 @@ export default function LookupPage() {
               找到 {results.length} 筆訂單
             </div>
             {results.map((result) => (
-              <form
+              <Link
                 key={result.order_number}
-                action="/api/public-order/access"
-                method="POST"
+                href={result.detail_url}
+                prefetch={false}
               >
-                <input type="hidden" name="order_number" value={result.order_number} />
-                <input
-                  type="hidden"
-                  name="purchaser_name"
-                  value={lookupIdentity?.purchaserName ?? ""}
-                />
-                <input
-                  type="hidden"
-                  name="phone_last3"
-                  value={lookupIdentity?.phoneLast3 ?? ""}
-                />
-                <button
-                  type="submit"
-                  className="w-full text-left"
-                >
-                  <div className="lux-panel lux-card-hover cursor-pointer space-y-3 p-4 md:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="lux-kicker">Order Number</div>
-                        <span className="font-mono text-sm font-semibold text-[hsl(var(--ink))]">
-                          {result.order_number}
-                        </span>
-                      </div>
-                      <OrderStatusBadge status={result.status as OrderStatus} />
-                    </div>
-                    <div className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                      {result.order_items
-                        .map((i) => `${i.product_name} × ${i.quantity}`)
-                        .join("、")}
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(177,140,92,0.16)] pt-3 text-sm">
-                      <span className="text-[hsl(var(--muted-foreground))]">
-                        商品小計{" "}
-                        {formatCurrency(
-                          result.total_amount - (result.shipping_fee ?? 0),
-                        )}
-                        {result.shipping_fee ? (
-                          <span className="ml-1 text-[hsl(var(--bronze))]">
-                            + {formatCurrency(result.shipping_fee)} 運費
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="font-display text-2xl text-[hsl(var(--ink))]">
-                        {formatCurrency(result.total_amount)}
+                <div className="lux-panel lux-card-hover cursor-pointer space-y-3 p-4 md:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="lux-kicker">Order Number</div>
+                      <span className="font-mono text-sm font-semibold text-[hsl(var(--ink))]">
+                        {result.order_number}
                       </span>
                     </div>
-                    <div className="text-right text-xs uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
-                      view detail / 查詢細節
-                    </div>
+                    <OrderStatusBadge status={result.status as OrderStatus} />
                   </div>
-                </button>
-              </form>
+                  <div className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                    {result.order_items
+                      .map((i) => `${i.product_name} × ${i.quantity}`)
+                      .join("、")}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(177,140,92,0.16)] pt-3 text-sm">
+                    <span className="text-[hsl(var(--muted-foreground))]">
+                      商品小計{" "}
+                      {formatCurrency(
+                        result.total_amount - (result.shipping_fee ?? 0),
+                      )}
+                      {result.shipping_fee ? (
+                        <span className="ml-1 text-[hsl(var(--bronze))]">
+                          + {formatCurrency(result.shipping_fee)} 運費
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="font-display text-2xl text-[hsl(var(--ink))]">
+                      {formatCurrency(result.total_amount)}
+                    </span>
+                  </div>
+                  <div className="text-right text-xs uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
+                    view detail / 查詢細節
+                  </div>
+                </div>
+              </Link>
             ))}
           </section>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,6 +17,9 @@ import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
 import { SharePanel } from "@/components/SharePanel";
 import { ShippingFeeNote } from "@/components/ShippingFeeNote";
+import { useCheckoutAutofill } from "@/hooks/use-checkout-autofill";
+import { useStorefrontCart } from "@/hooks/use-storefront-cart";
+import { useStorefrontCheckoutForm } from "@/hooks/use-storefront-checkout-form";
 import {
   DELIVERY_SELECT_SENTINEL,
   DELIVERY_PICKUP_VALUE,
@@ -28,8 +31,6 @@ import {
   calcOrderTotal,
   generateSubmissionKey,
   getPhoneLast3,
-  normalizePhoneDigits,
-  PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS,
 } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Round, ProductWithProgress, CartItem } from "@/types";
@@ -44,27 +45,30 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const { toast } = useToast();
   const checkoutRef = useRef<HTMLDivElement>(null);
 
-  // Cart state
-  const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
+  const { cart, cartItems, addToCart, removeFromCart } = useStorefrontCart();
+  const {
+    nickname,
+    setNickname,
+    purchaserName,
+    setPurchaserName,
+    recipientName,
+    setRecipientName,
+    phone,
+    setPhone,
+    address,
+    setAddress,
+    email,
+    setEmail,
+    pickupLocation,
+    setPickupLocation,
+    note,
+    setNote,
+    saveProfile,
+    setSaveProfile,
+  } = useStorefrontCheckoutForm();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submissionKey, setSubmissionKey] = useState<string | null>(null);
-
-  // Form state
-  const [nickname, setNickname] = useState("");
-  const [purchaserName, setPurchaserName] = useState("");
-  const [recipientName, setRecipientName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [email, setEmail] = useState("");
-  const [pickupLocation, setPickupLocation] = useState(
-    DELIVERY_SELECT_SENTINEL,
-  );
-  const [note, setNote] = useState("");
-  const [saveProfile, setSaveProfile] = useState(false);
-  const [autofillStatus, setAutofillStatus] = useState<
-    "idle" | "loading" | "matched" | "phone_mismatch" | "not_found"
-  >("idle");
 
   // Derived
   const pickupConfig = getRoundPickupConfig(round);
@@ -79,7 +83,6 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
       : "本團運費待設定";
   const isDelivery = pickupLocation === DELIVERY_SELECT_SENTINEL;
   const shippingFee = isDelivery ? round.shipping_fee : null;
-  const cartItems = Array.from(cart.values());
   const itemsTotal = cartItems.reduce((sum, i) => sum + i.subtotal, 0);
   const orderTotal = calcOrderTotal(cartItems, shippingFee);
   const anyUnderGoal = products.some(
@@ -88,110 +91,17 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const roundClosed =
     !round.is_open ||
     (round.deadline !== null && new Date(round.deadline) < new Date());
-  const nicknameTrimmed = nickname.trim();
-  const phoneDigits = normalizePhoneDigits(phone);
-  const canAutofill =
-    !!nicknameTrimmed &&
-    phoneDigits.length >= PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS;
-  const visibleAutofillStatus = canAutofill ? autofillStatus : "idle";
-
-  useEffect(() => {
-    if (!canAutofill) {
-      return;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      setAutofillStatus("loading");
-      try {
-        const res = await fetch("/api/checkout-profile/lookup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nickname: nicknameTrimmed,
-            phone: phone.trim(),
-          }),
-        });
-
-        if (!res.ok) {
-          if (!cancelled) {
-            setAutofillStatus("idle");
-          }
-          return;
-        }
-
-        const data = (await res.json()) as {
-          status: "matched" | "not_found" | "phone_mismatch";
-          profile?: {
-            purchaser_name?: string | null;
-            recipient_name?: string | null;
-            address?: string | null;
-            email?: string | null;
-          };
-        };
-
-        if (cancelled) return;
-
-        if (data.status === "matched" && data.profile) {
-          setPurchaserName(data.profile.purchaser_name ?? "");
-          setRecipientName(data.profile.recipient_name ?? "");
-          setAddress(data.profile.address ?? "");
-          setEmail(data.profile.email ?? "");
-          setAutofillStatus("matched");
-          return;
-        }
-
-        setAutofillStatus(data.status);
-      } catch {
-        if (!cancelled) {
-          setAutofillStatus("idle");
-        }
-      }
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [canAutofill, nicknameTrimmed, phone]);
-
-  // Cart actions
-  const addToCart = useCallback((product: ProductWithProgress) => {
-    setCart((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(product.id);
-      const currentQty = existing?.quantity ?? 0;
-      if (product.stock !== null && currentQty >= product.stock) return prev;
-      const newQty = currentQty + 1;
-      next.set(product.id, {
-        product_id: product.id,
-        product_name: product.name,
-        unit_price: product.price,
-        quantity: newQty,
-        subtotal: product.price * newQty,
-      });
-      return next;
+  const { autofillStatus, visibleAutofillStatus, resetAutofillStatus } =
+    useCheckoutAutofill({
+      nickname,
+      phone,
+      onMatchedProfile: (profile) => {
+        setPurchaserName(profile.purchaser_name ?? "");
+        setRecipientName(profile.recipient_name ?? "");
+        setAddress(profile.address ?? "");
+        setEmail(profile.email ?? "");
+      },
     });
-  }, []);
-
-  const removeFromCart = useCallback((productId: string) => {
-    setCart((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(productId);
-      if (!existing) return prev;
-      if (existing.quantity <= 1) {
-        next.delete(productId);
-      } else {
-        const newQty = existing.quantity - 1;
-        next.set(productId, {
-          ...existing,
-          quantity: newQty,
-          subtotal: existing.unit_price * newQty,
-        });
-      }
-      return next;
-    });
-  }, []);
 
   // Checkout open
   function handleCheckout() {
@@ -458,7 +368,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                         onChange={(e) => {
                           setNickname(e.target.value);
                           if (autofillStatus !== "idle") {
-                            setAutofillStatus("idle");
+                            resetAutofillStatus();
                           }
                         }}
                         placeholder="群組或熟客常用稱呼"
@@ -488,7 +398,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                         onChange={(e) => {
                           setPhone(e.target.value);
                           if (autofillStatus !== "idle") {
-                            setAutofillStatus("idle");
+                            resetAutofillStatus();
                           }
                         }}
                         placeholder="0912-345-678"

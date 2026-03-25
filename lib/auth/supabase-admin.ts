@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { verifyToken, signToken } from "@/lib/auth/signed-token";
+import { getAdminSessionSecret } from "@/lib/server-env";
 
 export const ADMIN_SESSION_COOKIE_NAME = "tendy_admin_session";
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
@@ -34,14 +35,6 @@ export function getSupabaseAnon(): SupabaseClient {
   return anonClient;
 }
 
-function getAdminSessionSecret() {
-  return (
-    process.env.ADMIN_SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    ""
-  );
-}
-
 function isAllowedAdminEmail(email: string) {
   const allowedEmailsStr = process.env.ADMIN_EMAILS || "";
   const allowedEmails = allowedEmailsStr
@@ -65,27 +58,23 @@ function parseCookieHeader(header: string | null, name: string) {
 }
 
 export function createAdminSessionValue(email: string) {
-  const secret = getAdminSessionSecret();
-  if (!secret) {
-    throw new Error("Missing ADMIN_SESSION_SECRET or SUPABASE_SERVICE_ROLE_KEY");
-  }
-
   return signToken(
     {
       email,
       exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_MAX_AGE_SECONDS,
     } satisfies AdminSessionClaims,
-    secret,
+    getAdminSessionSecret(),
   );
 }
 
 export function readAdminSessionValue(
   value: string | null | undefined,
 ): AdminSessionClaims | null {
-  const secret = getAdminSessionSecret();
-  if (!secret) return null;
+  if (!value) {
+    return null;
+  }
 
-  const claims = verifyToken<AdminSessionClaims>(value, secret);
+  const claims = verifyToken<AdminSessionClaims>(value, getAdminSessionSecret());
   if (!claims?.email || typeof claims.exp !== "number") {
     return null;
   }

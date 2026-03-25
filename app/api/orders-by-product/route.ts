@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { getOrdersByProduct } from "@/lib/db/orders";
+import {
+  parseSearchParams,
+  requiredTrimmedStringSchema,
+  z,
+} from "@/lib/validation";
+
+const ordersByProductQuerySchema = z.object({
+  productId: requiredTrimmedStringSchema("productId"),
+  roundId: requiredTrimmedStringSchema("roundId"),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,25 +19,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const productId = request.nextUrl.searchParams.get("productId");
-    const roundId = request.nextUrl.searchParams.get("roundId");
-
-    if (!productId || !productId.trim()) {
-      return NextResponse.json(
-        { error: "productId is required" },
-        { status: 400 },
-      );
-    }
-    if (!roundId || !roundId.trim()) {
-      return NextResponse.json(
-        { error: "roundId is required" },
-        { status: 400 },
-      );
+    const parsedQuery = parseSearchParams(
+      request.nextUrl.searchParams,
+      ordersByProductQuerySchema,
+    );
+    if (!parsedQuery.success) {
+      return parsedQuery.response;
     }
 
     const customers = await getOrdersByProduct(
-      productId.trim(),
-      roundId.trim(),
+      parsedQuery.data.productId,
+      parsedQuery.data.roundId,
     );
 
     return NextResponse.json({ customers });

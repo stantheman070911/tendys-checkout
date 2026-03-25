@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { toAdminOrderListRow } from "@/lib/admin/order-view";
 import { prisma } from "@/lib/db/prisma";
+import { decrementStock, restoreStock } from "@/lib/db/products";
 import { isValidRoundPickupLocation } from "@/lib/pickup-options";
 import { normalizePhoneDigits } from "@/lib/utils";
 import type { AdminOrderListRow } from "@/types";
@@ -70,6 +71,27 @@ type OrderWithAdminListRelations = Prisma.OrderGetPayload<{
   select: typeof orderWithAdminListSelect;
 }>;
 
+type AdminOrderListQueryRow = {
+  id: string;
+  order_number: string;
+  round_id: string | null;
+  total_amount: number;
+  shipping_fee: number | null;
+  status: string;
+  payment_amount: number | null;
+  payment_last5: string | null;
+  payment_reported_at: Date | null;
+  confirmed_at: Date | null;
+  shipped_at: Date | null;
+  pickup_location: string | null;
+  created_at: Date;
+  items_preview: string | null;
+  user_nickname: string | null;
+  user_purchaser_name: string | null;
+  user_recipient_name: string | null;
+  user_phone: string | null;
+};
+
 type CheckoutUserRecord = {
   id: string;
   nickname: string;
@@ -99,6 +121,12 @@ interface CreateOrderData {
 interface CreateOrderItem {
   product_id: string;
   quantity: number;
+}
+
+function sortByProductId<T extends { product_id: string | null }>(items: T[]) {
+  return [...items].sort((left, right) =>
+    (left.product_id ?? "").localeCompare(right.product_id ?? ""),
+  );
 }
 
 export interface PaginatedOrdersResult {
@@ -373,19 +401,13 @@ async function createOrderInTx(
 
   const resolvedItems = [];
   let itemsTotal = 0;
-  const sortedItems = [...items].sort((left, right) =>
-    left.product_id.localeCompare(right.product_id),
-  );
+  const sortedItems = sortByProductId(items);
 
   for (const item of sortedItems) {
     const product = productMap.get(item.product_id)!;
 
-    const updated = await tx.$executeRaw`
-      UPDATE products
-      SET stock = CASE WHEN stock IS NOT NULL THEN stock - ${item.quantity} ELSE stock END
-      WHERE id = ${item.product_id}::uuid AND (stock IS NULL OR stock >= ${item.quantity})
-    `;
-    if (updated === 0) {
+    const stockReserved = await decrementStock(item.product_id, item.quantity, tx);
+    if (!stockReserved) {
       throw new OrderValidationError(`Insufficient stock for ${product.name}`);
     }
 
@@ -689,20 +711,114 @@ export async function listPageByRound(input: {
   const page = Math.max(1, input.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 50));
   const where = buildAdminOrderWhere(input);
+  const searchTerm = input.search?.trim();
+  const conditions: Prisma.Sql[] = [Prisma.sql`o.round_id = ${input.roundId}::uuid`];
+
+  if (input.status) {
+    conditions.push(Prisma.sql`o.status = ${input.status}`);
+  }
+
+  if (input.productId) {
+    conditions.push(Prisma.sql`
+      EXISTS (
+        SELECT 1
+        FROM order_items oi_filter
+        WHERE oi_filter.order_id = o.id
+          AND oi_filter.product_id = ${input.productId}::uuid
+      )
+    `);
+  }
+
+  if (searchTerm) {
+    const searchLike = `%${searchTerm}%`;
+    conditions.push(Prisma.sql`
+      (
+        o.order_number ILIKE ${searchLike}
+        OR COALESCE(u.nickname, '') ILIKE ${searchLike}
+        OR COALESCE(u.purchaser_name, '') ILIKE ${searchLike}
+        OR COALESCE(u.recipient_name, '') ILIKE ${searchLike}
+        OR COALESCE(u.phone, '') LIKE ${searchLike}
+      )
+    `);
+  }
+
+  const whereSql = Prisma.join(conditions, " AND ");
 
   const [total, items] = await prisma.$transaction([
     prisma.order.count({ where }),
-    prisma.order.findMany({
-      where,
-      select: orderWithAdminListSelect,
-      orderBy: { created_at: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
+    prisma.$queryRaw<AdminOrderListQueryRow[]>(Prisma.sql`
+      SELECT
+        o.id,
+        o.order_number,
+        o.round_id,
+        o.total_amount,
+        o.shipping_fee,
+        o.status,
+        o.payment_amount,
+        o.payment_last5,
+        o.payment_reported_at,
+        o.confirmed_at,
+        o.shipped_at,
+        o.pickup_location,
+        o.created_at,
+        preview.items_preview,
+        u.nickname AS user_nickname,
+        u.purchaser_name AS user_purchaser_name,
+        u.recipient_name AS user_recipient_name,
+        u.phone AS user_phone
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.user_id
+      LEFT JOIN LATERAL (
+        SELECT
+          string_agg(
+            oi.product_name || ' ×' || oi.quantity::text,
+            '、'
+            ORDER BY oi.id
+          ) AS items_preview
+        FROM order_items oi
+        WHERE oi.order_id = o.id
+      ) preview ON true
+      WHERE ${whereSql}
+      ORDER BY o.created_at DESC
+      OFFSET ${(page - 1) * pageSize}
+      LIMIT ${pageSize}
+    `),
   ]);
 
   return {
-    items: items.map((item) => toAdminOrderListRow(item)),
+    items: items.map((item) =>
+      toAdminOrderListRow({
+        id: item.id,
+        order_number: item.order_number,
+        round_id: item.round_id,
+        total_amount: item.total_amount,
+        shipping_fee: item.shipping_fee,
+        status: item.status,
+        payment_amount: item.payment_amount,
+        payment_last5: item.payment_last5,
+        payment_reported_at: item.payment_reported_at,
+        confirmed_at: item.confirmed_at,
+        shipped_at: item.shipped_at,
+        pickup_location: item.pickup_location,
+        created_at: item.created_at,
+        items_preview: item.items_preview ?? "",
+        user: item.user_nickname
+          ? {
+              nickname: item.user_nickname,
+              purchaser_name: item.user_purchaser_name,
+              recipient_name: item.user_recipient_name,
+              phone: item.user_phone,
+            }
+          : item.user_purchaser_name || item.user_recipient_name || item.user_phone
+            ? {
+                nickname: item.user_nickname,
+                purchaser_name: item.user_purchaser_name,
+                recipient_name: item.user_recipient_name,
+                phone: item.user_phone,
+              }
+            : null,
+      }),
+    ),
     total,
     page,
     pageSize,
@@ -982,13 +1098,9 @@ export async function cancelOrder(
 
     // Restore stock for each item (skip for shipped orders — product already sent)
     if (order.status !== "shipped") {
-      for (const item of order.order_items) {
+      for (const item of sortByProductId(order.order_items)) {
         if (item.product_id) {
-          await tx.$executeRaw`
-            UPDATE products
-            SET stock = CASE WHEN stock IS NOT NULL THEN stock + ${item.quantity} ELSE stock END
-            WHERE id = ${item.product_id}::uuid
-          `;
+          await restoreStock(item.product_id, item.quantity, tx);
         }
       }
     }

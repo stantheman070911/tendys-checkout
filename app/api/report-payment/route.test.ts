@@ -8,6 +8,12 @@ const ordersMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
+const rateLimitMock = vi.hoisted(() => ({
+  checkRateLimit: vi.fn(),
+  getClientIp: vi.fn(() => "127.0.0.1"),
+}));
+vi.mock("@/lib/rate-limit", () => rateLimitMock);
+
 import { POST } from "./route";
 
 function makeRequest(body: unknown) {
@@ -23,6 +29,10 @@ function makeRequest(body: unknown) {
 describe("POST /api/report-payment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    rateLimitMock.checkRateLimit.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+    });
   });
 
   it("returns 200 on valid payment report", async () => {

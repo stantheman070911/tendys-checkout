@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { getConfirmedShipmentPrintOrdersByIds } from "@/lib/db/orders";
+import {
+  parseJsonBody,
+  requiredTrimmedStringSchema,
+  z,
+} from "@/lib/validation";
 
 const MAX_PRINT_BATCH_SIZE = 50;
+const printBatchSchema = z
+  .object({
+    roundId: requiredTrimmedStringSchema("roundId"),
+    orderIds: z.array(z.string()).min(1, {
+      message: "orderIds must be a non-empty array of strings",
+    }),
+  })
+  .transform((value) => ({
+    roundId: value.roundId,
+    orderIds: Array.from(
+      new Set(value.orderIds.map((id) => id.trim()).filter(Boolean)),
+    ),
+  }))
+  .superRefine((value, context) => {
+    if (value.orderIds.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "orderIds must be a non-empty array of strings",
+      });
+    }
+  });
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,40 +37,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, printBatchSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
-    const { orderIds, roundId } = body as {
-      orderIds?: string[];
-      roundId?: string;
-    };
-    const trimmedRoundId = typeof roundId === "string" ? roundId.trim() : "";
-
-    if (!trimmedRoundId) {
-      return NextResponse.json(
-        { error: "roundId is required" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      !Array.isArray(orderIds) ||
-      orderIds.length === 0 ||
-      !orderIds.every((id) => typeof id === "string" && id.trim())
-    ) {
-      return NextResponse.json(
-        { error: "orderIds must be a non-empty array of strings" },
-        { status: 400 },
-      );
-    }
-
-    const trimmedIds = Array.from(
-      new Set(orderIds.map((id) => id.trim()).filter(Boolean)),
-    );
+    const { roundId, orderIds: trimmedIds } = parsedBody.data;
     if (trimmedIds.length > MAX_PRINT_BATCH_SIZE) {
       return NextResponse.json(
         {
@@ -55,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     const orders = await getConfirmedShipmentPrintOrdersByIds(
-      trimmedRoundId,
+      roundId,
       trimmedIds,
     );
     if (orders.length !== trimmedIds.length) {

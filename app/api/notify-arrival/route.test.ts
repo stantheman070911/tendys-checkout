@@ -46,7 +46,11 @@ describe("POST /api/notify-arrival", () => {
   });
 
   it("returns 200 with 0 customers and no notification call", async () => {
-    productsMock.findById.mockResolvedValue({ id: "p1", name: "地瓜" });
+    productsMock.findById.mockResolvedValue({
+      id: "p1",
+      name: "地瓜",
+      round_id: "r1",
+    });
     ordersMock.getCustomersForArrivalNotification.mockResolvedValue({
       customerCount: 0,
       lineUserIds: [],
@@ -76,7 +80,11 @@ describe("POST /api/notify-arrival", () => {
       lineUserIds: ["line1"],
       emails: ["a@b.com"],
     };
-    productsMock.findById.mockResolvedValue({ id: "p1", name: "地瓜" });
+    productsMock.findById.mockResolvedValue({
+      id: "p1",
+      name: "地瓜",
+      round_id: "r1",
+    });
     ordersMock.getCustomersForArrivalNotification.mockResolvedValue(recipients);
     notifyMock.sendProductArrivalNotifications.mockResolvedValue(undefined);
 
@@ -91,6 +99,19 @@ describe("POST /api/notify-arrival", () => {
       "r1",
       recipients,
     );
+  });
+
+  it("returns 400 when product and round do not match", async () => {
+    productsMock.findById.mockResolvedValue({
+      id: "p1",
+      name: "地瓜",
+      round_id: "other-round",
+    });
+
+    const res = await POST(makeRequest({ productId: "p1", roundId: "r1" }));
+    expect(res.status).toBe(400);
+    expect(ordersMock.getCustomersForArrivalNotification).not.toHaveBeenCalled();
+    expect(notifyMock.sendProductArrivalNotifications).not.toHaveBeenCalled();
   });
 
   it("returns 401 when not admin", async () => {

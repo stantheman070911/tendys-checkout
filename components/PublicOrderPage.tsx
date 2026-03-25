@@ -54,6 +54,8 @@ function getErrorMessage(error: string | null | undefined) {
       return "嘗試次數過多，請稍後再試。";
     case "invalid":
       return "驗證資訊無效，請重新輸入。";
+    case "service_unavailable":
+      return "訂單查詢暫時無法使用，請稍後再試。";
     default:
       return null;
   }

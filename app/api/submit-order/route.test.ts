@@ -10,6 +10,12 @@ const ordersMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
+const rateLimitMock = vi.hoisted(() => ({
+  checkRateLimit: vi.fn(),
+  getClientIp: vi.fn(() => "127.0.0.1"),
+}));
+vi.mock("@/lib/rate-limit", () => rateLimitMock);
+
 vi.mock("@/lib/public-order-access", () => ({
   buildPublicOrderPath: vi.fn((orderNumber: string) => `/order/${orderNumber}`),
   createPublicOrderAccessCookie: vi.fn((args: { orderNumber: string }) => ({
@@ -54,6 +60,11 @@ describe("POST /api/submit-order", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue(false);
+    process.env.PUBLIC_ORDER_ACCESS_SECRET = "test-public-order-secret";
+    rateLimitMock.checkRateLimit.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+    });
   });
 
   it("returns 201 on valid order", async () => {

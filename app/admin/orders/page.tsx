@@ -4,6 +4,10 @@ import { getAdminChromeContext, requireAdminPageSession } from "@/lib/admin/serv
 import { listPageByRound } from "@/lib/db/orders";
 import { listAllByRound } from "@/lib/db/products";
 import { serializeForClient } from "@/lib/server-serialize";
+import {
+  getPlaywrightOrdersPageFixture,
+  isPlaywrightAdminFixtureEnabled,
+} from "@/lib/testing/playwright-admin";
 import { ORDER_STATUS } from "@/constants";
 import type { AdminOrderListRow, ProductWithProgress, Round } from "@/types";
 
@@ -46,16 +50,24 @@ export default async function OrdersPage({
       : "all";
   const search = params.q?.trim() ?? "";
 
-  const [ordersPage, products] = await Promise.all([
-    listPageByRound({
-      roundId: round.id,
-      status: status === "all" ? undefined : status,
-      search,
-      page,
-      pageSize: 50,
-    }),
-    listAllByRound(round.id),
-  ]);
+  const fixture = isPlaywrightAdminFixtureEnabled()
+    ? getPlaywrightOrdersPageFixture({
+        status,
+        search,
+      })
+    : null;
+  const [ordersPage, products] = fixture
+    ? [fixture.ordersPage, fixture.products]
+    : await Promise.all([
+        listPageByRound({
+          roundId: round.id,
+          status: status === "all" ? undefined : status,
+          search,
+          page,
+          pageSize: 50,
+        }),
+        listAllByRound(round.id),
+      ]);
   const clientRound = serializeForClient<Round>(round);
 
   return (

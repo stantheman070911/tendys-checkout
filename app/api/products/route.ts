@@ -6,8 +6,132 @@ import {
   create,
   update,
 } from "@/lib/db/products";
+import {
+  nonNegativeIntegerOrNullSchema,
+  parseJsonBody,
+  requiredTrimmedStringSchema,
+  uuidStringSchema,
+  z,
+} from "@/lib/validation";
 
 const PUBLIC_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=60";
+
+const productCreateSchema = z.object({
+  name: requiredTrimmedStringSchema("name"),
+  price: z
+    .number({ message: "price must be a positive integer" })
+    .int("price must be a positive integer")
+    .positive("price must be a positive integer"),
+  unit: requiredTrimmedStringSchema("unit"),
+  round_id: uuidStringSchema("round_id"),
+  supplier_id: z
+    .union([z.string(), z.null(), z.undefined()])
+    .superRefine((value, context) => {
+      if (value === undefined || value === null || value.trim()) {
+        return;
+      }
+
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "supplier_id must be a non-empty string or null",
+      });
+    })
+    .transform((value) => {
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    }),
+  stock: nonNegativeIntegerOrNullSchema("stock"),
+  goal_qty: z
+    .union([
+      z.null(),
+      z
+        .number({ message: "goal_qty must be a positive integer or null" })
+        .int("goal_qty must be a positive integer or null")
+        .positive("goal_qty must be a positive integer or null"),
+      z.undefined(),
+    ])
+    .transform((value) => (value === undefined ? undefined : value)),
+  image_url: z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform((value) => {
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    }),
+});
+
+const productUpdateSchema = z.object({
+  id: requiredTrimmedStringSchema("id"),
+  name: z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, { message: "name cannot be empty" }))
+    .optional(),
+  price: z
+    .number({ message: "price must be a positive integer" })
+    .int("price must be a positive integer")
+    .positive("price must be a positive integer")
+    .optional(),
+  unit: z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, { message: "unit cannot be empty" }))
+    .optional(),
+  round_id: z
+    .string()
+    .trim()
+    .uuid({ message: "round_id must be a valid UUID" })
+    .optional(),
+  supplier_id: z
+    .union([z.string(), z.null(), z.undefined()])
+    .superRefine((value, context) => {
+      if (value === undefined || value === null || value.trim()) {
+        return;
+      }
+
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "supplier_id must be a non-empty string or null",
+      });
+    })
+    .transform((value) => {
+      if (value === undefined) return undefined;
+      if (value === null) return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    }),
+  is_active: z.boolean().optional(),
+  stock: nonNegativeIntegerOrNullSchema("stock"),
+  goal_qty: z
+    .union([
+      z.null(),
+      z
+        .number({ message: "goal_qty must be a positive integer or null" })
+        .int("goal_qty must be a positive integer or null")
+        .positive("goal_qty must be a positive integer or null"),
+      z.undefined(),
+    ])
+    .transform((value) => (value === undefined ? undefined : value)),
+  image_url: z
+    .union([z.string(), z.null(), z.undefined()])
+    .superRefine((value, context) => {
+      if (value === undefined || value === null || value.trim()) {
+        return;
+      }
+
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "image_url must be a non-empty string or null",
+      });
+    })
+    .transform((value) => {
+      if (value === undefined) return undefined;
+      if (value === null) return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    }),
+});
 
 // Public — storefront needs product list. Admin with ?all=true gets inactive products too.
 export async function GET(request: NextRequest) {
@@ -54,11 +178,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, productCreateSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
     const {
@@ -70,85 +192,17 @@ export async function POST(request: NextRequest) {
       stock,
       goal_qty,
       image_url,
-    } = body as {
-      name?: string;
-      price?: number;
-      unit?: string;
-      round_id?: string;
-      supplier_id?: string | null;
-      stock?: number | null;
-      goal_qty?: number | null;
-      image_url?: string | null;
-    };
-
-    const trimmedName = typeof name === "string" ? name.trim() : "";
-    if (!trimmedName) {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
-    }
-
-    if (
-      price === undefined ||
-      typeof price !== "number" ||
-      !Number.isInteger(price) ||
-      price <= 0
-    ) {
-      return NextResponse.json(
-        { error: "price must be a positive integer" },
-        { status: 400 },
-      );
-    }
-
-    const trimmedUnit = typeof unit === "string" ? unit.trim() : "";
-    if (!trimmedUnit) {
-      return NextResponse.json({ error: "unit is required" }, { status: 400 });
-    }
-
-    if (!round_id || typeof round_id !== "string" || !round_id.trim()) {
-      return NextResponse.json(
-        { error: "round_id is required" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      stock !== undefined &&
-      stock !== null &&
-      (typeof stock !== "number" || !Number.isInteger(stock) || stock < 0)
-    ) {
-      return NextResponse.json(
-        { error: "stock must be a non-negative integer or null" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      goal_qty !== undefined &&
-      goal_qty !== null &&
-      (typeof goal_qty !== "number" ||
-        !Number.isInteger(goal_qty) ||
-        goal_qty <= 0)
-    ) {
-      return NextResponse.json(
-        { error: "goal_qty must be a positive integer or null" },
-        { status: 400 },
-      );
-    }
+    } = parsedBody.data;
 
     const product = await create({
-      name: trimmedName,
+      name,
       price,
-      unit: trimmedUnit,
-      round_id: round_id.trim(),
-      supplier_id:
-        typeof supplier_id === "string" && supplier_id.trim()
-          ? supplier_id.trim()
-          : null,
+      unit,
+      round_id,
+      supplier_id,
       stock: stock ?? null,
       goal_qty: goal_qty ?? null,
-      image_url:
-        typeof image_url === "string" && image_url.trim()
-          ? image_url.trim()
-          : null,
+      image_url,
     });
 
     return NextResponse.json({ product }, { status: 201 });
@@ -167,115 +221,40 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, productUpdateSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
-    const { id, ...fields } = body as {
-      id?: string;
-      name?: string;
-      price?: number;
-      unit?: string;
-      round_id?: string;
-      supplier_id?: string | null;
-      is_active?: boolean;
-      stock?: number | null;
-      goal_qty?: number | null;
-      image_url?: string | null;
-    };
-
-    if (!id || typeof id !== "string" || !id.trim()) {
-      return NextResponse.json({ error: "id is required" }, { status: 400 });
-    }
+    const { id, ...fields } = parsedBody.data;
 
     // Build update data, validating each field if present
     const data: Record<string, unknown> = {};
 
     if (typeof fields.name === "string") {
-      const v = fields.name.trim();
-      if (!v)
-        return NextResponse.json(
-          { error: "name cannot be empty" },
-          { status: 400 },
-        );
-      data.name = v;
+      data.name = fields.name;
     }
     if (typeof fields.price === "number") {
-      if (!Number.isInteger(fields.price) || fields.price <= 0) {
-        return NextResponse.json(
-          { error: "price must be a positive integer" },
-          { status: 400 },
-        );
-      }
       data.price = fields.price;
     }
     if (typeof fields.unit === "string") {
-      const v = fields.unit.trim();
-      if (!v)
-        return NextResponse.json(
-          { error: "unit cannot be empty" },
-          { status: 400 },
-        );
-      data.unit = v;
+      data.unit = fields.unit;
     }
     if (typeof fields.round_id === "string")
-      data.round_id = fields.round_id.trim();
+      data.round_id = fields.round_id;
     if (fields.supplier_id !== undefined) {
-      if (
-        fields.supplier_id !== null &&
-        (typeof fields.supplier_id !== "string" || !fields.supplier_id.trim())
-      ) {
-        return NextResponse.json(
-          { error: "supplier_id must be a non-empty string or null" },
-          { status: 400 },
-        );
-      }
-      data.supplier_id = fields.supplier_id ? fields.supplier_id.trim() : null;
+      data.supplier_id = fields.supplier_id;
     }
     if (typeof fields.is_active === "boolean")
       data.is_active = fields.is_active;
     if (fields.stock !== undefined) {
-      if (
-        fields.stock !== null &&
-        (typeof fields.stock !== "number" ||
-          !Number.isInteger(fields.stock) ||
-          fields.stock < 0)
-      ) {
-        return NextResponse.json(
-          { error: "stock must be a non-negative integer or null" },
-          { status: 400 },
-        );
-      }
       data.stock = fields.stock;
     }
     if (fields.goal_qty !== undefined) {
-      if (
-        fields.goal_qty !== null &&
-        (typeof fields.goal_qty !== "number" ||
-          !Number.isInteger(fields.goal_qty) ||
-          fields.goal_qty <= 0)
-      ) {
-        return NextResponse.json(
-          { error: "goal_qty must be a positive integer or null" },
-          { status: 400 },
-        );
-      }
       data.goal_qty = fields.goal_qty;
     }
     if (fields.image_url !== undefined) {
-      if (
-        fields.image_url !== null &&
-        (typeof fields.image_url !== "string" || !fields.image_url.trim())
-      ) {
-        return NextResponse.json(
-          { error: "image_url must be a non-empty string or null" },
-          { status: 400 },
-        );
-      }
-      data.image_url = fields.image_url ? fields.image_url.trim() : null;
+      data.image_url = fields.image_url;
     }
 
     if (Object.keys(data).length === 0) {

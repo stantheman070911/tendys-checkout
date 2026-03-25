@@ -5,6 +5,10 @@ import { getOpenRound } from "@/lib/db/rounds";
 import { listActiveByRound } from "@/lib/db/products";
 import { prisma } from "@/lib/db/prisma";
 import { StorefrontClient } from "@/components/StorefrontClient";
+import {
+  getPlaywrightStorefrontFixture,
+  isPlaywrightAdminFixtureEnabled,
+} from "@/lib/testing/playwright-admin";
 import type { Round, ProductWithProgress } from "@/types";
 
 export default async function Home({
@@ -13,6 +17,16 @@ export default async function Home({
   searchParams: Promise<{ round?: string }>;
 }) {
   const { round: roundId } = await searchParams;
+
+  if (isPlaywrightAdminFixtureEnabled()) {
+    const fixture = getPlaywrightStorefrontFixture();
+    return (
+      <StorefrontClient
+        round={fixture.round}
+        products={fixture.products}
+      />
+    );
+  }
 
   const round = roundId
     ? await prisma.round.findUnique({ where: { id: roundId } })

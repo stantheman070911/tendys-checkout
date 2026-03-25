@@ -134,6 +134,7 @@ npm run build        # must pass
 npx tsc --noEmit     # must pass (requires prior build)
 npm run lint         # must pass
 npx vitest run       # must pass
+npm run test:e2e     # browser coverage for CSV preflight/download + shipment batch print
 ```
 
 **Verify:**

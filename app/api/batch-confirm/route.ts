@@ -4,6 +4,25 @@ import { batchConfirm } from "@/lib/db/orders";
 import { mapWithConcurrency } from "@/lib/async";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendPaymentConfirmedNotifications } from "@/lib/notifications/send";
+import { parseJsonBody, z } from "@/lib/validation";
+
+const batchConfirmSchema = z
+  .object({
+    orderIds: z.array(z.string()).min(1, {
+      message: "orderIds must be a non-empty array of strings",
+    }),
+  })
+  .transform((value) => ({
+    orderIds: value.orderIds.map((id) => id.trim()),
+  }))
+  .superRefine((value, context) => {
+    if (value.orderIds.some((id) => !id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "orderIds must be a non-empty array of strings",
+      });
+    }
+  });
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,27 +31,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, batchConfirmSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
-    const { orderIds } = body as { orderIds?: string[] };
-
-    if (
-      !Array.isArray(orderIds) ||
-      orderIds.length === 0 ||
-      !orderIds.every((id) => typeof id === "string" && id.trim())
-    ) {
-      return NextResponse.json(
-        { error: "orderIds must be a non-empty array of strings" },
-        { status: 400 },
-      );
-    }
-
-    const trimmedIds = orderIds.map((id) => id.trim());
+    const trimmedIds = parsedBody.data.orderIds;
     const confirmedOrders = await batchConfirm(trimmedIds);
     const changedIds = new Set(confirmedOrders.map((order) => order.id));
     const skipped = trimmedIds.filter((id) => !changedIds.has(id));

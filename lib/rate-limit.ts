@@ -1,26 +1,145 @@
+import { Redis } from "@upstash/redis";
+import {
+  getRateLimitConfig,
+  isEnvironmentConfigurationError,
+} from "@/lib/server-env";
+
 type RateLimitEntry = {
   count: number;
   resetAt: number;
 };
 
 const globalForRateLimit = globalThis as typeof globalThis & {
-  __rateLimitStore?: Map<string, RateLimitEntry>;
+  __rateLimitStore?: RateLimitStore;
 };
+
+const incrementBucketScript = `
+  local key = KEYS[1]
+  local ttl_ms = tonumber(ARGV[1])
+  local current = redis.call("INCR", key)
+  if current == 1 then
+    redis.call("PEXPIRE", key, ttl_ms)
+  end
+  local remaining = redis.call("PTTL", key)
+  return { current, remaining }
+`;
+
+export interface CheckRateLimitResult {
+  allowed: boolean;
+  retryAfterSeconds: number;
+  error?: "backend_unavailable";
+}
+
+interface RateLimitCheckArgs {
+  key: string;
+  limit: number;
+  windowMs: number;
+}
+
+interface RateLimitStore {
+  check(args: RateLimitCheckArgs): Promise<CheckRateLimitResult>;
+}
+
+class MemoryRateLimitStore implements RateLimitStore {
+  private readonly store = new Map<string, RateLimitEntry>();
+
+  private cleanupExpiredEntries(now: number) {
+    for (const [key, entry] of this.store.entries()) {
+      if (entry.resetAt <= now) {
+        this.store.delete(key);
+      }
+    }
+  }
+
+  async check(args: RateLimitCheckArgs): Promise<CheckRateLimitResult> {
+    const now = Date.now();
+    this.cleanupExpiredEntries(now);
+
+    const existing = this.store.get(args.key);
+    if (!existing || existing.resetAt <= now) {
+      this.store.set(args.key, { count: 1, resetAt: now + args.windowMs });
+      return { allowed: true, retryAfterSeconds: 0 };
+    }
+
+    if (existing.count >= args.limit) {
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil((existing.resetAt - now) / 1000),
+        ),
+      };
+    }
+
+    existing.count += 1;
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+}
+
+class RedisRateLimitStore implements RateLimitStore {
+  private readonly redis: Redis;
+  private readonly prefix: string;
+  private readonly incrementBucket;
+
+  constructor() {
+    const config = getRateLimitConfig();
+    this.prefix = config.prefix;
+    this.redis = new Redis({
+      url: config.url!,
+      token: config.token!,
+    });
+    this.incrementBucket =
+      this.redis.createScript<[number, number]>(incrementBucketScript);
+  }
+
+  private buildBucketKey(key: string, bucket: number) {
+    return `${this.prefix}:${key}:${bucket}`;
+  }
+
+  async check(args: RateLimitCheckArgs): Promise<CheckRateLimitResult> {
+    const now = Date.now();
+    const bucket = Math.floor(now / args.windowMs);
+    const bucketEndsAt = (bucket + 1) * args.windowMs;
+    const ttlMs = Math.max(1, bucketEndsAt - now);
+    const bucketKey = this.buildBucketKey(args.key, bucket);
+
+    const response = await this.incrementBucket.exec(
+      [bucketKey],
+      [String(ttlMs)],
+    );
+
+    const count = Number(response[0] ?? 0);
+    const remainingMs = Number(response[1] ?? ttlMs);
+
+    if (count > args.limit) {
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(1, Math.ceil(remainingMs / 1000)),
+      };
+    }
+
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+}
+
+function createRateLimitStore(): RateLimitStore {
+  if (process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development") {
+    return new MemoryRateLimitStore();
+  }
+
+  return new RedisRateLimitStore();
+}
 
 function getStore() {
   if (!globalForRateLimit.__rateLimitStore) {
-    globalForRateLimit.__rateLimitStore = new Map<string, RateLimitEntry>();
+    globalForRateLimit.__rateLimitStore = createRateLimitStore();
   }
+
   return globalForRateLimit.__rateLimitStore;
 }
 
-function cleanupExpiredEntries(now: number) {
-  const store = getStore();
-  for (const [key, entry] of store.entries()) {
-    if (entry.resetAt <= now) {
-      store.delete(key);
-    }
-  }
+export function resetRateLimitStoreForTests() {
+  delete globalForRateLimit.__rateLimitStore;
 }
 
 export function getClientIp(request: Request): string {
@@ -36,35 +155,22 @@ export function getClientIp(request: Request): string {
   return "unknown";
 }
 
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   limit: number,
   windowMs: number,
-): { allowed: boolean; retryAfterSeconds: number } {
-  if (process.env.NODE_ENV === "test") {
-    return { allowed: true, retryAfterSeconds: 0 };
+): Promise<CheckRateLimitResult> {
+  try {
+    return await getStore().check({ key, limit, windowMs });
+  } catch (error) {
+    if (isEnvironmentConfigurationError(error)) {
+      return {
+        allowed: false,
+        retryAfterSeconds: 0,
+        error: "backend_unavailable",
+      };
+    }
+
+    throw error;
   }
-
-  const now = Date.now();
-  cleanupExpiredEntries(now);
-
-  const store = getStore();
-  const existing = store.get(key);
-  if (!existing || existing.resetAt <= now) {
-    store.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
-
-  if (existing.count >= limit) {
-    return {
-      allowed: false,
-      retryAfterSeconds: Math.max(
-        1,
-        Math.ceil((existing.resetAt - now) / 1000),
-      ),
-    };
-  }
-
-  existing.count += 1;
-  return { allowed: true, retryAfterSeconds: 0 };
 }

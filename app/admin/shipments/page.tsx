@@ -3,6 +3,10 @@ import { ShipmentsPageClient } from "@/components/admin/ShipmentsPageClient";
 import { getAdminChromeContext, requireAdminPageSession } from "@/lib/admin/server";
 import { listPageByRound } from "@/lib/db/orders";
 import { serializeForClient } from "@/lib/server-serialize";
+import {
+  getPlaywrightShipmentsPageFixture,
+  isPlaywrightAdminFixtureEnabled,
+} from "@/lib/testing/playwright-admin";
 import type { AdminOrderListRow, Round } from "@/types";
 
 export default async function ShipmentsPage({
@@ -36,14 +40,22 @@ export default async function ShipmentsPage({
   const search = params.q?.trim() ?? "";
   const productId = params.productId?.trim() ?? "";
 
-  const ordersPage = await listPageByRound({
-    roundId: round.id,
-    status: "confirmed",
-    search,
-    productId: productId || undefined,
-    page,
-    pageSize: 50,
-  });
+  const fixture = isPlaywrightAdminFixtureEnabled()
+    ? getPlaywrightShipmentsPageFixture({
+        search,
+        productId: productId || undefined,
+      })
+    : null;
+  const ordersPage = fixture
+    ? fixture.ordersPage
+    : await listPageByRound({
+        roundId: round.id,
+        status: "confirmed",
+        search,
+        productId: productId || undefined,
+        page,
+        pageSize: 50,
+      });
   const clientRound = serializeForClient<Round>(round);
 
   return (
