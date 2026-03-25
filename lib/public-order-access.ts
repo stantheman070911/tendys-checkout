@@ -51,6 +51,10 @@ export function getPublicOrderAccessCookieName(orderNumber: string) {
   ).toString("base64url")}`;
 }
 
+export function buildPublicOrderPath(orderNumber: string) {
+  return `/order/${encodeURIComponent(orderNumber.trim().toUpperCase())}`;
+}
+
 export function createPublicOrderAccessToken(args: {
   orderNumber: string;
   purchaserName: string;
@@ -114,6 +118,17 @@ export function verifyPublicOrderAccessToken(
   };
 }
 
-export function buildPublicOrderAccessPath(token: string) {
-  return `/api/public-order/access?token=${encodeURIComponent(token)}`;
+export function createPublicOrderAccessCookie(args: {
+  orderNumber: string;
+  purchaserName: string;
+  phoneLast3: string;
+}) {
+  const orderNumber = args.orderNumber.trim().toUpperCase();
+
+  return {
+    name: getPublicOrderAccessCookieName(orderNumber),
+    value: createPublicOrderAccessToken(args),
+    maxAge: PUBLIC_ORDER_ACCESS_TTL_SECONDS,
+    path: buildPublicOrderPath(orderNumber),
+  };
 }

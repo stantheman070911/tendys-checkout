@@ -11,8 +11,13 @@ const ordersMock = vi.hoisted(() => ({
 vi.mock("@/lib/db/orders", () => ordersMock);
 
 vi.mock("@/lib/public-order-access", () => ({
-  createPublicOrderAccessToken: vi.fn(() => "public-token"),
-  buildPublicOrderAccessPath: vi.fn(() => "/api/public-order/access?token=public-token"),
+  buildPublicOrderPath: vi.fn((orderNumber: string) => `/order/${orderNumber}`),
+  createPublicOrderAccessCookie: vi.fn((args: { orderNumber: string }) => ({
+    name: `tendy_order_access_${args.orderNumber}`,
+    value: "public-token",
+    maxAge: 86400,
+    path: `/order/${args.orderNumber}`,
+  })),
 }));
 
 import { POST } from "./route";
@@ -66,8 +71,10 @@ describe("POST /api/submit-order", () => {
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.order.id).toBe("o1");
-    expect(data.access_token).toBe("public-token");
-    expect(data.detail_url).toContain("/api/public-order/access");
+    expect(data.detail_url).toBe("/order/ORD-20260324-001");
+    expect(res.headers.get("set-cookie")).toContain(
+      "tendy_order_access_ORD-20260324-001",
+    );
     expect(ordersMock.createCheckoutOrder).toHaveBeenCalledWith(
       expect.objectContaining({
         round_id: VALID_ROUND_ID,

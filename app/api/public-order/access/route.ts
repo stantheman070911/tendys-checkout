@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findPublicOrderByOrderNumberAndIdentity } from "@/lib/db/orders";
 import {
-  createPublicOrderAccessToken,
-  getPublicOrderAccessCookieName,
-  PUBLIC_ORDER_ACCESS_TTL_SECONDS,
-  verifyPublicOrderAccessToken,
+  buildPublicOrderPath,
+  createPublicOrderAccessCookie,
 } from "@/lib/public-order-access";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
@@ -17,7 +15,7 @@ const COOKIE_OPTIONS = {
 
 function redirectToOrder(orderNumber: string, error?: string) {
   const pathname = orderNumber.trim()
-    ? `/order/${encodeURIComponent(orderNumber)}`
+    ? buildPublicOrderPath(orderNumber)
     : "/lookup";
   const url = new URL(
     pathname,
@@ -29,36 +27,8 @@ function redirectToOrder(orderNumber: string, error?: string) {
   return url;
 }
 
-function withAccessCookie(response: NextResponse, token: string) {
-  const claims = verifyPublicOrderAccessToken(token);
-  if (!claims) {
-    return response;
-  }
-
-  response.cookies.set({
-    ...COOKIE_OPTIONS,
-    name: getPublicOrderAccessCookieName(claims.order_number),
-    value: token,
-    maxAge: PUBLIC_ORDER_ACCESS_TTL_SECONDS,
-    path: `/order/${encodeURIComponent(claims.order_number)}`,
-  });
-  return response;
-}
-
-export async function GET(request: NextRequest) {
-  const token = request.nextUrl.searchParams.get("token");
-  const claims = verifyPublicOrderAccessToken(token);
-  if (!claims) {
-    const orderNumber = request.nextUrl.searchParams.get("order") ?? "";
-    return NextResponse.redirect(
-      redirectToOrder(orderNumber, "invalid"),
-    );
-  }
-
-  const response = NextResponse.redirect(
-    redirectToOrder(claims.order_number),
-  );
-  return withAccessCookie(response, token!);
+function seeOther(url: URL) {
+  return NextResponse.redirect(url, 303);
 }
 
 export async function POST(request: NextRequest) {
@@ -70,7 +40,7 @@ export async function POST(request: NextRequest) {
     const clientIp = getClientIp(request);
     const rateLimit = checkRateLimit(`public-order-access:${clientIp}`, 5, 60_000);
     if (!rateLimit.allowed) {
-      return NextResponse.redirect(
+      return seeOther(
         redirectToOrder(orderNumber, "rate_limited"),
       );
     }
@@ -83,7 +53,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (!orderNumber || !purchaserName || phoneLast3.length !== 3) {
-      return NextResponse.redirect(redirectToOrder(orderNumber, "invalid"));
+      return seeOther(redirectToOrder(orderNumber, "invalid"));
     }
 
     const order = await findPublicOrderByOrderNumberAndIdentity(
@@ -92,18 +62,21 @@ export async function POST(request: NextRequest) {
       phoneLast3,
     );
     if (!order) {
-      return NextResponse.redirect(redirectToOrder(orderNumber, "not_found"));
+      return seeOther(redirectToOrder(orderNumber, "not_found"));
     }
 
-    const token = createPublicOrderAccessToken({
-      orderNumber,
-      purchaserName,
-      phoneLast3,
+    const response = seeOther(redirectToOrder(orderNumber));
+    response.cookies.set({
+      ...COOKIE_OPTIONS,
+      ...createPublicOrderAccessCookie({
+        orderNumber,
+        purchaserName,
+        phoneLast3,
+      }),
     });
-    const response = NextResponse.redirect(redirectToOrder(orderNumber));
-    return withAccessCookie(response, token);
+    return response;
   } catch {
-    return NextResponse.redirect(
+    return seeOther(
       redirectToOrder("", "invalid"),
     );
   }

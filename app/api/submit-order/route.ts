@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { createCheckoutOrder } from "@/lib/db/orders";
 import {
-  buildPublicOrderAccessPath,
-  createPublicOrderAccessToken,
+  buildPublicOrderPath,
+  createPublicOrderAccessCookie,
 } from "@/lib/public-order-access";
 import { getPhoneLast3 } from "@/lib/utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -21,6 +21,12 @@ const MAX_LEN = {
   email: 254,
   note: 500,
 } as const;
+
+const PUBLIC_ORDER_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -294,19 +300,24 @@ export async function POST(request: NextRequest) {
 
     switch (result.kind) {
       case "success": {
-        const access_token = createPublicOrderAccessToken({
-          orderNumber: result.order.order_number,
-          purchaserName: trimmedPurchaserName,
-          phoneLast3: getPhoneLast3(trimmedPhone),
-        });
-        return NextResponse.json(
+        const response = NextResponse.json(
           {
             order: result.order,
-            access_token,
-            detail_url: buildPublicOrderAccessPath(access_token),
+            detail_url: buildPublicOrderPath(result.order.order_number),
           },
           { status: result.deduplicated ? 200 : 201 },
         );
+
+        response.cookies.set({
+          ...PUBLIC_ORDER_COOKIE_OPTIONS,
+          ...createPublicOrderAccessCookie({
+            orderNumber: result.order.order_number,
+            purchaserName: trimmedPurchaserName,
+            phoneLast3: getPhoneLast3(trimmedPhone),
+          }),
+        });
+
+        return response;
       }
       case "validation_error":
         return NextResponse.json({ error: result.error }, { status: 400 });

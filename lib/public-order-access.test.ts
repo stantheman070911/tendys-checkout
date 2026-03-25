@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  buildPublicOrderAccessPath,
+  buildPublicOrderPath,
+  createPublicOrderAccessCookie,
   createPublicOrderAccessToken,
   getPublicOrderAccessCookieName,
   normalizePublicOrderAccessIdentity,
@@ -41,18 +42,18 @@ describe("public order access tokens", () => {
   });
 
   it("builds cookie-safe helpers", () => {
-    const token = createPublicOrderAccessToken({
+    const cookie = createPublicOrderAccessCookie({
       orderNumber: "ORD-001",
       purchaserName: "王小美",
       phoneLast3: "678",
     });
 
-    expect(buildPublicOrderAccessPath(token)).toContain(
-      "/api/public-order/access?token=",
-    );
+    expect(buildPublicOrderPath("ORD-001")).toBe("/order/ORD-001");
     expect(getPublicOrderAccessCookieName("ORD-001")).toMatch(
       /^tendy_order_access_/,
     );
+    expect(cookie.path).toBe("/order/ORD-001");
+    expect(cookie.value).toBeTruthy();
   });
 
   it("rejects invalid tokens", () => {
