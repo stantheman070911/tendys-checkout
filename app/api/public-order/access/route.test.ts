@@ -24,7 +24,7 @@ describe("POST /api/public-order/access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.ADMIN_SESSION_SECRET = "test-secret";
-    process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://wrong.example.com";
   });
 
   it("uses 303 and sets an access cookie on success", async () => {
@@ -42,7 +42,7 @@ describe("POST /api/public-order/access", () => {
     );
 
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBe("http://localhost:3000/order/ORD-001");
+    expect(res.headers.get("location")).toBe("http://localhost/order/ORD-001");
     expect(res.headers.get("set-cookie")).toContain(
       `${getPublicOrderAccessCookieName("ORD-001")}=`,
     );
@@ -60,7 +60,7 @@ describe("POST /api/public-order/access", () => {
 
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe(
-      "http://localhost:3000/order/ORD-001?error=invalid",
+      "http://localhost/order/ORD-001?error=invalid",
     );
   });
 
@@ -77,7 +77,7 @@ describe("POST /api/public-order/access", () => {
 
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe(
-      "http://localhost:3000/order/ORD-404?error=not_found",
+      "http://localhost/order/ORD-404?error=not_found",
     );
   });
 });

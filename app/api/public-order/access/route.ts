@@ -13,14 +13,17 @@ const COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
 };
 
-function redirectToOrder(orderNumber: string, error?: string) {
+function redirectToOrder(
+  request: NextRequest,
+  orderNumber: string,
+  error?: string,
+) {
   const pathname = orderNumber.trim()
     ? buildPublicOrderPath(orderNumber)
     : "/lookup";
-  const url = new URL(
-    pathname,
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-  );
+  const url = request.nextUrl?.clone() ?? new URL(request.url);
+  url.pathname = pathname;
+  url.search = "";
   if (error) {
     url.searchParams.set("error", error);
   }
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkRateLimit(`public-order-access:${clientIp}`, 5, 60_000);
     if (!rateLimit.allowed) {
       return seeOther(
-        redirectToOrder(orderNumber, "rate_limited"),
+        redirectToOrder(request, orderNumber, "rate_limited"),
       );
     }
 
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (!orderNumber || !purchaserName || phoneLast3.length !== 3) {
-      return seeOther(redirectToOrder(orderNumber, "invalid"));
+      return seeOther(redirectToOrder(request, orderNumber, "invalid"));
     }
 
     const order = await findPublicOrderByOrderNumberAndIdentity(
@@ -62,10 +65,10 @@ export async function POST(request: NextRequest) {
       phoneLast3,
     );
     if (!order) {
-      return seeOther(redirectToOrder(orderNumber, "not_found"));
+      return seeOther(redirectToOrder(request, orderNumber, "not_found"));
     }
 
-    const response = seeOther(redirectToOrder(orderNumber));
+    const response = seeOther(redirectToOrder(request, orderNumber));
     response.cookies.set({
       ...COOKIE_OPTIONS,
       ...createPublicOrderAccessCookie({
@@ -77,7 +80,7 @@ export async function POST(request: NextRequest) {
     return response;
   } catch {
     return seeOther(
-      redirectToOrder("", "invalid"),
+      redirectToOrder(request, "", "invalid"),
     );
   }
 }

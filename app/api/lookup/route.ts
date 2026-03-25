@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findOrdersByPurchaserNameAndPhoneLast3 } from "@/lib/db/orders";
-import {
-  buildPublicOrderPath,
-  createPublicOrderAccessCookie,
-} from "@/lib/public-order-access";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
-
-const PUBLIC_ORDER_COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,7 +61,6 @@ export async function POST(request: NextRequest) {
       total_amount: order.total_amount,
       shipping_fee: order.shipping_fee,
       created_at: order.created_at,
-      detail_url: buildPublicOrderPath(order.order_number),
       order_items: order.order_items.map((item) => ({
         id: item.id,
         product_name: item.product_name,
@@ -80,19 +69,7 @@ export async function POST(request: NextRequest) {
       })),
     }));
 
-    const response = NextResponse.json({ orders: safeOrders });
-    for (const order of orders) {
-      response.cookies.set({
-        ...PUBLIC_ORDER_COOKIE_OPTIONS,
-        ...createPublicOrderAccessCookie({
-          orderNumber: order.order_number,
-          purchaserName,
-          phoneLast3,
-        }),
-      });
-    }
-
-    return response;
+    return NextResponse.json({ orders: safeOrders });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
