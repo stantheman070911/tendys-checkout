@@ -27,6 +27,7 @@ import {
   getPublicOrderAccessSessionKey,
   getPhoneLast3,
 } from "@/lib/utils";
+import { serializePublicOrderAccess } from "@/lib/public-order-access";
 import { useToast } from "@/hooks/use-toast";
 import type { Round, ProductWithProgress, CartItem } from "@/types";
 
@@ -173,10 +174,13 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
       const orderNumber = data.order.order_number as string;
       sessionStorage.setItem(
         getPublicOrderAccessSessionKey(orderNumber),
-        JSON.stringify({
-          recipient_name: trimmedName,
-          phone_last3: getPhoneLast3(trimmedPhone),
-        }),
+        serializePublicOrderAccess(
+          {
+            recipient_name: trimmedName,
+            phone_last3: getPhoneLast3(trimmedPhone),
+          },
+          "checkout",
+        ),
       );
 
       router.push(`/order/${encodeURIComponent(orderNumber)}`);

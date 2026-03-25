@@ -19,17 +19,27 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 - The redesign was visual only. Business logic and public/admin flows were intentionally preserved.
 - `/api/submit-order` now uses an atomic checkout path in `lib/db/orders.ts`: nickname resolution + user persistence + order creation happen in one transaction, and stale `orders.access_code` schema drift is surfaced as `503` instead of opaque `500`.
 - `components/PublicOrderPage.tsx` no longer flashes the manual verification form immediately after checkout redirect; it waits for the stored access auto-unlock attempt to finish first.
+- Public product progress now distinguishes **goal** from **sellout** for finite-stock items:
+  - shared helper: `lib/progress-bar.ts`
+  - finite-stock bars use stock ceiling as the track and render `成團目標` as a marker instead of filling to 100% at goal hit
+  - storefront `餘量` badge in `components/ProductCard.tsx` was enlarged and given stronger contrast for urgency
+  - admin products/suppliers pages were updated to use the same stock-cap bar logic
 - `Round` now owns configurable `pickup_option_a` + `pickup_option_b`. Shared helper: `lib/pickup-options.ts`. Storefront checkout, admin POS, rounds admin UI, and submit-order validation all read from the round, not a hard-coded constant.
 - Live databases need manual SQL `prisma/migration_008_round_pickup_options.sql` before deploying the round-configurable pickup feature.
 - Public order detail now includes:
   - one-click copy of the LINE binding string
   - a direct button to the official LINE OA
   - saved contact phone + shipping address after successful public verification
+- Public lookup no longer forces a second verification step before opening a matched order:
+  - shared helper: `lib/public-order-access.ts`
+  - a verified `/lookup` search now caches session access for every matched order in that browser session
+  - direct `/order/[orderNumber]` visits still fall back to manual `recipient_name + phone_last3` verification
+  - lookup CTA copy now includes Chinese (`view detail / 查詢細節`) for lower-English users
 - Verified after redesign + subsequent checkout/order-detail follow-up:
   - `npx tsc --noEmit`
   - `npm run lint`
   - `npm run build`
-  - focused `npx vitest run ...` coverage for submit-order, round pickup config, and public lookup/order detail flows
+  - focused `npx vitest run ...` coverage for submit-order, round pickup config, public lookup/order detail flows, stock-cap progress math, and public-order access session handling
 
 ### Primary Redesign Files
 
@@ -77,7 +87,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 6. Admin confirms (single/batch) → LINE + email notification. Status: `confirmed`.
 7. Products arrive → admin sends arrival notification to relevant customers.
 8. Admin marks shipped (待出貨, grouped by pickup method) → shipment notification. Status: `shipped`.
-9. User checks status via `/lookup` (`recipient_name + phone_last3`).
+9. User checks status via `/lookup` (`recipient_name + phone_last3`) and can open any matched order detail in that browser session without re-entering the same fields.
 10. **LINE linking**: User pastes `ORD-YYYYMMDD-NNN 王小美 678` → webhook validates + links `line_user_id`.
 11. **POS**: Admin creates orders on behalf of customers, instant cash confirmation.
 12. **Admin cancel**: From any status, with reason + cancellation notification.
@@ -89,7 +99,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 ```
 app/
   page.tsx                      # Storefront
-  order/[orderNumber]/page.tsx  # Public order detail (gated by order_number + recipient_name + phone_last3)
+  order/[orderNumber]/page.tsx  # Public order detail (auto-unlocks from checkout or verified lookup session; direct access still gated by order_number + recipient_name + phone_last3)
   lookup/page.tsx               # Order lookup (recipient_name + phone_last3)
   gtfo/page.tsx                 # Troll page for /admin snoopers
   admin/                        # ⚠️ NOT /admin (redirects to /gtfo). Real URL: /bitchassnigga (next.config.ts rewrites)
@@ -199,7 +209,7 @@ Cancel stock restore: yes except `shipped`.
 - **`product_progress` view**: Aggregates order_items by product (excluding cancelled).
 - **Shipping fee**: `submit-order` snapshots `round.shipping_fee` on 宅配 orders. Never recalculate after creation.
 - **Pickup options**: `pickup_option_a` / `pickup_option_b` live on `Round`. `pickup_location` must be empty string (宅配) or match that round’s configured labels.
-- **Public access**: `/api/lookup` requires `recipient_name + phone_last3`. Single-order actions require `order_number + recipient_name + phone_last3`. No internal UUIDs on public routes.
+- **Public access**: `/api/lookup` requires `recipient_name + phone_last3`. A successful lookup may cache per-order session access client-side, but server truth for single-order actions remains `order_number + recipient_name + phone_last3`. No internal UUIDs on public routes.
 - **Public order detail payload**: After public verification succeeds, `/api/lookup/order` may return saved phone + address for that order’s user so the customer can verify delivery details.
 - **LINE linking**: Per-order (not per-user). Webhook verifies all three fields. Idempotent. One order = one LINE account.
 - **Single-open-round**: Partial unique index. `create()` atomically closes existing open rounds. `update()` catches `P2002`.

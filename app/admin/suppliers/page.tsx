@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { buildAdminPath } from "@/lib/admin/paths";
+import { deriveStockLimitQty } from "@/lib/progress-bar";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SupplierForm } from "@/components/admin/SupplierForm";
 import {
@@ -342,10 +343,14 @@ export default function SuppliersPage() {
                               </button>
                               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                                 {p.goal_qty != null && p.goal_qty > 0 && (
-                                  <div className="w-28">
+                                  <div className="w-40">
                                     <ProgressBar
                                       currentQty={p.current_qty}
                                       goalQty={p.goal_qty}
+                                      stockLimitQty={deriveStockLimitQty(
+                                        p.current_qty,
+                                        p.stock,
+                                      )}
                                       unit={p.unit}
                                     />
                                   </div>

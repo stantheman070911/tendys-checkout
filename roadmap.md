@@ -82,6 +82,14 @@
 - [x] **7.12** Public order detail polish
   - Added one-click LINE binding copy and a direct official LINE OA button on the public order detail page
   - Extended `/api/lookup/order` to return saved contact phone + shipping address after successful public verification, and surfaced both on the unlocked order detail view
+- [x] **7.13** Stock-cap progress bar clarification
+  - Added shared progress-bar math helper in `lib/progress-bar.ts`
+  - Finite-stock products now use stock ceiling as the bar length and render `成團目標` as a marker instead of filling the whole bar at goal hit
+  - Raised storefront `餘量` badge size/contrast for urgency and updated admin products/suppliers to share the same stock-cap logic
+- [x] **7.14** Lookup single-verification flow
+  - Added shared public-order session helper in `lib/public-order-access.ts`
+  - A verified `/lookup` search now caches access for all matched orders in the current browser session, so opening a result no longer asks for the same identity twice
+  - Direct `/order/[orderNumber]` visits still fall back to manual verification, and lookup CTA/copy was localized with Chinese support (`查詢細節`)
 
 ### Checkpoint 7 (Final)
 

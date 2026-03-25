@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
+import { deriveStockLimitQty } from "@/lib/progress-bar";
 import { formatCurrency } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ProductForm } from "@/components/admin/ProductForm";
@@ -177,6 +178,7 @@ export default function ProductsPage() {
             <ProgressBar
               currentQty={p.current_qty}
               goalQty={p.goal_qty}
+              stockLimitQty={deriveStockLimitQty(p.current_qty, p.stock)}
               unit={p.unit}
             />
           </div>

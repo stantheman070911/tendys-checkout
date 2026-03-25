@@ -5,7 +5,9 @@ import Link from "next/link";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { serializePublicOrderAccess } from "@/lib/public-order-access";
 import { formatCurrency } from "@/lib/utils";
+import { getPublicOrderAccessSessionKey } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Order, OrderItem, OrderStatus } from "@/types";
 
@@ -42,6 +44,23 @@ export default function LookupPage() {
       });
       if (res.ok) {
         const data = await res.json();
+        for (const order of data.orders ?? []) {
+          if (
+            typeof order.order_number === "string" &&
+            order.order_number.trim()
+          ) {
+            sessionStorage.setItem(
+              getPublicOrderAccessSessionKey(order.order_number),
+              serializePublicOrderAccess(
+                {
+                  recipient_name: trimmedRecipientName,
+                  phone_last3: trimmedPhoneLast3,
+                },
+                "lookup",
+              ),
+            );
+          }
+        }
         setResults(data.orders ?? []);
       } else {
         setResults([]);
@@ -82,7 +101,7 @@ export default function LookupPage() {
                 用姓名與手機末三碼，快速找回訂單。
               </h1>
               <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                系統會列出所有符合的歷史訂單。點進單筆訂單後，仍需再次驗證才能查看完整內容與後續操作。
+                系統會列出所有符合的歷史訂單，點進去即可查看完整內容與後續操作。
               </p>
             </div>
 
@@ -162,7 +181,7 @@ export default function LookupPage() {
                     </span>
                   </div>
                   <div className="text-right text-xs uppercase tracking-[0.22em] text-[hsl(var(--bronze))]">
-                    view detail
+                    view detail / 查詢細節
                   </div>
                 </div>
               </Link>

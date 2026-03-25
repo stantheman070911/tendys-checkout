@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ProgressBar";
+import { deriveStockLimitQty } from "@/lib/progress-bar";
 import { formatCurrency } from "@/lib/utils";
 import type { ProductWithProgress } from "@/types";
 
@@ -24,6 +25,7 @@ export function ProductCard({
   const outOfStock = product.stock !== null && product.stock <= 0;
   const remainingStock =
     product.stock !== null ? product.stock - cartQty : null;
+  const stockLimitQty = deriveStockLimitQty(product.current_qty, product.stock);
   const hasImage = !!product.image_url;
   const placeholderTone =
     product.current_qty >= (product.goal_qty ?? Number.MAX_SAFE_INTEGER)
@@ -61,7 +63,7 @@ export function ProductCard({
               )}
             </div>
             {remainingStock !== null && !outOfStock && (
-              <span className="rounded-full border border-white/24 bg-[rgba(255,251,246,0.14)] px-3 py-1 text-[11px] font-medium text-white/90 backdrop-blur-sm">
+              <span className="rounded-full border border-[rgba(255,244,234,0.42)] bg-[rgba(116,48,28,0.9)] px-4 py-2 text-sm font-semibold tracking-[0.04em] text-[rgba(255,248,242,0.98)] shadow-[0_18px_36px_-18px_rgba(52,21,12,0.72)] backdrop-blur-sm">
                 餘量 {remainingStock}
                 {product.unit}
               </span>
@@ -122,6 +124,7 @@ export function ProductCard({
             <ProgressBar
               currentQty={product.current_qty + cartQty}
               goalQty={product.goal_qty}
+              stockLimitQty={stockLimitQty}
               unit={product.unit}
             />
           </div>

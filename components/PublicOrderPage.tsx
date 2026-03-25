@@ -9,10 +9,10 @@ import { SharePanel } from "@/components/SharePanel";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { BANK_INFO } from "@/constants";
+import { parsePublicOrderAccess } from "@/lib/public-order-access";
 import {
   buildShareUrl,
   formatCurrency,
-  getPhoneLast3,
   getPublicOrderAccessSessionKey,
 } from "@/lib/utils";
 import type { OrderStatus } from "@/types";
@@ -81,7 +81,11 @@ export function PublicOrderPage({
   const unlockOrder = useCallback(
     async (
       nextIdentity: PublicIdentity,
-      options?: { consumeStoredAccess?: boolean; showErrorToast?: boolean },
+      options?: {
+        consumeStoredAccessOnSuccess?: boolean;
+        clearStoredAccessOnFailure?: boolean;
+        showErrorToast?: boolean;
+      },
     ) => {
       setUnlocking(true);
       try {
@@ -97,7 +101,7 @@ export function PublicOrderPage({
 
         if (!res.ok) {
           setOrder(null);
-          if (options?.consumeStoredAccess) {
+          if (options?.clearStoredAccessOnFailure) {
             sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
           }
           if (options?.showErrorToast !== false) {
@@ -113,7 +117,7 @@ export function PublicOrderPage({
         setOrder(data.order);
         setAnyUnderGoal(data.any_under_goal);
 
-        if (options?.consumeStoredAccess) {
+        if (options?.consumeStoredAccessOnSuccess) {
           sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
         }
       } catch {
@@ -138,20 +142,19 @@ export function PublicOrderPage({
     }
 
     try {
-      const parsed = JSON.parse(stored) as Partial<PublicIdentity>;
-      const storedRecipientName = parsed.recipient_name?.trim() ?? "";
-      const storedPhoneLast3 = parsed.phone_last3?.replace(/\D/g, "") ?? "";
-      if (!storedRecipientName || storedPhoneLast3.length !== 3) {
+      const resolved = parsePublicOrderAccess(stored);
+      if (!resolved) {
         sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
         setAutoUnlockChecked(true);
         return;
       }
       void unlockOrder(
+        resolved.identity,
         {
-          recipient_name: storedRecipientName,
-          phone_last3: storedPhoneLast3,
+          consumeStoredAccessOnSuccess: resolved.consumeOnUse,
+          clearStoredAccessOnFailure: true,
+          showErrorToast: false,
         },
-        { consumeStoredAccess: true, showErrorToast: false },
       );
     } catch {
       sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
@@ -251,16 +254,12 @@ export function PublicOrderPage({
             <div className="lux-panel-strong overflow-hidden p-6 md:p-8">
               <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)] md:items-end">
                 <div className="space-y-3">
-                  <div className="lux-kicker">Recipient Verification</div>
+                  <div className="lux-kicker">Order Recovery</div>
                   <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
-                    先驗證收件人，再查看這筆訂單。
+                    請先確認收件人資訊，再開啟這筆訂單。
                   </h1>
                   <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                    請輸入訂購人姓名與手機末三碼。
-                    <span className="mx-1 rounded bg-[rgba(236,224,205,0.5)] px-1.5 py-0.5 font-mono text-xs text-[hsl(var(--ink))]">
-                      ?code=
-                    </span>
-                
+                    若你不是從訂單查詢頁或剛下單後直接進來，請重新輸入訂購人姓名與手機末三碼。
                   </p>
                 </div>
 
