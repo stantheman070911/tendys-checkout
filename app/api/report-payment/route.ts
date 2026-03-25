@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
 
     const {
       order_number,
+      purchaser_name,
       recipient_name,
       phone_last3,
       payment_amount,
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
     } =
       body as {
         order_number?: string;
+        purchaser_name?: string;
         recipient_name?: string;
         phone_last3?: string;
         payment_amount?: number;
@@ -55,11 +57,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const recipientName =
-      typeof recipient_name === "string" ? recipient_name.trim() : "";
-    if (!recipientName) {
+    const purchaserName =
+      typeof purchaser_name === "string" && purchaser_name.trim()
+        ? purchaser_name.trim()
+        : typeof recipient_name === "string"
+          ? recipient_name.trim()
+          : "";
+    if (!purchaserName) {
       return NextResponse.json(
-        { error: "recipient_name is required" },
+        { error: "purchaser_name is required" },
         { status: 400 },
       );
     }
@@ -74,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     const existingOrder = await findPublicOrderByOrderNumberAndIdentity(
       orderNumber,
-      recipientName,
+      purchaserName,
       phoneLast3,
     );
     if (!existingOrder) {

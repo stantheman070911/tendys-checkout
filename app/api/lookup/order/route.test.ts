@@ -45,6 +45,8 @@ describe("POST /api/lookup/order", () => {
       line_user_id: null,
       created_at: "2026-03-24T00:00:00Z",
       user: {
+        nickname: "小美",
+        purchaser_name: "王小美",
         recipient_name: "王小美",
         phone: "0912-345-678",
         address: "台北市信義區測試路 1 號",
@@ -64,7 +66,7 @@ describe("POST /api/lookup/order", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-001",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       }),
     );
@@ -75,6 +77,7 @@ describe("POST /api/lookup/order", () => {
     expect(data.order.user.masked_phone).toContain("***");
     expect(data.order.user.phone).toBe("0912-345-678");
     expect(data.order.user.address).toBe("台北市信義區測試路 1 號");
+    expect(data.order.user.purchaser_name).toBe("王小美");
   });
 
   it("returns 404 when the order cannot be resolved", async () => {
@@ -83,7 +86,7 @@ describe("POST /api/lookup/order", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-404",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       }),
     );
@@ -95,7 +98,7 @@ describe("POST /api/lookup/order", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-001",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "67",
       }),
     );

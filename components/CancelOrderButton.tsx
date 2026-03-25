@@ -15,14 +15,14 @@ import { useToast } from "@/hooks/use-toast";
 
 interface CancelOrderButtonProps {
   orderNumber: string;
-  recipientName: string;
+  purchaserName: string;
   phoneLast3: string;
   onSuccess?: () => void | Promise<void>;
 }
 
 export function CancelOrderButton({
   orderNumber,
-  recipientName,
+  purchaserName,
   phoneLast3,
   onSuccess,
 }: CancelOrderButtonProps) {
@@ -39,7 +39,7 @@ export function CancelOrderButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order_number: orderNumber,
-          recipient_name: recipientName,
+          purchaser_name: purchaserName,
           phone_last3: phoneLast3,
         }),
       });

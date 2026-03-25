@@ -25,14 +25,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { order_number, recipient_name, phone_last3 } = body as {
+    const { order_number, purchaser_name, recipient_name, phone_last3 } = body as {
       order_number?: string;
+      purchaser_name?: string;
       recipient_name?: string;
       phone_last3?: string;
     };
 
     const orderNumber = order_number?.trim().toUpperCase();
-    const recipientName = recipient_name?.trim();
+    const purchaserName = purchaser_name?.trim() || recipient_name?.trim();
     const phoneLast3 = normalizePhoneDigits(phone_last3?.trim());
 
     if (!orderNumber) {
@@ -41,9 +42,9 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    if (!recipientName) {
+    if (!purchaserName) {
       return NextResponse.json(
-        { error: "recipient_name is required" },
+        { error: "purchaser_name is required" },
         { status: 400 },
       );
     }
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const order = await findPublicOrderByOrderNumberAndIdentity(
       orderNumber,
-      recipientName,
+      purchaserName,
       phoneLast3,
     );
     if (!order) {
@@ -94,6 +95,8 @@ export async function POST(request: NextRequest) {
         created_at: order.created_at,
         user: order.user
           ? {
+              nickname: order.user.nickname,
+              purchaser_name: order.user.purchaser_name,
               recipient_name: order.user.recipient_name,
               phone: order.user.phone,
               address: order.user.address,

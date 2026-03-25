@@ -40,6 +40,7 @@ const fakeOrders = [
     created_at: "2026-03-24T09:00:00Z",
     user: {
       nickname: "王小明",
+      purchaser_name: "王大明",
       recipient_name: "王小明",
       phone: "0900-000-001",
       address: "台北市信義區",
@@ -86,6 +87,7 @@ describe("GET /api/export-csv", () => {
     const res = await GET(makeRequest("r1"));
     const text = await res.text();
     expect(text).toContain("王小明");
+    expect(text).toContain("王大明");
     expect(text).toContain("台農57號黃金地瓜");
     expect(text).toContain("備註測試");
   });

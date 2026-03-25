@@ -87,6 +87,9 @@ export default function PrintOrderPage() {
           <p className="font-medium text-lg">
             {order.user?.recipient_name ?? "—"}
           </p>
+          <p className="text-gray-700">
+            訂購人：{order.user?.purchaser_name ?? "—"}
+          </p>
           <p className="text-gray-700">{order.user?.phone ?? "—"}</p>
           {order.pickup_location ? (
             <p className="text-purple-600 mt-1 font-medium">
@@ -103,7 +106,7 @@ export default function PrintOrderPage() {
             訂單資訊
           </h2>
           <p className="text-gray-700 mb-1">
-            訂購人：{order.user?.nickname ?? "—"}
+            暱稱：{order.user?.nickname ?? "—"}
           </p>
           <p className="text-gray-700 mb-1">狀態：{statusLabel}</p>
           {order.note && (

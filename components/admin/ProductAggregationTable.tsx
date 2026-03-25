@@ -206,6 +206,7 @@ export function ProductAggregationTable({
         (customer) => `
           <tr>
             <td>${escapeHtml(customer.nickname)}</td>
+            <td>${escapeHtml(customer.purchaser_name ?? "—")}</td>
             <td>${escapeHtml(customer.recipient_name ?? "—")}</td>
             <td>${escapeHtml(customer.phone ?? "—")}</td>
             <td>${escapeHtml(customer.order_number)}</td>
@@ -234,6 +235,7 @@ export function ProductAggregationTable({
             <thead>
               <tr>
                 <th>暱稱</th>
+                <th>訂購人</th>
                 <th>收貨人</th>
                 <th>電話</th>
                 <th>訂單編號</th>
@@ -363,11 +365,12 @@ export function ProductAggregationTable({
                   customers.map((c, i) => (
                     <div
                       key={i}
-                      className="grid gap-2 border-b border-[rgba(177,140,92,0.12)] py-2 text-xs last:border-0 lg:grid-cols-[5rem,6rem,1fr,8rem,5rem]"
+                      className="grid gap-2 border-b border-[rgba(177,140,92,0.12)] py-2 text-xs last:border-0 lg:grid-cols-[5rem,6rem,6rem,1fr,8rem,5rem]"
                     >
                       <span className="font-medium text-[hsl(var(--ink))]">
                         {c.nickname}
                       </span>
+                      <span>{c.purchaser_name ?? "—"}</span>
                       <span>{c.recipient_name ?? "—"}</span>
                       <span className="truncate text-[hsl(var(--muted-foreground))]">
                         {c.phone ?? "—"}

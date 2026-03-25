@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findOrdersByRecipientNameAndPhoneLast3 } from "@/lib/db/orders";
+import { findOrdersByPurchaserNameAndPhoneLast3 } from "@/lib/db/orders";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
 
@@ -24,17 +24,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { recipient_name, phone_last3 } = body as {
+    const { purchaser_name, recipient_name, phone_last3 } = body as {
+      purchaser_name?: string;
       recipient_name?: string;
       phone_last3?: string;
     };
 
-    const recipientName = recipient_name?.trim();
+    const purchaserName = purchaser_name?.trim() || recipient_name?.trim();
     const phoneLast3 = normalizePhoneDigits(phone_last3?.trim());
 
-    if (!recipientName) {
+    if (!purchaserName) {
       return NextResponse.json(
-        { error: "recipient_name is required" },
+        { error: "purchaser_name is required" },
         { status: 400 },
       );
     }
@@ -45,8 +46,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const orders = await findOrdersByRecipientNameAndPhoneLast3(
-      recipientName,
+    const orders = await findOrdersByPurchaserNameAndPhoneLast3(
+      purchaserName,
       phoneLast3,
     );
 

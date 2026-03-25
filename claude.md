@@ -33,10 +33,15 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 - Public lookup no longer forces a second verification step before opening a matched order:
   - shared helper: `lib/public-order-access.ts`
   - a verified `/lookup` search now caches session access for every matched order in that browser session
-  - direct `/order/[orderNumber]` visits still fall back to manual `recipient_name + phone_last3` verification
+  - direct `/order/[orderNumber]` visits still fall back to manual `purchaser_name + phone_last3` verification
   - lookup CTA copy now includes Chinese (`view detail / 查詢細節`) for lower-English users
-- Public checkout copy and hero summary were simplified for lower-friction ordering:
-  - the public checkout form now uses one visible shared field `訂購人/收貨人`, while still submitting the same value to both `nickname` and `recipient_name`
+- Public checkout and public identity now use a stored-profile model instead of nickname-conflict rejection:
+  - public checkout shows distinct `暱稱 / 訂購人 / 收貨人` fields plus an opt-in `儲存資料，下次結帳自動帶入` checkbox
+  - auto-fill only runs when both `暱稱 + 完整電話` are present, via `/api/checkout-profile/lookup`
+  - saved checkout data now lives in `saved_checkout_profiles`, while `users` became per-order contact snapshots with `purchaser_name` + `recipient_name`
+  - public lookup, single-order unlock, payment report, cancel, and LINE binding now verify with `purchaser_name + phone_last3`
+  - admin orders / shipments / supplier drill-down / CSV / print now surface all three names: `暱稱 / 訂購人 / 收貨人`
+- Public checkout hero summary was simplified for lower-friction ordering:
   - storefront delivery copy now says `宅配到以下地址`
   - homepage summary pills now show live round shipping info (`本團運費 {n}元` or `本團運費待設定`), a separate `面交取貨免運` pill, and round-normalized pickup labels
 - Storefront card polish follow-up:
@@ -91,16 +96,17 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 
 1. Admin creates round (開團) with deadline + shipping fee + pickup labels + products.
 2. Shares URL in LINE group.
-3. User browses → adds to cart → enters shared purchaser/recipient name + contact info + pickup option → submits (idempotent via `submission_key`).
-4. System shows bank details + share CTA if any product under goal.
-5. User transfers money, reports payment (`order_number + recipient_name + phone_last3`).
-6. Admin confirms (single/batch) → LINE + email notification. Status: `confirmed`.
-7. Products arrive → admin sends arrival notification to relevant customers.
-8. Admin marks shipped (待出貨, grouped by pickup method) → shipment notification. Status: `shipped`.
-9. User checks status via `/lookup` (`recipient_name + phone_last3`) and can open any matched order detail in that browser session without re-entering the same fields.
-10. **LINE linking**: User pastes `ORD-YYYYMMDD-NNN 王小美 678` → webhook validates + links `line_user_id`.
-11. **POS**: Admin creates orders on behalf of customers, instant cash confirmation.
-12. **Admin cancel**: From any status, with reason + cancellation notification.
+3. User browses → adds to cart → enters `暱稱 / 訂購人 / 收貨人` + contact info + pickup option → optionally saves profile for next time → submits (idempotent via `submission_key`).
+4. If both `暱稱 + 完整電話` are entered, the system may auto-fill previously saved checkout data for that exact pair.
+5. System shows bank details + share CTA if any product under goal.
+6. User transfers money, reports payment (`order_number + purchaser_name + phone_last3`).
+7. Admin confirms (single/batch) → LINE + email notification. Status: `confirmed`.
+8. Products arrive → admin sends arrival notification to relevant customers.
+9. Admin marks shipped (待出貨, grouped by pickup method) → shipment notification. Status: `shipped`.
+10. User checks status via `/lookup` (`purchaser_name + phone_last3`) and can open any matched order detail in that browser session without re-entering the same fields.
+11. **LINE linking**: User pastes `ORD-YYYYMMDD-NNN 王小美 678` → webhook validates against `purchaser_name + phone_last3` and links `line_user_id`.
+12. **POS**: Admin creates orders on behalf of customers, instant cash confirmation, with nickname autofill preferring saved checkout profiles.
+13. **Admin cancel**: From any status, with reason + cancellation notification.
 
 ---
 
@@ -109,8 +115,8 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 ```
 app/
   page.tsx                      # Storefront
-  order/[orderNumber]/page.tsx  # Public order detail (auto-unlocks from checkout or verified lookup session; direct access still gated by order_number + recipient_name + phone_last3)
-  lookup/page.tsx               # Order lookup (recipient_name + phone_last3)
+  order/[orderNumber]/page.tsx  # Public order detail (auto-unlocks from checkout or verified lookup session; direct access still gated by order_number + purchaser_name + phone_last3)
+  lookup/page.tsx               # Order lookup (purchaser_name + phone_last3)
   gtfo/page.tsx                 # Troll page for /admin snoopers
   admin/                        # ⚠️ NOT /admin (redirects to /gtfo). Real URL: /bitchassnigga (next.config.ts rewrites)
     layout.tsx                  # Auth guard, nav tabs, POS button
@@ -140,9 +146,10 @@ app/
     orders/[id]/route.ts        # Single order detail
     orders-by-product/route.ts  # Group by product → customer list
     notification-logs/route.ts
+    checkout-profile/lookup/route.ts # Public autofill: nickname + full phone
     users/lookup/route.ts       # Admin-only POS autofill
-    lookup/route.ts             # Public: recipient_name + phone_last3
-    lookup/order/route.ts       # Public: order_number + recipient_name + phone_last3
+    lookup/route.ts             # Public: purchaser_name + phone_last3
+    lookup/order/route.ts       # Public: order_number + purchaser_name + phone_last3
     line/webhook/route.ts       # LINE webhook (signature verify → order linking)
 lib/                            # Pure TypeScript — NO React/Next imports
   db/prisma.ts                  # globalThis singleton PrismaClient
@@ -166,24 +173,25 @@ hooks/use-toast.ts, use-admin-session.ts, use-admin-fetch.ts
 types/index.ts
 constants/index.ts              # Status enums, bank info keys
 prisma/
-  schema.prisma                 # 7 models
+  schema.prisma                 # 8 models
   migration.sql                 # Initial (tables, triggers, RLS, views)
-  migration_002–008             # Incremental (line_user_id, notif context, single-open-round, line index, RLS hardening, remove access_code, round pickup labels)
+  migration_002–009             # Incremental (line_user_id, notif context, single-open-round, line index, RLS hardening, remove access_code, round pickup labels, saved checkout profiles)
   seed.ts
 ```
 
 ---
 
-## Database Schema (7 models)
+## Database Schema (8 models)
 
 ```
-Round          → id, name, is_open, deadline, shipping_fee, pickup_option_a, pickup_option_b, created_at
-Supplier       → id, name, contact_name, phone, email, note, created_at, updated_at
-Product        → id, round_id(FK), supplier_id(FK), name, price, unit, is_active, stock, goal_qty, image_url, created_at
-User           → id, nickname(UNIQUE), recipient_name, phone, address, email, created_at, updated_at
-Order          → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), line_user_id, created_at
-OrderItem      → id, order_id(FK), product_id(FK), product_name, unit_price, quantity, subtotal
-NotificationLog → id, order_id(FK|null), round_id(FK|null), product_id(FK|null), channel, type, status, error_message, created_at
+Round               → id, name, is_open, deadline, shipping_fee, pickup_option_a, pickup_option_b, created_at
+Supplier            → id, name, contact_name, phone, email, note, created_at, updated_at
+Product             → id, round_id(FK), supplier_id(FK), name, price, unit, is_active, stock, goal_qty, image_url, created_at
+User                → id, nickname(INDEX), purchaser_name, recipient_name, phone, address, email, created_at, updated_at
+SavedCheckoutProfile → id, nickname(UNIQUE), purchaser_name, recipient_name, phone, address, email, created_at, updated_at
+Order               → id, order_number(UNIQUE), user_id(FK), round_id(FK), total_amount, shipping_fee, status, payment_amount, payment_last5, payment_reported_at, confirmed_at, shipped_at, note, pickup_location, cancel_reason, submission_key(UNIQUE), line_user_id, created_at
+OrderItem           → id, order_id(FK), product_id(FK), product_name, unit_price, quantity, subtotal
+NotificationLog     → id, order_id(FK|null), round_id(FK|null), product_id(FK|null), channel, type, status, error_message, created_at
 ```
 
 ### Order Status Flow
@@ -210,7 +218,7 @@ Cancel stock restore: yes except `shipped`.
 | 確認寄出/確認取貨 | Mark shipped (宅配/面交, same status: `shipped`) |
 | 代客下單 | Admin POS order creation |
 | 快速收款 | POS cash → quick-confirm |
-| 綁定訂單 | LINE linking via order_number + recipient_name + phone_last3 |
+| 綁定訂單 | LINE linking via order_number + purchaser_name + phone_last3 |
 
 ### Key DB Behaviors
 
@@ -219,7 +227,8 @@ Cancel stock restore: yes except `shipped`.
 - **`product_progress` view**: Aggregates order_items by product (excluding cancelled).
 - **Shipping fee**: `submit-order` snapshots `round.shipping_fee` on 宅配 orders. Never recalculate after creation.
 - **Pickup options**: `pickup_option_a` / `pickup_option_b` live on `Round`. `pickup_location` must be empty string (宅配) or match that round’s configured labels.
-- **Public access**: `/api/lookup` requires `recipient_name + phone_last3`. A successful lookup may cache per-order session access client-side, but server truth for single-order actions remains `order_number + recipient_name + phone_last3`. No internal UUIDs on public routes.
+- **Saved checkout profiles**: `saved_checkout_profiles` is the reusable autofill store keyed by `nickname`; `users` is now a per-order snapshot and is never reused across orders.
+- **Public access**: `/api/lookup` requires `purchaser_name + phone_last3`. A successful lookup may cache per-order session access client-side, but server truth for single-order actions remains `order_number + purchaser_name + phone_last3`. No internal UUIDs on public routes.
 - **Public order detail payload**: After public verification succeeds, `/api/lookup/order` may return saved phone + address for that order’s user so the customer can verify delivery details.
 - **LINE linking**: Per-order (not per-user). Webhook verifies all three fields. Idempotent. One order = one LINE account.
 - **Single-open-round**: Partial unique index. `create()` atomically closes existing open rounds. `update()` catches `P2002`.
@@ -250,14 +259,14 @@ Public operations go through server-side API routes + Prisma, not direct anon ac
 6. **`submission_key`** = `crypto.randomUUID()`, generated client-side once per checkout session.
 7. **Shipping fee snapshot.** Stored on order at creation. Never recalculate from round.
 8. **Arrival notifications target by product**, not order.
-9. **Public routes use `recipient_name + phone_last3`** (+ `order_number` for single-order actions). No internal UUIDs.
+9. **Public routes use `purchaser_name + phone_last3`** (+ `order_number` for single-order actions). No internal UUIDs.
 10. **Pickup options are round-scoped.** Never validate or render pickup labels from a global constant.
 
 ### API Route Contracts
 
 - Type with `NextRequest`/`NextResponse`. Return `{ error: string }` + correct HTTP status on failure.
 - Validate request bodies before DB access.
-- `submit-order`: round open → validate stock → calc shipping → decrement stock → insert (transaction). No overwriting existing nickname profiles with different details.
+- `submit-order`: round open → validate stock → calc shipping → decrement stock → insert (transaction). Public checkout may optionally save/update a reusable checkout profile, but only when `nickname + full phone` match.
 - `submit-order`: validate `pickup_location` against the round’s configured pickup labels, not a static options array.
 - `confirm-order`/`batch-confirm`: update status → notify → log. Notification failure does NOT rollback.
 - `confirm-shipment`: status → `shipped` + `shipped_at` → notify → log.

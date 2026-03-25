@@ -29,6 +29,7 @@ type OrderWithRelations = Prisma.OrderGetPayload<{
 type CheckoutUserRecord = {
   id: string;
   nickname: string;
+  purchaser_name: string | null;
   recipient_name: string | null;
   phone: string | null;
   address: string | null;
@@ -37,6 +38,7 @@ type CheckoutUserRecord = {
 
 interface CheckoutUserInput {
   nickname: string;
+  purchaser_name: string;
   recipient_name: string;
   phone: string;
   address?: string;
@@ -62,6 +64,7 @@ export interface CreateCheckoutOrderInput {
   submission_key: string;
   items: CreateOrderItem[];
   is_admin: boolean;
+  save_profile: boolean;
   user: CheckoutUserInput;
 }
 
@@ -76,7 +79,7 @@ export type CreateCheckoutOrderResult =
       error: string;
     }
   | {
-      kind: "nickname_conflict";
+      kind: "saved_profile_phone_mismatch";
     }
   | {
       kind: "schema_drift_access_code";
@@ -92,13 +95,12 @@ type CreateWithItemsResult =
       error: string;
     };
 
-type ResolveUserResult =
+type SaveCheckoutProfileResult =
   | {
       kind: "success";
-      user: CheckoutUserRecord;
     }
   | {
-      kind: "nickname_conflict";
+      kind: "saved_profile_phone_mismatch";
     };
 
 // Thrown inside $transaction to trigger rollback while carrying a user-facing message
@@ -109,53 +111,34 @@ class OrderValidationError extends Error {
   }
 }
 
-function normalizeRecipientName(value: string | null | undefined): string {
-  return (value ?? "").trim().toLocaleLowerCase();
-}
-
-function normalizeEmail(value: string | null | undefined): string {
+function normalizePersonName(value: string | null | undefined): string {
   return (value ?? "").trim().toLocaleLowerCase();
 }
 
 function orderMatchesPublicIdentity(
   order: {
     user?: {
-      recipient_name?: string | null;
+      purchaser_name?: string | null;
       phone?: string | null;
     } | null;
   },
-  recipientName: string,
+  purchaserName: string,
   phoneLast3: string,
 ): boolean {
   return (
-    normalizeRecipientName(order.user?.recipient_name) ===
-      normalizeRecipientName(recipientName) &&
+    normalizePersonName(order.user?.purchaser_name) ===
+      normalizePersonName(purchaserName) &&
     normalizePhoneDigits(order.user?.phone).endsWith(phoneLast3)
   );
 }
 
-function hasPublicProfileConflict(
-  existingUser: {
-    phone?: string | null;
-    recipient_name?: string | null;
-    address?: string | null;
-    email?: string | null;
-  },
-  nextUser: {
-    phone?: string | undefined;
-    recipient_name?: string | undefined;
-    address?: string | undefined;
-    email?: string | undefined;
-  },
+function phoneMatchesExact(
+  existingPhone: string | null | undefined,
+  nextPhone: string | null | undefined,
 ): boolean {
-  return (
-    normalizePhoneDigits(existingUser.phone) !==
-      normalizePhoneDigits(nextUser.phone) ||
-    normalizeRecipientName(existingUser.recipient_name) !==
-      normalizeRecipientName(nextUser.recipient_name) ||
-    (existingUser.address ?? "").trim() !== (nextUser.address ?? "").trim() ||
-    normalizeEmail(existingUser.email) !== normalizeEmail(nextUser.email)
-  );
+  const existingDigits = normalizePhoneDigits(existingPhone);
+  const nextDigits = normalizePhoneDigits(nextPhone);
+  return !!existingDigits && existingDigits === nextDigits;
 }
 
 function errorMetaIncludesField(value: unknown, field: string): boolean {
@@ -200,109 +183,65 @@ async function findBySubmissionKeyTx(
   });
 }
 
-async function insertPublicUserIfMissing(
-  tx: TxClient,
-  nickname: string,
-  data: Omit<CheckoutUserInput, "nickname">,
-): Promise<CheckoutUserRecord | null> {
-  const users = await tx.$queryRaw<CheckoutUserRecord[]>`
-    INSERT INTO public.users (nickname, recipient_name, phone, address, email)
-    VALUES (
-      ${nickname},
-      ${data.recipient_name},
-      ${data.phone},
-      ${data.address ?? null},
-      ${data.email ?? null}
-    )
-    ON CONFLICT (nickname) DO NOTHING
-    RETURNING id, nickname, recipient_name, phone, address, email
-  `;
-
-  return users[0] ?? null;
+async function acquireSavedProfileLock(tx: TxClient, nickname: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${nickname}))`;
 }
 
-async function upsertAdminUser(
+async function createUserSnapshot(
   tx: TxClient,
-  nickname: string,
-  data: Omit<CheckoutUserInput, "nickname">,
+  data: CheckoutUserInput,
 ): Promise<CheckoutUserRecord> {
-  const users = await tx.$queryRaw<CheckoutUserRecord[]>`
-    INSERT INTO public.users (nickname, recipient_name, phone, address, email)
-    VALUES (
-      ${nickname},
-      ${data.recipient_name},
-      ${data.phone},
-      ${data.address ?? null},
-      ${data.email ?? null}
-    )
-    ON CONFLICT (nickname) DO UPDATE
-    SET
-      recipient_name = EXCLUDED.recipient_name,
-      phone = EXCLUDED.phone,
-      address = EXCLUDED.address,
-      email = EXCLUDED.email
-    RETURNING id, nickname, recipient_name, phone, address, email
-  `;
-
-  return users[0]!;
+  return tx.user.create({
+    data: {
+      nickname: data.nickname,
+      purchaser_name: data.purchaser_name,
+      recipient_name: data.recipient_name,
+      phone: data.phone,
+      address: data.address ?? null,
+      email: data.email ?? null,
+    },
+  });
 }
 
-async function resolveCheckoutUser(
+async function saveCheckoutProfileInTx(
   tx: TxClient,
-  input: CreateCheckoutOrderInput,
-): Promise<ResolveUserResult> {
-  const userData = {
-    recipient_name: input.user.recipient_name,
-    phone: input.user.phone,
-    address: input.user.address,
-    email: input.user.email,
+  input: CheckoutUserInput,
+): Promise<SaveCheckoutProfileResult> {
+  await acquireSavedProfileLock(tx, input.nickname);
+
+  const existingProfile = await tx.savedCheckoutProfile.findUnique({
+    where: { nickname: input.nickname },
+  });
+
+  if (existingProfile && !phoneMatchesExact(existingProfile.phone, input.phone)) {
+    return { kind: "saved_profile_phone_mismatch" };
+  }
+
+  const profileData = {
+    purchaser_name: input.purchaser_name,
+    recipient_name: input.recipient_name,
+    phone: input.phone,
+    address: input.address ?? null,
+    email: input.email ?? null,
+    updated_at: new Date(),
   };
 
-  const existingUser = await tx.user.findUnique({
-    where: { nickname: input.user.nickname },
+  if (existingProfile) {
+    await tx.savedCheckoutProfile.update({
+      where: { nickname: input.nickname },
+      data: profileData,
+    });
+    return { kind: "success" };
+  }
+
+  await tx.savedCheckoutProfile.create({
+    data: {
+      nickname: input.nickname,
+      ...profileData,
+      created_at: new Date(),
+    },
   });
-
-  if (existingUser) {
-    if (input.is_admin) {
-      return {
-        kind: "success",
-        user: await upsertAdminUser(tx, input.user.nickname, userData),
-      };
-    }
-
-    return hasPublicProfileConflict(existingUser, userData)
-      ? { kind: "nickname_conflict" }
-      : { kind: "success", user: existingUser };
-  }
-
-  if (input.is_admin) {
-    return {
-      kind: "success",
-      user: await upsertAdminUser(tx, input.user.nickname, userData),
-    };
-  }
-
-  const insertedUser = await insertPublicUserIfMissing(
-    tx,
-    input.user.nickname,
-    userData,
-  );
-  if (insertedUser) {
-    return { kind: "success", user: insertedUser };
-  }
-
-  const concurrentUser = await tx.user.findUnique({
-    where: { nickname: input.user.nickname },
-  });
-  if (!concurrentUser) {
-    throw new Error(
-      `Failed to resolve nickname after insert conflict: ${input.user.nickname}`,
-    );
-  }
-
-  return hasPublicProfileConflict(concurrentUser, userData)
-    ? { kind: "nickname_conflict" }
-    : { kind: "success", user: concurrentUser };
+  return { kind: "success" };
 }
 
 async function createOrderInTx(
@@ -373,7 +312,7 @@ async function createOrderInTx(
   }
 
   const isDelivery = !data.pickup_location;
-  const shippingFee = isDelivery && round.shipping_fee ? round.shipping_fee : null;
+  const shippingFee = isDelivery ? round.shipping_fee : null;
   const totalAmount = itemsTotal + (shippingFee ?? 0);
 
   return tx.order.create({
@@ -432,16 +371,20 @@ export async function createCheckoutOrder(
         };
       }
 
-      const resolvedUser = await resolveCheckoutUser(tx, input);
-      if (resolvedUser.kind === "nickname_conflict") {
-        return resolvedUser;
+      if (!input.is_admin && input.save_profile) {
+        const savedProfileResult = await saveCheckoutProfileInTx(tx, input.user);
+        if (savedProfileResult.kind === "saved_profile_phone_mismatch") {
+          return savedProfileResult;
+        }
       }
+
+      const snapshotUser = await createUserSnapshot(tx, input.user);
 
       const order = await createOrderInTx(
         tx,
         {
           round_id: input.round_id,
-          user_id: resolvedUser.user.id,
+          user_id: snapshotUser.id,
           pickup_location: input.pickup_location,
           note: input.note,
         },
@@ -500,16 +443,16 @@ export async function getOrderWithItems(
   });
 }
 
-export async function findOrdersByRecipientNameAndPhoneLast3(
-  recipientName: string,
+export async function findOrdersByPurchaserNameAndPhoneLast3(
+  purchaserName: string,
   phoneLast3: string,
 ): Promise<OrderWithRelations[]> {
   const orders = await prisma.order.findMany({
     where: {
       user: {
         is: {
-          recipient_name: {
-            equals: recipientName,
+          purchaser_name: {
+            equals: purchaserName,
             mode: "insensitive",
           },
         },
@@ -520,13 +463,13 @@ export async function findOrdersByRecipientNameAndPhoneLast3(
   });
 
   return orders.filter((order) =>
-    orderMatchesPublicIdentity(order, recipientName, phoneLast3),
+    orderMatchesPublicIdentity(order, purchaserName, phoneLast3),
   );
 }
 
 export async function findPublicOrderByOrderNumberAndIdentity(
   orderNumber: string,
-  recipientName: string,
+  purchaserName: string,
   phoneLast3: string,
 ): Promise<OrderWithRelations | null> {
   const order = await prisma.order.findFirst({
@@ -534,8 +477,8 @@ export async function findPublicOrderByOrderNumberAndIdentity(
       order_number: orderNumber,
       user: {
         is: {
-          recipient_name: {
-            equals: recipientName,
+          purchaser_name: {
+            equals: purchaserName,
             mode: "insensitive",
           },
         },
@@ -544,7 +487,7 @@ export async function findPublicOrderByOrderNumberAndIdentity(
     include: orderWithRelationsInclude,
   });
 
-  if (!order || !orderMatchesPublicIdentity(order, recipientName, phoneLast3)) {
+  if (!order || !orderMatchesPublicIdentity(order, purchaserName, phoneLast3)) {
     return null;
   }
 
@@ -581,6 +524,7 @@ export async function getOrdersByProduct(productId: string, roundId: string) {
     product_id: item.product_id,
     product_name: item.product_name,
     nickname: item.order.user?.nickname ?? "",
+    purchaser_name: item.order.user?.purchaser_name ?? null,
     recipient_name: item.order.user?.recipient_name ?? null,
     phone: item.order.user?.phone ?? null,
     quantity: item.quantity,
@@ -614,11 +558,16 @@ export async function getCustomersForArrivalNotification(
   // orders from the same user may have different link states)
   const lineUserIdSet = new Set<string>();
   const emailSet = new Set<string>();
-  // Count unique customers by user_id (fall back to order.id for guest orders)
+  // Count unique customers by logical public identity rather than user snapshot ID.
   const customerIdSet = new Set<string>();
 
   for (const item of items) {
-    customerIdSet.add(item.order.user_id ?? item.order.id);
+    const identityKey = [
+      item.order.user?.nickname ?? "",
+      item.order.user?.purchaser_name ?? "",
+      normalizePhoneDigits(item.order.user?.phone),
+    ].join("|");
+    customerIdSet.add(identityKey === "||" ? item.order.id : identityKey);
 
     const lineUserId = item.order.line_user_id;
     if (lineUserId) lineUserIdSet.add(lineUserId);

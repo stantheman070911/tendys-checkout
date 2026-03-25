@@ -9,6 +9,7 @@ const PHONE_RE = /^[\d\-+().\s]{7,20}$/;
 
 const MAX_LEN = {
   nickname: 50,
+  purchaser_name: 100,
   recipient_name: 100,
   phone: 20,
   address: 200,
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
     const {
       round_id,
       nickname,
+      purchaser_name,
       recipient_name,
       phone,
       address,
@@ -51,9 +53,11 @@ export async function POST(request: NextRequest) {
       items,
       submission_key,
       note,
+      save_profile,
     } = body as {
       round_id?: string;
       nickname?: string;
+      purchaser_name?: string;
       recipient_name?: string;
       phone?: string;
       address?: string;
@@ -68,6 +72,7 @@ export async function POST(request: NextRequest) {
       }>;
       submission_key?: string;
       note?: string;
+      save_profile?: boolean;
     };
 
     // ─── Validation ──────────────────────────────────────────
@@ -107,6 +112,25 @@ export async function POST(request: NextRequest) {
     if (trimmedNickname.length > MAX_LEN.nickname) {
       return NextResponse.json(
         { error: `nickname must be ≤ ${MAX_LEN.nickname} chars` },
+        { status: 400 },
+      );
+    }
+
+    const trimmedPurchaserName =
+      typeof purchaser_name === "string"
+        ? purchaser_name.trim()
+        : typeof recipient_name === "string"
+          ? recipient_name.trim()
+          : "";
+    if (!trimmedPurchaserName) {
+      return NextResponse.json(
+        { error: "purchaser_name is required" },
+        { status: 400 },
+      );
+    }
+    if (trimmedPurchaserName.length > MAX_LEN.purchaser_name) {
+      return NextResponse.json(
+        { error: `purchaser_name must be ≤ ${MAX_LEN.purchaser_name} chars` },
         { status: 400 },
       );
     }
@@ -243,6 +267,7 @@ export async function POST(request: NextRequest) {
       product_id: item.product_id!.trim(),
       quantity: item.quantity!,
     }));
+    const shouldSaveProfile = save_profile === true;
 
     const result = await createCheckoutOrder({
       round_id: trimmedRoundId,
@@ -251,8 +276,10 @@ export async function POST(request: NextRequest) {
       submission_key,
       items: orderItems,
       is_admin: isAdmin,
+      save_profile: shouldSaveProfile,
       user: {
         nickname: trimmedNickname,
+        purchaser_name: trimmedPurchaserName,
         recipient_name: trimmedRecipientName,
         phone: trimmedPhone,
         address: trimmedAddress,
@@ -268,11 +295,11 @@ export async function POST(request: NextRequest) {
         );
       case "validation_error":
         return NextResponse.json({ error: result.error }, { status: 400 });
-      case "nickname_conflict":
+      case "saved_profile_phone_mismatch":
         return NextResponse.json(
           {
             error:
-              "This nickname already exists with different saved details. Use a different nickname or contact the organizer.",
+              "此暱稱已有資料儲存；電話一致才可自動帶入或覆寫更新。若要直接下單，請取消勾選儲存資料或改用其他暱稱。",
           },
           { status: 409 },
         );

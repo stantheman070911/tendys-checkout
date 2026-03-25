@@ -4,6 +4,7 @@ interface SearchableOrder {
   user: {
     nickname: string | null;
     phone: string | null;
+    purchaser_name: string | null;
     recipient_name: string | null;
   } | null;
 }
@@ -21,6 +22,7 @@ export function matchesOrderSearch(
     (order.user?.nickname ?? "").toLowerCase().includes(normalizedQuery) ||
     (order.user?.phone ?? "").includes(normalizedQuery) ||
     order.order_number.toLowerCase().includes(normalizedQuery) ||
+    (order.user?.purchaser_name ?? "").toLowerCase().includes(normalizedQuery) ||
     (order.user?.recipient_name ?? "").toLowerCase().includes(normalizedQuery)
   );
 }

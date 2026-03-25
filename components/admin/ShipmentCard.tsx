@@ -118,6 +118,19 @@ export function ShipmentCard({
       {/* Customer info */}
       <div className="lux-panel-muted space-y-1 p-3 text-xs text-[hsl(var(--muted-foreground))]">
         <div>
+          暱稱：{" "}
+          <span className="font-medium text-[hsl(var(--ink))]">
+            {o.user?.nickname ?? "—"}
+          </span>
+        </div>
+        <div>
+          訂購人：{" "}
+          <span className="font-medium text-[hsl(var(--ink))]">
+            {o.user?.purchaser_name ?? "—"}
+          </span>
+        </div>
+        <div>
+          收貨人：{" "}
           <span className="font-medium text-[hsl(var(--ink))]">
             {o.user?.recipient_name ?? "—"}
           </span>{" "}

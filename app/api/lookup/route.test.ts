@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ── Mocks ──────────────────────────────────────────────────────
 
 const ordersMock = vi.hoisted(() => ({
-  findOrdersByRecipientNameAndPhoneLast3: vi.fn(),
+  findOrdersByPurchaserNameAndPhoneLast3: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -25,7 +25,7 @@ describe("POST /api/lookup", () => {
   });
 
   it("returns 200 with a matching order", async () => {
-    ordersMock.findOrdersByRecipientNameAndPhoneLast3.mockResolvedValue([
+    ordersMock.findOrdersByPurchaserNameAndPhoneLast3.mockResolvedValue([
       {
         id: "o1",
         order_number: "ORD-001",
@@ -40,7 +40,7 @@ describe("POST /api/lookup", () => {
     ]);
 
     const res = await POST(
-      makeRequest({ recipient_name: "王小美", phone_last3: "678" }),
+      makeRequest({ purchaser_name: "王小美", phone_last3: "678" }),
     );
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -49,22 +49,22 @@ describe("POST /api/lookup", () => {
   });
 
   it("returns 404 when no match", async () => {
-    ordersMock.findOrdersByRecipientNameAndPhoneLast3.mockResolvedValue([]);
+    ordersMock.findOrdersByPurchaserNameAndPhoneLast3.mockResolvedValue([]);
 
     const res = await POST(
-      makeRequest({ recipient_name: "王小美", phone_last3: "678" }),
+      makeRequest({ purchaser_name: "王小美", phone_last3: "678" }),
     );
     expect(res.status).toBe(404);
   });
 
-  it("returns 400 for missing recipient_name", async () => {
+  it("returns 400 for missing purchaser_name", async () => {
     const res = await POST(makeRequest({ phone_last3: "678" }));
     expect(res.status).toBe(400);
   });
 
   it("returns 400 for invalid phone_last3", async () => {
     const res = await POST(
-      makeRequest({ recipient_name: "王小美", phone_last3: "12" }),
+      makeRequest({ purchaser_name: "王小美", phone_last3: "12" }),
     );
     expect(res.status).toBe(400);
   });

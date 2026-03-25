@@ -44,12 +44,12 @@
   - Create supplier → round (with shipping fee + pickup point A/B labels) → products (linked to supplier, with goals)
   - Place test orders: 宅配 (verify shipping added), 面交 (verify no shipping)
   - Verify progress bars update
-  - Report payments via `order_number + recipient_name + phone_last3` → admin confirm → verify notifications
-  - Bind LINE with `order_number + recipient_name + phone_last3` → verify push routing
+  - Report payments via `order_number + purchaser_name + phone_last3` → admin confirm → verify notifications
+  - Bind LINE with `order_number + purchaser_name + phone_last3` → verify push routing
   - Admin 通知到貨 → verify customers notified
   - Admin confirm shipment (single + batch) → verify notifications
   - Cancel order → verify stock restored
-  - Lookup by `recipient_name + phone_last3` → verify access works, no cross-order leaks, and unlocked detail shows expected address/phone
+  - Lookup by `purchaser_name + phone_last3` → verify access works, no cross-order leaks, and unlocked detail shows expected address/phone
   - Export CSV → verify shipping fee column + Chinese encoding
   - Close round → verify 已截單
 - [x] **7.2** Edge case tests (99 tests / 21 files)
@@ -70,10 +70,10 @@
   - Moved public/admin nickname resolution and user persistence into one transactional checkout helper in `lib/db/orders.ts`
   - Preserved `submission_key` dedup while preventing failed order creation from leaving partial user rows behind
   - Added explicit `/api/submit-order` handling for stale `orders.access_code` schema drift, returning `503` with migration guidance instead of opaque `500`
-  - Added focused route + DB tests for dedup, nickname conflicts, concurrent nickname reuse, and schema-drift detection
+  - Added focused route + DB tests for dedup, saved-profile phone mismatches, concurrent nickname reuse, and schema-drift detection
 - [x] **7.10** Public order redirect polish
   - Replaced the post-checkout verification-form flash with a loading state while stored order access is being auto-consumed
-  - Preserved the existing `recipient_name + phone_last3` public auth rule; this was UX-only polish in `components/PublicOrderPage.tsx`
+  - This later evolved into the current `purchaser_name + phone_last3` public auth rule; the core UX goal stayed the same in `components/PublicOrderPage.tsx`
 - [x] **7.11** Configurable pickup points per round
   - Added `pickup_option_a` + `pickup_option_b` to `Round` in Prisma, shared types, seed data, and Supabase SQL
   - Added manual migration file `prisma/migration_008_round_pickup_options.sql` for live databases
@@ -91,13 +91,17 @@
   - A verified `/lookup` search now caches access for all matched orders in the current browser session, so opening a result no longer asks for the same identity twice
   - Direct `/order/[orderNumber]` visits still fall back to manual verification, and lookup CTA/copy was localized with Chinese support (`查詢細節`)
 - [x] **7.15** Public checkout + storefront copy clarification
-  - Public checkout now uses one visible `訂購人/收貨人` field while still submitting the same value into the existing `nickname` / `recipient_name` backend fields
   - Storefront delivery wording now says `宅配到以下地址`
   - Homepage hero pills now show the live round shipping fee (`本團運費 {n}元` or `本團運費待設定`), a separate `面交取貨免運` pill, and normalized round pickup labels
 - [x] **7.16** Storefront product-card wording + layout polish
   - Public product cards now describe aggregate demand as `已有 x被預訂，共有 y`, with unlimited-stock fallback `已被預訂 x`
   - Storefront progress-bar copy now uses `庫存` / `已被預訂`, and the stock-limit pill is shortened to `已達庫存`
   - Product image overlay text is vertically centered, and the round-status badge keeps `開放中` on one line
+- [x] **7.17** Public saved-profile checkout + purchaser identity split
+  - Added `users.purchaser_name`, removed global uniqueness from `users.nickname`, and introduced `saved_checkout_profiles` for reusable checkout autofill
+  - Public checkout now shows `暱稱 / 訂購人 / 收貨人` with opt-in `儲存資料，下次結帳自動帶入`, and autofill only runs when `暱稱 + 完整電話` both exist
+  - Public lookup, order unlock, payment report, cancel, and LINE binding now verify with `purchaser_name + phone_last3`
+  - Admin orders / shipments / supplier drill-down / CSV / print now show all three names, and admin search now covers `暱稱 / 訂購人 / 收貨人 / 電話 / 訂單號`
 
 ### Checkpoint 7 (Final)
 

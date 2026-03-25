@@ -3,7 +3,7 @@ import { normalizePhoneDigits } from "@/lib/utils";
 export type PublicOrderAccessSource = "lookup" | "checkout";
 
 export interface PublicOrderAccessIdentity {
-  recipient_name: string;
+  purchaser_name: string;
   phone_last3: string;
 }
 
@@ -16,15 +16,19 @@ export interface ResolvedPublicOrderAccess {
 function normalizeIdentity(
   value: Partial<PublicOrderAccessIdentity> | null | undefined,
 ): PublicOrderAccessIdentity | null {
-  const recipientName = value?.recipient_name?.trim() ?? "";
+  const purchaserName =
+    value?.purchaser_name?.trim() ??
+    (value as { recipient_name?: string | null } | null | undefined)
+      ?.recipient_name?.trim() ??
+    "";
   const phoneLast3 = normalizePhoneDigits(value?.phone_last3).trim();
 
-  if (!recipientName || phoneLast3.length !== 3) {
+  if (!purchaserName || phoneLast3.length !== 3) {
     return null;
   }
 
   return {
-    recipient_name: recipientName,
+    purchaser_name: purchaserName,
     phone_last3: phoneLast3,
   };
 }

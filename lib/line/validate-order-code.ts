@@ -35,7 +35,7 @@ export type ValidationResult = ValidationSuccess | ValidationFailure;
  */
 export async function validateOrderNumber(
   orderNumber: string,
-  recipientName: string,
+  purchaserName: string,
   phoneLast3: string,
   lineUserId: string,
 ): Promise<ValidationResult> {
@@ -44,8 +44,8 @@ export async function validateOrderNumber(
       order_number: orderNumber,
       user: {
         is: {
-          recipient_name: {
-            equals: recipientName,
+          purchaser_name: {
+            equals: purchaserName,
             mode: "insensitive",
           },
         },

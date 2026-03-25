@@ -46,6 +46,8 @@ interface PublicOrder {
   line_user_id: string | null;
   created_at: string;
   user: {
+    nickname: string | null;
+    purchaser_name: string | null;
     recipient_name: string | null;
     phone: string | null;
     address: string | null;
@@ -60,7 +62,7 @@ interface PublicOrderResponse {
 }
 
 interface PublicIdentity {
-  recipient_name: string;
+  purchaser_name: string;
   phone_last3: string;
 }
 
@@ -70,7 +72,7 @@ export function PublicOrderPage({
   orderNumber: string;
 }) {
   const { toast } = useToast();
-  const [recipientName, setRecipientName] = useState("");
+  const [purchaserName, setPurchaserName] = useState("");
   const [phoneLast3, setPhoneLast3] = useState("");
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [anyUnderGoal, setAnyUnderGoal] = useState(false);
@@ -94,7 +96,7 @@ export function PublicOrderPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             order_number: orderNumber,
-            recipient_name: nextIdentity.recipient_name,
+            purchaser_name: nextIdentity.purchaser_name,
             phone_last3: nextIdentity.phone_last3,
           }),
         });
@@ -111,7 +113,7 @@ export function PublicOrderPage({
         }
 
         const data = (await res.json()) as PublicOrderResponse;
-        setRecipientName(nextIdentity.recipient_name);
+        setPurchaserName(nextIdentity.purchaser_name);
         setPhoneLast3(nextIdentity.phone_last3);
         setIdentity(nextIdentity);
         setOrder(data.order);
@@ -165,11 +167,11 @@ export function PublicOrderPage({
   async function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
     const nextIdentity = {
-      recipient_name: recipientName.trim(),
+      purchaser_name: purchaserName.trim(),
       phone_last3: phoneLast3.replace(/\D/g, "").slice(0, 3),
     };
 
-    if (!nextIdentity.recipient_name) {
+    if (!nextIdentity.purchaser_name) {
       toast({ title: "請輸入訂購人姓名", variant: "destructive" });
       return;
     }
@@ -256,7 +258,7 @@ export function PublicOrderPage({
                 <div className="space-y-3">
                   <div className="lux-kicker">Order Recovery</div>
                   <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
-                    請先確認收件人資訊，再開啟這筆訂單。
+                    請先確認訂購人資訊，再開啟這筆訂單。
                   </h1>
                   <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                     若你不是從訂單查詢頁或剛下單後直接進來，請重新輸入訂購人姓名與手機末三碼。
@@ -277,8 +279,8 @@ export function PublicOrderPage({
                       訂購人姓名
                     </label>
                     <Input
-                      value={recipientName}
-                      onChange={(e) => setRecipientName(e.target.value)}
+                      value={purchaserName}
+                      onChange={(e) => setPurchaserName(e.target.value)}
                       placeholder="王小美"
                     />
                   </div>
@@ -329,7 +331,7 @@ export function PublicOrderPage({
   const status = order.status;
   const lineBindMessage =
     identity &&
-    `${order.order_number} ${identity.recipient_name} ${identity.phone_last3}`;
+    `${order.order_number} ${identity.purchaser_name} ${identity.phone_last3}`;
 
   return (
     <div className="lux-shell">
@@ -358,10 +360,12 @@ export function PublicOrderPage({
               </h1>
               <div className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                 <span className="font-mono">{order.order_number}</span>
-                {order.user?.recipient_name && (
+                {order.user?.purchaser_name && (
                   <span>
-                    {" "}
-                    · {order.user.recipient_name}
+                    {" "}· 訂購人 {order.user.purchaser_name}
+                    {order.user?.recipient_name
+                      ? ` · 收貨人 ${order.user.recipient_name}`
+                      : ""}
                     {order.user?.masked_phone ? ` · ${order.user.masked_phone}` : ""}
                   </span>
                 )}
@@ -445,6 +449,19 @@ export function PublicOrderPage({
             </div>
 
             <div className="mt-6 space-y-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              {order.user?.nickname && (
+                <div className="lux-panel-muted p-3">暱稱：{order.user.nickname}</div>
+              )}
+              {order.user?.purchaser_name && (
+                <div className="lux-panel-muted p-3">
+                  訂購人：{order.user.purchaser_name}
+                </div>
+              )}
+              {order.user?.recipient_name && (
+                <div className="lux-panel-muted p-3">
+                  收貨人：{order.user.recipient_name}
+                </div>
+              )}
               {order.user?.phone && (
                 <div className="lux-panel-muted p-3">
                   聯絡電話：{order.user.phone}
@@ -543,7 +560,7 @@ export function PublicOrderPage({
                 <div className="mt-5">
                   <PaymentReportForm
                     orderNumber={order.order_number}
-                    recipientName={identity.recipient_name}
+                    purchaserName={identity.purchaser_name}
                     phoneLast3={identity.phone_last3}
                     orderTotal={order.total_amount}
                     onSuccess={() => unlockOrder(identity, { showErrorToast: false })}
@@ -569,7 +586,7 @@ export function PublicOrderPage({
             <div className="flex-1">
               <CancelOrderButton
                 orderNumber={order.order_number}
-                recipientName={identity.recipient_name}
+                purchaserName={identity.purchaser_name}
                 phoneLast3={identity.phone_last3}
                 onSuccess={() => unlockOrder(identity, { showErrorToast: false })}
               />

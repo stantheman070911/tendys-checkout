@@ -20,7 +20,7 @@ interface OrderResult extends Pick<
 
 export default function LookupPage() {
   const { toast } = useToast();
-  const [recipientName, setRecipientName] = useState("");
+  const [purchaserName, setPurchaserName] = useState("");
   const [phoneLast3, setPhoneLast3] = useState("");
   const [results, setResults] = useState<OrderResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -28,9 +28,9 @@ export default function LookupPage() {
 
   async function handleSearch(e?: React.FormEvent) {
     e?.preventDefault();
-    const trimmedRecipientName = recipientName.trim();
+    const trimmedPurchaserName = purchaserName.trim();
     const trimmedPhoneLast3 = phoneLast3.replace(/\D/g, "").slice(0, 3);
-    if (!trimmedRecipientName || trimmedPhoneLast3.length !== 3) return;
+    if (!trimmedPurchaserName || trimmedPhoneLast3.length !== 3) return;
 
     setSearching(true);
     try {
@@ -38,7 +38,7 @@ export default function LookupPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipient_name: trimmedRecipientName,
+          purchaser_name: trimmedPurchaserName,
           phone_last3: trimmedPhoneLast3,
         }),
       });
@@ -53,7 +53,7 @@ export default function LookupPage() {
               getPublicOrderAccessSessionKey(order.order_number),
               serializePublicOrderAccess(
                 {
-                  recipient_name: trimmedRecipientName,
+                  purchaser_name: trimmedPurchaserName,
                   phone_last3: trimmedPhoneLast3,
                 },
                 "lookup",
@@ -96,7 +96,7 @@ export default function LookupPage() {
         <section className="lux-panel-strong mx-auto max-w-3xl overflow-hidden p-5 md:p-8">
           <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)] md:items-end">
             <div className="space-y-3">
-              <div className="lux-kicker">Recipient Verification</div>
+              <div className="lux-kicker">Purchaser Verification</div>
               <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
                 用姓名與手機末三碼，快速找回訂單。
               </h1>
@@ -107,8 +107,8 @@ export default function LookupPage() {
 
             <form onSubmit={handleSearch} className="space-y-3">
               <Input
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
+                value={purchaserName}
+                onChange={(e) => setPurchaserName(e.target.value)}
                 placeholder="訂購人姓名"
               />
               <Input

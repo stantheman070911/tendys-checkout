@@ -17,9 +17,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { orderId, order_number, recipient_name, phone_last3, cancel_reason } = body as {
+    const { orderId, order_number, purchaser_name, recipient_name, phone_last3, cancel_reason } = body as {
       orderId?: string;
       order_number?: string;
+      purchaser_name?: string;
       recipient_name?: string;
       phone_last3?: string;
       cancel_reason?: string;
@@ -55,11 +56,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const recipientName =
-        typeof recipient_name === "string" ? recipient_name.trim() : "";
-      if (!recipientName) {
+      const purchaserName =
+        typeof purchaser_name === "string" && purchaser_name.trim()
+          ? purchaser_name.trim()
+          : typeof recipient_name === "string"
+            ? recipient_name.trim()
+            : "";
+      if (!purchaserName) {
         return NextResponse.json(
-          { error: "recipient_name is required" },
+          { error: "purchaser_name is required" },
           { status: 400 },
         );
       }
@@ -74,7 +79,7 @@ export async function POST(request: NextRequest) {
 
       const order = await findPublicOrderByOrderNumberAndIdentity(
         orderNumber,
-        recipientName,
+        purchaserName,
         phoneLast3,
       );
       if (!order) {

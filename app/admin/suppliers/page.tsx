@@ -401,11 +401,12 @@ export default function SuppliersPage() {
                                   customers.map((c, i) => (
                                     <div
                                       key={i}
-                                      className="grid gap-2 border-b border-[rgba(177,140,92,0.12)] py-2 text-xs last:border-0 lg:grid-cols-[5rem,6rem,1fr,8rem,5rem]"
+                                      className="grid gap-2 border-b border-[rgba(177,140,92,0.12)] py-2 text-xs last:border-0 lg:grid-cols-[5rem,6rem,6rem,1fr,8rem,5rem]"
                                     >
                                       <span className="font-medium">
                                         {c.nickname}
                                       </span>
+                                      <span>{c.purchaser_name ?? "—"}</span>
                                       <span>{c.recipient_name ?? "—"}</span>
                                       <span className="truncate text-[hsl(var(--muted-foreground))]">
                                         {c.phone ?? "—"}

@@ -29,11 +29,13 @@ function validBody(overrides: Record<string, unknown> = {}) {
     submission_key: VALID_UUID,
     round_id: VALID_ROUND_ID,
     nickname: "TestUser",
+    purchaser_name: "Buyer Name",
     recipient_name: "Test Name",
     phone: "0900-000-001",
     pickup_location: "",
     address: "台北市信義區測試路 1 號",
     items: [{ product_id: VALID_PRODUCT_ID_1, quantity: 2 }],
+    save_profile: false,
     ...overrides,
   };
 }
@@ -96,9 +98,9 @@ describe("POST /api/submit-order", () => {
     expect(data.error).toMatch(/stock/i);
   });
 
-  it("returns 409 when nickname details conflict", async () => {
+  it("returns 409 when a saved profile phone mismatch blocks saving", async () => {
     ordersMock.createCheckoutOrder.mockResolvedValue({
-      kind: "nickname_conflict",
+      kind: "saved_profile_phone_mismatch",
     });
 
     const res = await POST(makeRequest(validBody()));
@@ -141,6 +143,7 @@ describe("POST /api/submit-order", () => {
       expect.objectContaining({
         is_admin: true,
         pickup_location: "面交點 A",
+        save_profile: false,
       }),
     );
   });

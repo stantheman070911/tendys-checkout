@@ -8,7 +8,7 @@ describe("public order access payloads", () => {
   it("parses a lookup payload and keeps it reusable", () => {
     const payload = serializePublicOrderAccess(
       {
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       },
       "lookup",
@@ -16,7 +16,7 @@ describe("public order access payloads", () => {
 
     expect(parsePublicOrderAccess(payload)).toEqual({
       identity: {
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       },
       source: "lookup",
@@ -27,7 +27,7 @@ describe("public order access payloads", () => {
   it("parses a checkout payload and marks it one-time", () => {
     const payload = serializePublicOrderAccess(
       {
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       },
       "checkout",
@@ -35,7 +35,7 @@ describe("public order access payloads", () => {
 
     expect(parsePublicOrderAccess(payload)).toEqual({
       identity: {
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       },
       source: "checkout",
@@ -53,7 +53,7 @@ describe("public order access payloads", () => {
       ),
     ).toEqual({
       identity: {
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       },
       source: "legacy",
@@ -67,7 +67,7 @@ describe("public order access payloads", () => {
     expect(
       parsePublicOrderAccess(
         JSON.stringify({
-          recipient_name: "王小美",
+          purchaser_name: "王小美",
           phone_last3: "67",
           source: "lookup",
         }),

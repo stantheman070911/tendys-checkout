@@ -57,8 +57,21 @@ export interface Product {
 export interface User {
   id: string;
   nickname: string;
+  purchaser_name: string | null;
   recipient_name: string | null;
   phone: string | null;
+  address: string | null;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedCheckoutProfile {
+  id: string;
+  nickname: string;
+  purchaser_name: string | null;
+  recipient_name: string | null;
+  phone: string;
   address: string | null;
   email: string | null;
   created_at: string;
@@ -121,6 +134,7 @@ export interface CartItem {
 export interface OrderSubmitRequest {
   round_id: string;
   nickname: string;
+  purchaser_name: string;
   recipient_name: string;
   phone: string;
   address?: string;
@@ -129,11 +143,12 @@ export interface OrderSubmitRequest {
   items: CartItem[];
   submission_key: string;
   note?: string;
+  save_profile?: boolean;
 }
 
 export interface PaymentReportRequest {
   order_number: string;
-  recipient_name: string;
+  purchaser_name: string;
   phone_last3: string;
   payment_amount: number;
   payment_last5: string;
@@ -162,6 +177,7 @@ export interface OrderByProduct {
   product_id: string;
   product_name: string;
   nickname: string;
+  purchaser_name: string | null;
   recipient_name: string | null;
   phone: string | null;
   quantity: number;

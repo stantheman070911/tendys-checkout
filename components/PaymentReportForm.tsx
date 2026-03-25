@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface PaymentReportFormProps {
   orderNumber: string;
-  recipientName: string;
+  purchaserName: string;
   phoneLast3: string;
   orderTotal: number;
   onSuccess?: () => void | Promise<void>;
@@ -15,7 +15,7 @@ interface PaymentReportFormProps {
 
 export function PaymentReportForm({
   orderNumber,
-  recipientName,
+  purchaserName,
   phoneLast3,
   orderTotal,
   onSuccess,
@@ -50,7 +50,7 @@ export function PaymentReportForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order_number: orderNumber,
-          recipient_name: recipientName,
+          purchaser_name: purchaserName,
           phone_last3: phoneLast3,
           payment_amount: parseInt(amount, 10),
           payment_last5: last5.trim(),

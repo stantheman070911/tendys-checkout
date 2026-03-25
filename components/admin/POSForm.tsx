@@ -39,6 +39,7 @@ export function POSForm({
   const { toast } = useToast();
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [nickname, setNickname] = useState("");
+  const [purchaserName, setPurchaserName] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -53,6 +54,7 @@ export function POSForm({
     if (open) {
       setCart([]);
       setNickname("");
+      setPurchaserName("");
       setRecipientName("");
       setPhone("");
       setAddress("");
@@ -70,6 +72,7 @@ export function POSForm({
       try {
         const data = await adminFetch<{
           user: {
+            purchaser_name?: string | null;
             recipient_name?: string | null;
             phone?: string | null;
             address?: string | null;
@@ -77,6 +80,7 @@ export function POSForm({
           } | null;
         }>(`/api/users/lookup?nickname=${encodeURIComponent(nickname.trim())}`);
         if (data.user) {
+          setPurchaserName(data.user.purchaser_name ?? "");
           setRecipientName(data.user.recipient_name ?? "");
           setPhone(data.user.phone ?? "");
           setAddress(data.user.address ?? "");
@@ -132,6 +136,7 @@ export function POSForm({
   const canSubmit =
     cart.length > 0 &&
     nickname.trim() &&
+    purchaserName.trim() &&
     recipientName.trim() &&
     phone.trim() &&
     (!isDelivery || address.trim());
@@ -158,6 +163,7 @@ export function POSForm({
           body: JSON.stringify({
             round_id: round.id,
             nickname: nickname.trim(),
+            purchaser_name: purchaserName.trim(),
             recipient_name: recipientName.trim(),
             phone: phone.trim(),
             address: address.trim() || undefined,
@@ -166,6 +172,7 @@ export function POSForm({
             items,
             submission_key: submissionKey,
             note: note.trim() || undefined,
+            save_profile: false,
           }),
         },
       );
@@ -262,16 +269,24 @@ export function POSForm({
                 setNickname(e.target.value);
                 setAutoFilled(false);
               }}
-              placeholder="LINE 暱稱"
+              placeholder="暱稱"
               className="lux-input"
             />
             <div className="grid gap-2 md:grid-cols-2">
+              <input
+                value={purchaserName}
+                onChange={(e) => setPurchaserName(e.target.value)}
+                placeholder="訂購人姓名"
+                className="lux-input"
+              />
               <input
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
                 placeholder="收貨人姓名"
                 className="lux-input"
               />
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}

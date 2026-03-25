@@ -57,7 +57,7 @@ describe("POST /api/cancel-order", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-20260324-001",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       }),
     );
@@ -77,7 +77,7 @@ describe("POST /api/cancel-order", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-20260324-001",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       }),
     );
@@ -124,7 +124,7 @@ describe("POST /api/cancel-order", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-404",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
       }),
     );
@@ -134,7 +134,7 @@ describe("POST /api/cancel-order", () => {
   it("missing public order_number → 400", async () => {
     authMock.mockResolvedValue(false);
     const res = await POST(
-      makeRequest({ recipient_name: "王小美", phone_last3: "678" }),
+      makeRequest({ purchaser_name: "王小美", phone_last3: "678" }),
     );
     expect(res.status).toBe(400);
   });
@@ -144,7 +144,7 @@ describe("POST /api/cancel-order", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-20260324-001",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "67",
       }),
     );

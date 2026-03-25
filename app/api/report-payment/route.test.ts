@@ -35,7 +35,7 @@ describe("POST /api/report-payment", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-001",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
         payment_amount: 500,
         payment_last5: "12345",
@@ -52,7 +52,7 @@ describe("POST /api/report-payment", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-404",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
         payment_amount: 500,
         payment_last5: "12345",
@@ -70,7 +70,7 @@ describe("POST /api/report-payment", () => {
       const res = await POST(
         makeRequest({
           order_number: "ORD-001",
-          recipient_name: "王小美",
+          purchaser_name: "王小美",
           phone_last3: "678",
           payment_amount: 500,
           payment_last5,
@@ -89,7 +89,7 @@ describe("POST /api/report-payment", () => {
       const res = await POST(
         makeRequest({
           order_number: "ORD-001",
-          recipient_name: "王小美",
+          purchaser_name: "王小美",
           phone_last3: "678",
           payment_amount,
           payment_last5: "12345",
@@ -102,7 +102,7 @@ describe("POST /api/report-payment", () => {
   it("returns 400 for missing order_number", async () => {
     const res = await POST(
       makeRequest({
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "678",
         payment_amount: 500,
         payment_last5: "12345",
@@ -115,7 +115,7 @@ describe("POST /api/report-payment", () => {
     const res = await POST(
       makeRequest({
         order_number: "ORD-001",
-        recipient_name: "王小美",
+        purchaser_name: "王小美",
         phone_last3: "67",
         payment_amount: 500,
         payment_last5: "12345",

@@ -6,7 +6,7 @@ vi.mock("@/lib/auth/supabase-admin", () => ({
 }));
 
 const usersMock = vi.hoisted(() => ({
-  findByNickname: vi.fn(),
+  findAutofillProfileByNickname: vi.fn(),
 }));
 vi.mock("@/lib/db/users", () => usersMock);
 
@@ -35,7 +35,8 @@ describe("GET /api/users/lookup", () => {
 
   it("returns autofill fields for admins", async () => {
     authMock.mockResolvedValue(true);
-    usersMock.findByNickname.mockResolvedValue({
+    usersMock.findAutofillProfileByNickname.mockResolvedValue({
+      purchaser_name: "王小明",
       recipient_name: "王小明",
       phone: "0912345678",
       address: "台北市",
@@ -46,6 +47,7 @@ describe("GET /api/users/lookup", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.user).toEqual({
+      purchaser_name: "王小明",
       recipient_name: "王小明",
       phone: "0912345678",
       address: "台北市",

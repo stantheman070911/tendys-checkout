@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ import {
   generateSubmissionKey,
   getPublicOrderAccessSessionKey,
   getPhoneLast3,
+  normalizePhoneDigits,
 } from "@/lib/utils";
 import { serializePublicOrderAccess } from "@/lib/public-order-access";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +52,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const [submissionKey, setSubmissionKey] = useState<string | null>(null);
 
   // Form state
-  const [customerName, setCustomerName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [purchaserName, setPurchaserName] = useState("");
+  const [recipientName, setRecipientName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
@@ -58,6 +62,10 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     DELIVERY_SELECT_SENTINEL,
   );
   const [note, setNote] = useState("");
+  const [saveProfile, setSaveProfile] = useState(false);
+  const [autofillStatus, setAutofillStatus] = useState<
+    "idle" | "loading" | "matched" | "phone_mismatch" | "not_found"
+  >("idle");
 
   // Derived
   const pickupConfig = getRoundPickupConfig(round);
@@ -71,8 +79,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
       ? `本團運費 ${round.shipping_fee}元`
       : "本團運費待設定";
   const isDelivery = pickupLocation === DELIVERY_SELECT_SENTINEL;
-  const shippingFee =
-    isDelivery && round.shipping_fee ? round.shipping_fee : null;
+  const shippingFee = isDelivery ? round.shipping_fee : null;
   const cartItems = Array.from(cart.values());
   const itemsTotal = cartItems.reduce((sum, i) => sum + i.subtotal, 0);
   const orderTotal = calcOrderTotal(cartItems, shippingFee);
@@ -82,6 +89,69 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   const roundClosed =
     !round.is_open ||
     (round.deadline !== null && new Date(round.deadline) < new Date());
+  const nicknameTrimmed = nickname.trim();
+  const phoneDigits = normalizePhoneDigits(phone);
+  const canAutofill = !!nicknameTrimmed && phoneDigits.length >= 7;
+
+  useEffect(() => {
+    if (!canAutofill) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setAutofillStatus("loading");
+      try {
+        const res = await fetch("/api/checkout-profile/lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nickname: nicknameTrimmed,
+            phone: phone.trim(),
+          }),
+        });
+
+        if (!res.ok) {
+          if (!cancelled) {
+            setAutofillStatus("idle");
+          }
+          return;
+        }
+
+        const data = (await res.json()) as {
+          status: "matched" | "not_found" | "phone_mismatch";
+          profile?: {
+            purchaser_name?: string | null;
+            recipient_name?: string | null;
+            address?: string | null;
+            email?: string | null;
+          };
+        };
+
+        if (cancelled) return;
+
+        if (data.status === "matched" && data.profile) {
+          setPurchaserName(data.profile.purchaser_name ?? "");
+          setRecipientName(data.profile.recipient_name ?? "");
+          setAddress(data.profile.address ?? "");
+          setEmail(data.profile.email ?? "");
+          setAutofillStatus("matched");
+          return;
+        }
+
+        setAutofillStatus(data.status);
+      } catch {
+        if (!cancelled) {
+          setAutofillStatus("idle");
+        }
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [canAutofill, nicknameTrimmed, phone]);
 
   // Cart actions
   const addToCart = useCallback((product: ProductWithProgress) => {
@@ -135,11 +205,21 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     e.preventDefault();
     if (submitting || cartItems.length === 0) return;
 
-    const trimmedCustomerName = customerName.trim();
+    const trimmedNickname = nickname.trim();
+    const trimmedPurchaserName = purchaserName.trim();
+    const trimmedRecipientName = recipientName.trim();
     const trimmedPhone = phone.trim();
 
-    if (!trimmedCustomerName) {
-      toast({ title: "請輸入訂購人/收貨人", variant: "destructive" });
+    if (!trimmedNickname) {
+      toast({ title: "請輸入暱稱", variant: "destructive" });
+      return;
+    }
+    if (!trimmedPurchaserName) {
+      toast({ title: "請輸入訂購人", variant: "destructive" });
+      return;
+    }
+    if (!trimmedRecipientName) {
+      toast({ title: "請輸入收貨人", variant: "destructive" });
       return;
     }
     if (!trimmedPhone) {
@@ -157,8 +237,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           round_id: round.id,
-          nickname: trimmedCustomerName,
-          recipient_name: trimmedCustomerName,
+          nickname: trimmedNickname,
+          purchaser_name: trimmedPurchaserName,
+          recipient_name: trimmedRecipientName,
           phone: trimmedPhone,
           address: address.trim() || undefined,
           email: email.trim() || undefined,
@@ -166,6 +247,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
           items: cartItems,
           submission_key: key,
           note: note.trim() || undefined,
+          save_profile: saveProfile,
         }),
       });
 
@@ -181,7 +263,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         getPublicOrderAccessSessionKey(orderNumber),
         serializePublicOrderAccess(
           {
-            recipient_name: trimmedCustomerName,
+            purchaser_name: trimmedPurchaserName,
             phone_last3: getPhoneLast3(trimmedPhone),
           },
           "checkout",
@@ -363,7 +445,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                     收貨與聯絡資訊
                   </div>
                   <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                    為保護個資，系統不再自動帶入舊資料。請重新確認本次收貨資訊。
+                    輸入暱稱和電話，可自動帶入已儲存資料；也可選擇在本次下單後儲存更新。
                   </p>
                 </div>
 
@@ -371,11 +453,27 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
-                        訂購人/收貨人
+                        暱稱
                       </label>
                       <Input
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
+                        value={nickname}
+                        onChange={(e) => {
+                          setNickname(e.target.value);
+                          if (autofillStatus !== "idle") {
+                            setAutofillStatus("idle");
+                          }
+                        }}
+                        placeholder="群組或熟客常用稱呼"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                        訂購人
+                      </label>
+                      <Input
+                        value={purchaserName}
+                        onChange={(e) => setPurchaserName(e.target.value)}
                         placeholder="真實姓名"
                         required
                       />
@@ -389,11 +487,49 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                         inputMode="tel"
                         maxLength={20}
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => {
+                          setPhone(e.target.value);
+                          if (autofillStatus !== "idle") {
+                            setAutofillStatus("idle");
+                          }
+                        }}
                         placeholder="0912-345-678"
                         required
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
+                      收貨人
+                    </label>
+                    <Input
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      placeholder="實際收貨人姓名"
+                      required
+                    />
+                  </div>
+
+                  <div className="rounded-[1.2rem] border border-[rgba(177,140,92,0.16)] bg-[rgba(244,239,230,0.58)] p-3 text-sm">
+                    <div className="text-[hsl(var(--muted-foreground))]">
+                      {autofillStatus === "matched"
+                        ? "已帶入此暱稱的已儲存資料。"
+                        : autofillStatus === "phone_mismatch"
+                          ? "此暱稱已有資料儲存；電話一致才可自動帶入或覆寫更新。"
+                          : autofillStatus === "loading"
+                            ? "正在確認是否有可帶入的已儲存資料…"
+                            : "輸入暱稱和電話，可自動帶入已儲存資料。"}
+                    </div>
+                    <label className="mt-3 flex items-center gap-3 text-[hsl(var(--ink))]">
+                      <Checkbox
+                        checked={saveProfile}
+                        onCheckedChange={(checked) =>
+                          setSaveProfile(checked === true)
+                        }
+                      />
+                      <span>儲存資料，下次結帳自動帶入</span>
+                    </label>
                   </div>
 
                   <div>
@@ -430,7 +566,9 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                         onChange={(e) => setAddress(e.target.value)}
                         placeholder="縣市、區、路、號"
                       />
-                      {shippingFee && <ShippingFeeNote fee={shippingFee} />}
+                      {shippingFee !== null && shippingFee > 0 && (
+                        <ShippingFeeNote fee={shippingFee} />
+                      )}
                     </div>
                   )}
 

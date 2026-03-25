@@ -194,7 +194,9 @@ export default function ShipmentsPage() {
       <div class="slip">
         <h2>${escapeHtml(o.order_number)}</h2>
         <div class="info">
-          <div><b>${escapeHtml(o.user?.recipient_name ?? "—")}</b> · ${escapeHtml(o.user?.phone ?? "—")}</div>
+          <div><b>暱稱：</b>${escapeHtml(o.user?.nickname ?? "—")}</div>
+          <div><b>訂購人：</b>${escapeHtml(o.user?.purchaser_name ?? "—")}</div>
+          <div><b>收貨人：</b>${escapeHtml(o.user?.recipient_name ?? "—")} · ${escapeHtml(o.user?.phone ?? "—")}</div>
           <div>${o.pickup_location ? `📍 ${escapeHtml(o.pickup_location)}` : `🚚 ${escapeHtml(o.user?.address ?? "—")}`}</div>
         </div>
         <table>
@@ -316,7 +318,7 @@ export default function ShipmentsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜尋 暱稱 / 電話 / 訂單號"
+          placeholder="搜尋 暱稱 / 訂購人 / 收貨人 / 電話 / 訂單號"
           className="lux-input flex-1"
         />
         {search && (

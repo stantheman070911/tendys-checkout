@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const headers = [
       "訂單編號",
       "暱稱",
+      "訂購人",
       "收件人",
       "電話",
       "地址",
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
           const row = [
             order.order_number ?? "",
             order.user?.nickname ?? "",
+            order.user?.purchaser_name ?? "",
             order.user?.recipient_name ?? "",
             order.user?.phone ?? "",
             order.user?.address ?? "",

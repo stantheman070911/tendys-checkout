@@ -229,7 +229,7 @@ export default function OrdersPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜尋 暱稱 / 電話 / 訂單號"
+          placeholder="搜尋 暱稱 / 訂購人 / 收貨人 / 電話 / 訂單號"
           className="lux-input flex-1"
         />
         {search && (

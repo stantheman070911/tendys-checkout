@@ -75,7 +75,8 @@ model Product {
 
 model User {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nickname       String   @unique
+  nickname       String
+  purchaser_name String?
   recipient_name String?
   phone          String?
   address        String?
@@ -85,7 +86,22 @@ model User {
 
   orders Order[]
 
+  @@index([nickname])
   @@map("users")
+}
+
+model SavedCheckoutProfile {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nickname       String   @unique
+  purchaser_name String?
+  recipient_name String?
+  phone          String
+  address        String?
+  email          String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("saved_checkout_profiles")
 }
 
 // ─── Order (訂單) ───────────────────────────────────────────

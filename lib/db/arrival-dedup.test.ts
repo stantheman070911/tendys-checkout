@@ -17,15 +17,20 @@ describe("getCustomersForArrivalNotification dedup", () => {
     vi.clearAllMocks();
   });
 
-  it("collects all unique line_user_ids across orders from the same user", async () => {
-    // Same user, two orders: first has no LINE link, second does
+  it("collects all unique line_user_ids across orders from the same logical customer", async () => {
+    // Same nickname + purchaser + phone, two orders: first has no LINE link, second does.
     prismaMock.orderItem.findMany.mockResolvedValue([
       {
         order: {
           id: "order-1",
           user_id: "user-1",
           line_user_id: null,
-          user: { email: "user1@test.com" },
+          user: {
+            nickname: "小美",
+            purchaser_name: "王小美",
+            phone: "0912-345-678",
+            email: "user1@test.com",
+          },
         },
       },
       {
@@ -33,7 +38,12 @@ describe("getCustomersForArrivalNotification dedup", () => {
           id: "order-2",
           user_id: "user-1",
           line_user_id: "LINE-user-1",
-          user: { email: "user1@test.com" },
+          user: {
+            nickname: "小美",
+            purchaser_name: "王小美",
+            phone: "0912345678",
+            email: "user1@test.com",
+          },
         },
       },
     ]);
@@ -45,7 +55,7 @@ describe("getCustomersForArrivalNotification dedup", () => {
 
     expect(result.lineUserIds).toEqual(["LINE-user-1"]);
     expect(result.emails).toEqual(["user1@test.com"]);
-    // Same user_id → 1 customer, not 2
+    // Same public identity → 1 customer, not 2
     expect(result.customerCount).toBe(1);
   });
 
@@ -56,7 +66,12 @@ describe("getCustomersForArrivalNotification dedup", () => {
           id: "order-1",
           user_id: "user-1",
           line_user_id: "LINE-A",
-          user: { email: "a@test.com" },
+          user: {
+            nickname: "小美",
+            purchaser_name: "王小美",
+            phone: "0912-345-678",
+            email: "a@test.com",
+          },
         },
       },
       {
@@ -64,7 +79,12 @@ describe("getCustomersForArrivalNotification dedup", () => {
           id: "order-2",
           user_id: "user-2",
           line_user_id: "LINE-A", // same LINE account somehow
-          user: { email: "b@test.com" },
+          user: {
+            nickname: "阿華",
+            purchaser_name: "陳大華",
+            phone: "0922-000-111",
+            email: "b@test.com",
+          },
         },
       },
       {
@@ -72,7 +92,12 @@ describe("getCustomersForArrivalNotification dedup", () => {
           id: "order-3",
           user_id: "user-3",
           line_user_id: "LINE-B",
-          user: { email: "a@test.com" }, // same email as user-1
+          user: {
+            nickname: "美玲",
+            purchaser_name: "林美玲",
+            phone: "0933-000-222",
+            email: "a@test.com", // same email as user-1
+          },
         },
       },
     ]);
@@ -88,7 +113,7 @@ describe("getCustomersForArrivalNotification dedup", () => {
     expect(result.emails).toHaveLength(2);
     expect(result.emails).toContain("a@test.com");
     expect(result.emails).toContain("b@test.com");
-    // 3 distinct user_ids → 3 customers (even though shared endpoints)
+    // 3 distinct logical customers → 3 customers (even though shared endpoints)
     expect(result.customerCount).toBe(3);
   });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
-import { findByNickname } from "@/lib/db/users";
+import { findAutofillProfileByNickname } from "@/lib/db/users";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,11 +18,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = await findByNickname(nickname);
+    const user = await findAutofillProfileByNickname(nickname);
 
     // Return only auto-fill fields — strip id, timestamps, nickname
     const safeUser = user
       ? {
+          purchaser_name: user.purchaser_name,
           recipient_name: user.recipient_name,
           phone: user.phone,
           address: user.address,

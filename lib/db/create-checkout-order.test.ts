@@ -14,10 +14,14 @@ const { txMock, prismaMock } = vi.hoisted(() => {
       findMany: vi.fn(),
     },
     user: {
+      create: vi.fn(),
+    },
+    savedCheckoutProfile: {
       findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
     $executeRaw: vi.fn(),
-    $queryRaw: vi.fn(),
   };
 
   const prismaMock = {
@@ -65,6 +69,7 @@ function makeUser(overrides: Record<string, unknown> = {}) {
   return {
     id: "user-1",
     nickname: "TestUser",
+    purchaser_name: "Buyer Name",
     recipient_name: "Test Name",
     phone: "0900-000-001",
     address: "台北市信義區測試路 1 號",
@@ -80,8 +85,10 @@ function makeInput(overrides: Record<string, unknown> = {}) {
     submission_key: "550e8400-e29b-41d4-a716-446655440000",
     items: [{ product_id: "prod-1", quantity: 2 }],
     is_admin: false,
+    save_profile: false,
     user: {
       nickname: "TestUser",
+      purchaser_name: "Buyer Name",
       recipient_name: "Test Name",
       phone: "0900-000-001",
       address: "台北市信義區測試路 1 號",
@@ -93,13 +100,24 @@ function makeInput(overrides: Record<string, unknown> = {}) {
 
 describe("createCheckoutOrder", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    prismaMock.$transaction.mockImplementation(
+      async (cb: (tx: typeof txMock) => unknown) => cb(txMock),
+    );
     txMock.order.findUnique.mockResolvedValue(null);
-    txMock.user.findUnique.mockResolvedValue(null);
     txMock.round.findUnique.mockResolvedValue(makeRound());
     txMock.product.findMany.mockResolvedValue([makeProduct()]);
     txMock.$executeRaw.mockResolvedValue(1);
-    txMock.$queryRaw.mockResolvedValue([makeUser()]);
+    txMock.user.create.mockResolvedValue(makeUser());
+    txMock.savedCheckoutProfile.findUnique.mockResolvedValue(null);
+    txMock.savedCheckoutProfile.create.mockResolvedValue({
+      id: "profile-1",
+      nickname: "TestUser",
+    });
+    txMock.savedCheckoutProfile.update.mockResolvedValue({
+      id: "profile-1",
+      nickname: "TestUser",
+    });
     txMock.order.create.mockImplementation(async ({ data }) => ({
       id: "order-1",
       order_number: "ORD-20260324-001",
@@ -123,14 +141,12 @@ describe("createCheckoutOrder", () => {
       order: expect.objectContaining({ id: "order-existing" }),
       deduplicated: true,
     });
-    expect(txMock.user.findUnique).not.toHaveBeenCalled();
-    expect(txMock.$queryRaw).not.toHaveBeenCalled();
+    expect(txMock.user.create).not.toHaveBeenCalled();
+    expect(txMock.savedCheckoutProfile.findUnique).not.toHaveBeenCalled();
     expect(txMock.order.create).not.toHaveBeenCalled();
   });
 
-  it("reuses a public nickname when saved details match", async () => {
-    txMock.user.findUnique.mockResolvedValueOnce(makeUser());
-
+  it("creates a fresh user snapshot for public checkout without saving a profile", async () => {
     const result = await createCheckoutOrder(makeInput());
 
     expect(result).toEqual({
@@ -138,7 +154,7 @@ describe("createCheckoutOrder", () => {
       order: expect.objectContaining({ id: "order-1" }),
       deduplicated: false,
     });
-    expect(txMock.$queryRaw).not.toHaveBeenCalled();
+    expect(txMock.savedCheckoutProfile.findUnique).not.toHaveBeenCalled();
     expect(txMock.order.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ user_id: "user-1" }),
@@ -146,28 +162,94 @@ describe("createCheckoutOrder", () => {
     );
   });
 
-  it("returns nickname_conflict for a public nickname with mismatched details", async () => {
-    txMock.user.findUnique.mockResolvedValueOnce(
-      makeUser({ recipient_name: "Other Name" }),
+  it("still creates the order when save_profile is false even if a saved profile exists", async () => {
+    txMock.savedCheckoutProfile.findUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      nickname: "TestUser",
+      phone: "0900-000-999",
+    });
+
+    const result = await createCheckoutOrder(
+      makeInput({ save_profile: false }),
     );
 
-    const result = await createCheckoutOrder(makeInput());
+    expect(result).toEqual({
+      kind: "success",
+      order: expect.objectContaining({ id: "order-1" }),
+      deduplicated: false,
+    });
+    expect(txMock.savedCheckoutProfile.findUnique).not.toHaveBeenCalled();
+  });
 
-    expect(result).toEqual({ kind: "nickname_conflict" });
+  it("creates a saved profile when save_profile is true and none exists", async () => {
+    const result = await createCheckoutOrder(makeInput({ save_profile: true }));
+
+    expect(result).toEqual({
+      kind: "success",
+      order: expect.objectContaining({ id: "order-1" }),
+      deduplicated: false,
+    });
+    expect(txMock.savedCheckoutProfile.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          nickname: "TestUser",
+          purchaser_name: "Buyer Name",
+          recipient_name: "Test Name",
+        }),
+      }),
+    );
+  });
+
+  it("updates a saved profile when nickname exists and phone matches", async () => {
+    txMock.savedCheckoutProfile.findUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      nickname: "TestUser",
+      purchaser_name: "Old Buyer",
+      recipient_name: "Old Recipient",
+      phone: "0900-000-001",
+      address: "舊地址",
+      email: null,
+    });
+
+    const result = await createCheckoutOrder(makeInput({ save_profile: true }));
+
+    expect(result).toEqual({
+      kind: "success",
+      order: expect.objectContaining({ id: "order-1" }),
+      deduplicated: false,
+    });
+    expect(txMock.savedCheckoutProfile.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { nickname: "TestUser" },
+      }),
+    );
+  });
+
+  it("returns saved_profile_phone_mismatch when nickname exists but phone differs", async () => {
+    txMock.savedCheckoutProfile.findUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      nickname: "TestUser",
+      purchaser_name: "Old Buyer",
+      recipient_name: "Old Recipient",
+      phone: "0900-000-999",
+      address: "舊地址",
+      email: null,
+    });
+
+    const result = await createCheckoutOrder(makeInput({ save_profile: true }));
+
+    expect(result).toEqual({ kind: "saved_profile_phone_mismatch" });
     expect(txMock.order.create).not.toHaveBeenCalled();
   });
 
-  it("updates an existing nickname for admin checkout", async () => {
-    txMock.user.findUnique.mockResolvedValueOnce(makeUser());
-    txMock.$queryRaw.mockResolvedValueOnce([
-      makeUser({ recipient_name: "Updated Name" }),
-    ]);
+  it("creates an admin order snapshot without touching saved profiles", async () => {
 
     const result = await createCheckoutOrder(
       makeInput({
         is_admin: true,
         user: {
           nickname: "TestUser",
+          purchaser_name: "Updated Buyer",
           recipient_name: "Updated Name",
           phone: "0900-000-001",
           address: "台北市信義區測試路 1 號",
@@ -181,7 +263,7 @@ describe("createCheckoutOrder", () => {
       order: expect.objectContaining({ id: "order-1" }),
       deduplicated: false,
     });
-    expect(txMock.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(txMock.savedCheckoutProfile.findUnique).not.toHaveBeenCalled();
     expect(txMock.order.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ user_id: "user-1" }),
@@ -189,24 +271,7 @@ describe("createCheckoutOrder", () => {
     );
   });
 
-  it("re-fetches and reuses a concurrently created public nickname", async () => {
-    txMock.user.findUnique
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(makeUser());
-    txMock.$queryRaw.mockResolvedValueOnce([]);
-
-    const result = await createCheckoutOrder(makeInput());
-
-    expect(result).toEqual({
-      kind: "success",
-      order: expect.objectContaining({ id: "order-1" }),
-      deduplicated: false,
-    });
-    expect(txMock.user.findUnique).toHaveBeenCalledTimes(2);
-  });
-
   it("returns schema_drift_access_code on Prisma P2011 access_code errors", async () => {
-    txMock.user.findUnique.mockResolvedValueOnce(makeUser());
     txMock.order.create.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError("Null constraint failed", {
         code: "P2011",
@@ -224,8 +289,6 @@ describe("createCheckoutOrder", () => {
   });
 
   it("returns validation_error when pickup_location is not allowed by the round", async () => {
-    txMock.user.findUnique.mockResolvedValueOnce(makeUser());
-
     const result = await createCheckoutOrder(
       makeInput({ pickup_location: "台中面交點" }),
     );

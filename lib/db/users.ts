@@ -1,46 +1,54 @@
 import { prisma } from "@/lib/db/prisma";
+import { normalizePhoneDigits } from "@/lib/utils";
 
-export async function findByNickname(nickname: string) {
-  return prisma.user.findUnique({ where: { nickname } });
+export function phoneMatchesStoredProfile(
+  storedPhone: string | null | undefined,
+  inputPhone: string | null | undefined,
+) {
+  const storedDigits = normalizePhoneDigits(storedPhone);
+  const inputDigits = normalizePhoneDigits(inputPhone);
+  return !!storedDigits && storedDigits === inputDigits;
 }
 
-export async function upsertByNickname(
-  nickname: string,
-  data: {
-    recipient_name?: string;
-    phone?: string;
-    address?: string;
-    email?: string;
-  },
-) {
-  return prisma.user.upsert({
+export async function findSavedCheckoutProfileByNickname(nickname: string) {
+  return prisma.savedCheckoutProfile.findUnique({
     where: { nickname },
-    update: data,
-    create: { nickname, ...data },
   });
 }
 
-export async function createUser(data: {
-  nickname: string;
-  recipient_name?: string;
-  phone?: string;
-  address?: string;
-  email?: string;
-}) {
-  return prisma.user.create({ data });
+export async function findLatestUserSnapshotByNickname(nickname: string) {
+  return prisma.user.findFirst({
+    where: { nickname },
+    orderBy: { created_at: "desc" },
+  });
 }
 
-export async function updateUser(
-  id: string,
-  data: {
-    recipient_name?: string;
-    phone?: string;
-    address?: string;
-    email?: string;
-  },
-) {
-  return prisma.user.update({
-    where: { id },
-    data,
-  });
+export async function findAutofillProfileByNickname(nickname: string) {
+  const savedProfile = await findSavedCheckoutProfileByNickname(nickname);
+  if (savedProfile) {
+    return {
+      nickname: savedProfile.nickname,
+      purchaser_name: savedProfile.purchaser_name,
+      recipient_name: savedProfile.recipient_name,
+      phone: savedProfile.phone,
+      address: savedProfile.address,
+      email: savedProfile.email,
+      source: "saved_profile" as const,
+    };
+  }
+
+  const latestUser = await findLatestUserSnapshotByNickname(nickname);
+  if (!latestUser) {
+    return null;
+  }
+
+  return {
+    nickname: latestUser.nickname,
+    purchaser_name: latestUser.purchaser_name,
+    recipient_name: latestUser.recipient_name,
+    phone: latestUser.phone,
+    address: latestUser.address,
+    email: latestUser.email,
+    source: "latest_snapshot" as const,
+  };
 }

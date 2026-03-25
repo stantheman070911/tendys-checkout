@@ -8,13 +8,15 @@ describe("matchesOrderSearch", () => {
     user: {
       nickname: "小美",
       phone: "0912-345-678",
+      purchaser_name: "王大美",
       recipient_name: "王小美",
     },
   };
 
-  it("matches nickname, phone, recipient, and order number", () => {
+  it("matches nickname, phone, purchaser, recipient, and order number", () => {
     expect(matchesOrderSearch(order, "小美")).toBe(true);
     expect(matchesOrderSearch(order, "0912")).toBe(true);
+    expect(matchesOrderSearch(order, "王大美")).toBe(true);
     expect(matchesOrderSearch(order, "王小美")).toBe(true);
     expect(matchesOrderSearch(order, "20260322")).toBe(true);
   });

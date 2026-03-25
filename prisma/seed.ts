@@ -25,6 +25,9 @@ async function main() {
   await prisma.user.deleteMany({
     where: { nickname: { in: SEED_USER_NICKNAMES } },
   });
+  await prisma.savedCheckoutProfile.deleteMany({
+    where: { nickname: { in: SEED_USER_NICKNAMES } },
+  });
 
   // 1. Round with shipping fee
   // Close any pre-existing open rounds to satisfy single-open-round constraint
@@ -120,6 +123,7 @@ async function main() {
     data: [
       {
         nickname: "Test User 1",
+        purchaser_name: "王小明",
         recipient_name: "王小明",
         phone: "0900-000-001",
         address: "台北市信義區測試路 1 號",
@@ -127,12 +131,42 @@ async function main() {
       },
       {
         nickname: "Test User 2",
+        purchaser_name: "林美玲",
         recipient_name: "林美玲",
         phone: "0900-000-002",
         address: "台中市西屯區測試路 2 號",
       },
       {
         nickname: "Test User 3",
+        purchaser_name: "陳大華",
+        recipient_name: "陳大華",
+        phone: "0900-000-003",
+        address: "高雄市前鎮區測試路 3 號",
+        email: "test3@example.com",
+      },
+    ],
+  });
+
+  await prisma.savedCheckoutProfile.createMany({
+    data: [
+      {
+        nickname: "Test User 1",
+        purchaser_name: "王小明",
+        recipient_name: "王小明",
+        phone: "0900-000-001",
+        address: "台北市信義區測試路 1 號",
+        email: "test1@example.com",
+      },
+      {
+        nickname: "Test User 2",
+        purchaser_name: "林美玲",
+        recipient_name: "林美玲",
+        phone: "0900-000-002",
+        address: "台中市西屯區測試路 2 號",
+      },
+      {
+        nickname: "Test User 3",
+        purchaser_name: "陳大華",
         recipient_name: "陳大華",
         phone: "0900-000-003",
         address: "高雄市前鎮區測試路 3 號",
