@@ -102,6 +102,11 @@
   - Public checkout now shows `暱稱 / 訂購人 / 收貨人` with opt-in `儲存資料，下次結帳自動帶入`, and autofill only runs when `暱稱 + 完整電話` both exist
   - Public lookup, order unlock, payment report, cancel, and LINE binding now verify with `purchaser_name + phone_last3`
   - Admin orders / shipments / supplier drill-down / CSV / print now show all three names, and admin search now covers `暱稱 / 訂購人 / 收貨人 / 電話 / 訂單號`
+- [x] **7.18** Saved-profile privacy + logical customer dedupe follow-up
+  - Added a shared public checkout autofill threshold (`normalizePhoneDigits(phone).length >= 10`) and enforced it on both storefront client and `/api/checkout-profile/lookup`
+  - Incomplete phone input now short-circuits before rate limiting or DB lookup, preventing saved-profile nickname disclosure while a user is still typing
+  - Arrival notification customer counts now dedupe by logical purchaser identity (`purchaser_name + normalized phone`, with `recipient_name` fallback) instead of including nickname
+  - Added focused route and DB tests for incomplete-phone autofill requests, cross-nickname same-customer dedupe, and legacy purchaser-name fallback
 
 ### Checkpoint 7 (Final)
 

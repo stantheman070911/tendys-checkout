@@ -30,6 +30,7 @@ import {
   getPublicOrderAccessSessionKey,
   getPhoneLast3,
   normalizePhoneDigits,
+  PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS,
 } from "@/lib/utils";
 import { serializePublicOrderAccess } from "@/lib/public-order-access";
 import { useToast } from "@/hooks/use-toast";
@@ -91,7 +92,10 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     (round.deadline !== null && new Date(round.deadline) < new Date());
   const nicknameTrimmed = nickname.trim();
   const phoneDigits = normalizePhoneDigits(phone);
-  const canAutofill = !!nicknameTrimmed && phoneDigits.length >= 7;
+  const canAutofill =
+    !!nicknameTrimmed &&
+    phoneDigits.length >= PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS;
+  const visibleAutofillStatus = canAutofill ? autofillStatus : "idle";
 
   useEffect(() => {
     if (!canAutofill) {
@@ -513,11 +517,11 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
 
                   <div className="rounded-[1.2rem] border border-[rgba(177,140,92,0.16)] bg-[rgba(244,239,230,0.58)] p-3 text-sm">
                     <div className="text-[hsl(var(--muted-foreground))]">
-                      {autofillStatus === "matched"
+                      {visibleAutofillStatus === "matched"
                         ? "已帶入此暱稱的已儲存資料。"
-                        : autofillStatus === "phone_mismatch"
+                        : visibleAutofillStatus === "phone_mismatch"
                           ? "此暱稱已有資料儲存；電話一致才可自動帶入或覆寫更新。"
-                          : autofillStatus === "loading"
+                          : visibleAutofillStatus === "loading"
                             ? "正在確認是否有可帶入的已儲存資料…"
                             : "輸入暱稱和電話，可自動帶入已儲存資料。"}
                     </div>

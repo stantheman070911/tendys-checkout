@@ -38,6 +38,7 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 - Public checkout and public identity now use a stored-profile model instead of nickname-conflict rejection:
   - public checkout shows distinct `暱稱 / 訂購人 / 收貨人` fields plus an opt-in `儲存資料，下次結帳自動帶入` checkbox
   - auto-fill only runs when both `暱稱 + 完整電話` are present, via `/api/checkout-profile/lookup`
+  - "完整電話" is now enforced as `normalizePhoneDigits(phone).length >= 10` on both client and server, so partial input does not trigger lookup, does not reveal saved nicknames, and does not consume lookup rate limit
   - saved checkout data now lives in `saved_checkout_profiles`, while `users` became per-order contact snapshots with `purchaser_name` + `recipient_name`
   - public lookup, single-order unlock, payment report, cancel, and LINE binding now verify with `purchaser_name + phone_last3`
   - admin orders / shipments / supplier drill-down / CSV / print now surface all three names: `暱稱 / 訂購人 / 收貨人`
@@ -233,7 +234,7 @@ Cancel stock restore: yes except `shipped`.
 - **LINE linking**: Per-order (not per-user). Webhook verifies all three fields. Idempotent. One order = one LINE account.
 - **Single-open-round**: Partial unique index. `create()` atomically closes existing open rounds. `update()` catches `P2002`.
 - **Order creation**: Two-phase — validate all products first, then decrement stock. `OrderValidationError` thrown inside `$transaction` triggers rollback.
-- **Arrival notifications**: Target customers by product, count by unique customer identity (not delivery endpoints).
+- **Arrival notifications**: Target customers by product, count by logical purchaser identity (`purchaser_name + normalized phone`, with legacy `recipient_name` fallback), not by nickname or delivery endpoints.
 
 ### RLS Policies
 

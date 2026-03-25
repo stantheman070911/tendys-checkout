@@ -115,6 +115,26 @@ function normalizePersonName(value: string | null | undefined): string {
   return (value ?? "").trim().toLocaleLowerCase();
 }
 
+function buildLogicalCustomerIdentityKey(order: {
+  id: string;
+  user?: {
+    purchaser_name?: string | null;
+    recipient_name?: string | null;
+    phone?: string | null;
+  } | null;
+}): string {
+  const normalizedName =
+    normalizePersonName(order.user?.purchaser_name) ||
+    normalizePersonName(order.user?.recipient_name);
+  const normalizedPhone = normalizePhoneDigits(order.user?.phone);
+
+  if (!normalizedName || !normalizedPhone) {
+    return order.id;
+  }
+
+  return `${normalizedName}|${normalizedPhone}`;
+}
+
 function orderMatchesPublicIdentity(
   order: {
     user?: {
@@ -562,12 +582,7 @@ export async function getCustomersForArrivalNotification(
   const customerIdSet = new Set<string>();
 
   for (const item of items) {
-    const identityKey = [
-      item.order.user?.nickname ?? "",
-      item.order.user?.purchaser_name ?? "",
-      normalizePhoneDigits(item.order.user?.phone),
-    ].join("|");
-    customerIdSet.add(identityKey === "||" ? item.order.id : identityKey);
+    customerIdSet.add(buildLogicalCustomerIdentityKey(item.order));
 
     const lineUserId = item.order.line_user_id;
     if (lineUserId) lineUserIdSet.add(lineUserId);

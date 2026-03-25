@@ -117,6 +117,84 @@ describe("getCustomersForArrivalNotification dedup", () => {
     expect(result.customerCount).toBe(3);
   });
 
+  it("counts different nicknames with the same purchaser identity as one customer", async () => {
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      {
+        order: {
+          id: "order-1",
+          user_id: "user-1",
+          line_user_id: null,
+          user: {
+            nickname: "公司團購",
+            purchaser_name: "王小美",
+            phone: "0912-345-678",
+            email: "user1@test.com",
+          },
+        },
+      },
+      {
+        order: {
+          id: "order-2",
+          user_id: "user-2",
+          line_user_id: null,
+          user: {
+            nickname: "小美本人",
+            purchaser_name: "王小美",
+            phone: "0912345678",
+            email: "user1@test.com",
+          },
+        },
+      },
+    ]);
+
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
+
+    expect(result.customerCount).toBe(1);
+  });
+
+  it("falls back to recipient_name when purchaser_name is blank", async () => {
+    prismaMock.orderItem.findMany.mockResolvedValue([
+      {
+        order: {
+          id: "order-1",
+          user_id: "user-1",
+          line_user_id: null,
+          user: {
+            nickname: "小美",
+            purchaser_name: " ",
+            recipient_name: "王小美",
+            phone: "0912-345-678",
+            email: "user1@test.com",
+          },
+        },
+      },
+      {
+        order: {
+          id: "order-2",
+          user_id: "user-2",
+          line_user_id: null,
+          user: {
+            nickname: "熟客",
+            purchaser_name: null,
+            recipient_name: "王小美",
+            phone: "0912345678",
+            email: "user1@test.com",
+          },
+        },
+      },
+    ]);
+
+    const result = await getCustomersForArrivalNotification(
+      "prod-1",
+      "round-1",
+    );
+
+    expect(result.customerCount).toBe(1);
+  });
+
   it("returns zero customerCount and empty arrays when no orders match", async () => {
     prismaMock.orderItem.findMany.mockResolvedValue([]);
 

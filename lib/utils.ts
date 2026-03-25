@@ -34,6 +34,8 @@ export function generateSubmissionKey(): string {
   return crypto.randomUUID();
 }
 
+export const PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS = 10;
+
 export function normalizePhoneDigits(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
 }

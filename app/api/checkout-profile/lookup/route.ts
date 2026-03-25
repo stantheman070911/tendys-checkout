@@ -4,23 +4,17 @@ import {
   phoneMatchesStoredProfile,
 } from "@/lib/db/users";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import {
+  normalizePhoneDigits,
+  PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS,
+} from "@/lib/utils";
 
 const PHONE_RE = /^[\d\-+().\s]{7,20}$/;
+const INCOMPLETE_PHONE_ERROR =
+  "phone is required and must include a full phone number for autofill";
 
 export async function POST(request: NextRequest) {
   try {
-    const clientIp = getClientIp(request);
-    const rateLimit = checkRateLimit(`checkout-profile:${clientIp}`, 5, 60_000);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        {
-          status: 429,
-          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
-        },
-      );
-    }
-
     let body: unknown;
     try {
       body = await request.json();
@@ -42,13 +36,27 @@ export async function POST(request: NextRequest) {
     }
 
     const trimmedPhone = typeof phone === "string" ? phone.trim() : "";
-    if (!trimmedPhone) {
-      return NextResponse.json({ error: "phone is required" }, { status: 400 });
-    }
-    if (!PHONE_RE.test(trimmedPhone)) {
+    const phoneDigits = normalizePhoneDigits(trimmedPhone);
+    if (
+      !trimmedPhone ||
+      !PHONE_RE.test(trimmedPhone) ||
+      phoneDigits.length < PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS
+    ) {
       return NextResponse.json(
-        { error: "phone format is invalid" },
+        { error: INCOMPLETE_PHONE_ERROR },
         { status: 400 },
+      );
+    }
+
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`checkout-profile:${clientIp}`, 5, 60_000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        },
       );
     }
 

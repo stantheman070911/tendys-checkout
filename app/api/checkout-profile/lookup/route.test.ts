@@ -89,4 +89,13 @@ describe("POST /api/checkout-profile/lookup", () => {
     const res = await POST(makeRequest({ phone: "0912345678" }));
     expect(res.status).toBe(400);
   });
+
+  it("returns 400 for incomplete phone before rate limiting or DB lookup", async () => {
+    const res = await POST(makeRequest({ nickname: "小美", phone: "0912345" }));
+
+    expect(res.status).toBe(400);
+    expect(rateLimitMock.checkRateLimit).not.toHaveBeenCalled();
+    expect(usersMock.findSavedCheckoutProfileByNickname).not.toHaveBeenCalled();
+    expect(usersMock.phoneMatchesStoredProfile).not.toHaveBeenCalled();
+  });
 });
