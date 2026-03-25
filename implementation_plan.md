@@ -5,7 +5,7 @@ Merged findings from two independent audits into a phased, prioritized fix plan.
 ## User Review Required
 
 > [!IMPORTANT]
-> **Phase 5 (Server Components) is HIGH difficulty** and touches every admin page. It's the largest change and may benefit from being done in a separate session.
+> **Phase 5 is complete.** The remaining high-difficulty idea in this document is the future server-components/admin rendering work noted under Phase 6 (Future / Out-of-Scope).
 
 > [!WARNING]
 > **Phase 2 changes notification behavior**: Mutations will return before notifications finish. Notification failures will no longer block the admin UI, but will still be logged. The admin will see notification results on the next dashboard refresh rather than inline in the mutation response.
