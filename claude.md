@@ -22,7 +22,7 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 - Public product progress now distinguishes **goal** from **sellout** for finite-stock items:
   - shared helper: `lib/progress-bar.ts`
   - finite-stock bars use stock ceiling as the track and render `成團目標` as a marker instead of filling to 100% at goal hit
-  - storefront `餘量` badge in `components/ProductCard.tsx` was enlarged and given stronger contrast for urgency
+  - storefront `剩餘` badge in `components/ProductCard.tsx` was enlarged and given stronger contrast for urgency
   - admin products/suppliers pages were updated to use the same stock-cap bar logic
 - `Round` now owns configurable `pickup_option_a` + `pickup_option_b`. Shared helper: `lib/pickup-options.ts`. Storefront checkout, admin POS, rounds admin UI, and submit-order validation all read from the round, not a hard-coded constant.
 - Live databases need manual SQL `prisma/migration_008_round_pickup_options.sql` before deploying the round-configurable pickup feature.
@@ -35,6 +35,16 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
   - a verified `/lookup` search now caches session access for every matched order in that browser session
   - direct `/order/[orderNumber]` visits still fall back to manual `recipient_name + phone_last3` verification
   - lookup CTA copy now includes Chinese (`view detail / 查詢細節`) for lower-English users
+- Public checkout copy and hero summary were simplified for lower-friction ordering:
+  - the public checkout form now uses one visible shared field `訂購人/收貨人`, while still submitting the same value to both `nickname` and `recipient_name`
+  - storefront delivery copy now says `宅配到以下地址`
+  - homepage summary pills now show live round shipping info (`本團運費 {n}元` or `本團運費待設定`), a separate `面交取貨免運` pill, and round-normalized pickup labels
+- Storefront card polish follow-up:
+  - product aggregate copy now reads as group demand (`已有 x被預訂，共有 y`)
+  - storefront progress-bar labels use `庫存` / `已被預訂` wording while admin bars keep the previous copy
+  - stock-limit state pill now says `已達庫存`
+  - product image overlay text is vertically centered in the image panel
+  - the round-status badge in `components/DeadlineBanner.tsx` now keeps `開放中` on one line
 - Verified after redesign + subsequent checkout/order-detail follow-up:
   - `npx tsc --noEmit`
   - `npm run lint`
@@ -81,7 +91,7 @@ Group-buy ordering system for fresh produce (生鮮團購訂購系統). Organize
 
 1. Admin creates round (開團) with deadline + shipping fee + pickup labels + products.
 2. Shares URL in LINE group.
-3. User browses → adds to cart → enters nickname + recipient info + pickup option → submits (idempotent via `submission_key`).
+3. User browses → adds to cart → enters shared purchaser/recipient name + contact info + pickup option → submits (idempotent via `submission_key`).
 4. System shows bank details + share CTA if any product under goal.
 5. User transfers money, reports payment (`order_number + recipient_name + phone_last3`).
 6. Admin confirms (single/batch) → LINE + email notification. Status: `confirmed`.

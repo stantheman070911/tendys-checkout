@@ -90,6 +90,14 @@
   - Added shared public-order session helper in `lib/public-order-access.ts`
   - A verified `/lookup` search now caches access for all matched orders in the current browser session, so opening a result no longer asks for the same identity twice
   - Direct `/order/[orderNumber]` visits still fall back to manual verification, and lookup CTA/copy was localized with Chinese support (`查詢細節`)
+- [x] **7.15** Public checkout + storefront copy clarification
+  - Public checkout now uses one visible `訂購人/收貨人` field while still submitting the same value into the existing `nickname` / `recipient_name` backend fields
+  - Storefront delivery wording now says `宅配到以下地址`
+  - Homepage hero pills now show the live round shipping fee (`本團運費 {n}元` or `本團運費待設定`), a separate `面交取貨免運` pill, and normalized round pickup labels
+- [x] **7.16** Storefront product-card wording + layout polish
+  - Public product cards now describe aggregate demand as `已有 x被預訂，共有 y`, with unlimited-stock fallback `已被預訂 x`
+  - Storefront progress-bar copy now uses `庫存` / `已被預訂`, and the stock-limit pill is shortened to `已達庫存`
+  - Product image overlay text is vertically centered, and the round-status badge keeps `開放中` on one line
 
 ### Checkpoint 7 (Final)
 

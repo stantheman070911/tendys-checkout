@@ -70,12 +70,14 @@ export function ProductCard({
               </span>
             )}
           </div>
-          <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-            <div className="lux-kicker text-[rgba(255,242,224,0.78)]">
-              seasonal selection
-            </div>
-            <div className="mt-2 font-display text-2xl leading-tight">
-              {product.name}
+          <div className="absolute inset-0 flex items-center p-4 text-white">
+            <div>
+              <div className="lux-kicker text-[rgba(255,242,224,0.78)]">
+                seasonal selection
+              </div>
+              <div className="mt-2 font-display text-2xl leading-tight">
+                {product.name}
+              </div>
             </div>
           </div>
         </div>

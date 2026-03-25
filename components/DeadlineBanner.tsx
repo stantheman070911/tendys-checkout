@@ -63,7 +63,7 @@ export function DeadlineBanner({
           </div>
         </div>
         <div
-          className={`inline-flex w-fit items-center rounded-full border px-3.5 py-2 text-xs font-semibold tracking-[0.18em] ${
+          className={`inline-flex w-fit items-center justify-center whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-semibold tracking-[0.18em] ${
             isUrgent
               ? "border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] text-[rgb(140,67,56)]"
               : "border-[rgba(184,132,71,0.2)] bg-[rgba(242,228,203,0.84)] text-[rgb(120,84,39)]"
