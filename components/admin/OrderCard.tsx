@@ -23,7 +23,10 @@ interface OrderCardProps {
   order: OrderWithRelations;
   selected: boolean;
   onToggleSelect: (id: string) => void;
-  onRefresh: () => void;
+  onOrderMutated: (
+    previousOrder: OrderWithRelations,
+    updatedOrder: OrderWithRelations,
+  ) => void;
   adminFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
 }
 
@@ -31,7 +34,7 @@ export function OrderCard({
   order,
   selected,
   onToggleSelect,
-  onRefresh,
+  onOrderMutated,
   adminFetch,
 }: OrderCardProps) {
   const { toast } = useToast();
@@ -54,13 +57,13 @@ export function OrderCard({
   ) => {
     setActing(true);
     try {
-      await adminFetch(url, {
+      const response = await adminFetch<{ order: OrderWithRelations }>(url, {
         method: "POST",
         body: JSON.stringify(body),
       });
       toast({ title: successMsg });
       setExpanded(false);
-      onRefresh();
+      onOrderMutated(o, response.order);
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "操作失敗",
@@ -91,19 +94,22 @@ export function OrderCard({
   const handleCancel = async () => {
     setActing(true);
     try {
-      await adminFetch("/api/cancel-order", {
-        method: "POST",
-        body: JSON.stringify({
-          orderId: o.id,
-          isAdmin: true,
-          cancel_reason: cancelReason.trim() || undefined,
-        }),
-      });
+      const response = await adminFetch<{ order: OrderWithRelations }>(
+        "/api/cancel-order",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            orderId: o.id,
+            isAdmin: true,
+            cancel_reason: cancelReason.trim() || undefined,
+          }),
+        },
+      );
       toast({ title: "訂單已取消" });
       setCancelOpen(false);
       setCancelReason("");
       setExpanded(false);
-      onRefresh();
+      onOrderMutated(o, response.order);
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "取消失敗",

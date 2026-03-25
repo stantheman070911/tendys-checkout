@@ -150,6 +150,15 @@ Reduce debounce from 450ms to 300ms.
 
 ## Phase 5 — Optimistic UI Updates (Skip Full Refetches)
 
+Status: COMPLETE on 2026-03-25 after follow-up review fixes.
+
+Implemented result:
+- Added parent-owned optimistic mutation updates for admin orders and shipments
+- Added `lib/admin/order-state.ts` helpers plus Vitest coverage for replacement, batch transitions, skipped-id shipment removal, and pending-count clamping
+- Extended `AdminRoundContext` with local pending-count adjustment so the orders badge updates immediately
+- Added 2-second debounced background revalidation on orders and shipments
+- Follow-up fix: silent revalidation failures now preserve the last good UI and surface a non-blocking inline warning instead of replacing the page with the blocking error banner
+
 After every admin mutation (confirm, cancel, ship), the current code calls `fetchData()` which re-fetches the entire dataset. Instead, patch the local state optimistically.
 
 #### [MODIFY] [components/admin/OrderCard.tsx](file:///Users/stanleylu/workspace/tendycheckout/components/admin/OrderCard.tsx)

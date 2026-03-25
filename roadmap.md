@@ -107,6 +107,11 @@
   - Incomplete phone input now short-circuits before rate limiting or DB lookup, preventing saved-profile nickname disclosure while a user is still typing
   - Arrival notification customer counts now dedupe by logical purchaser identity (`purchaser_name + normalized phone`, with `recipient_name` fallback) instead of including nickname
   - Added focused route and DB tests for incomplete-phone autofill requests, cross-nickname same-customer dedupe, and legacy purchaser-name fallback
+- [x] **7.19** Admin mutation refresh follow-up
+  - Replaced the remaining `onRefresh()`-driven admin order/shipment mutation flows with parent-owned optimistic state updates
+  - Added debounced silent background revalidation for orders and shipments, keeping the last good UI visible if background sync fails
+  - Added shared admin order-state helpers and focused Vitest coverage for replacement, batch status transitions, skipped-id shipment removal, and pending badge math
+  - Verified after follow-up review fixes with `npm run build`, `npx tsc --noEmit`, `npm run lint`, and `npx vitest run` (29 files / 145 tests)
 
 ### Checkpoint 7 (Final)
 

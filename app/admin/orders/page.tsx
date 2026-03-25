@@ -1,21 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAdminRound } from "@/contexts/AdminRoundContext";
+import {
+  applyBatchStatusTransition,
+  getPendingConfirmCountDelta,
+  replaceItemById,
+} from "@/lib/admin/order-state";
 import { matchesOrderSearch } from "@/lib/admin/order-search";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { STATUS_LABELS } from "@/constants";
 import { OrderCard } from "@/components/admin/OrderCard";
 import { POSForm } from "@/components/admin/POSForm";
-import type {
-  Round,
-  Order,
-  OrderItem,
-  User,
-  ProductWithProgress,
-} from "@/types";
+import type { Order, OrderItem, User, ProductWithProgress } from "@/types";
 
 type OrderWithRelations = Order & {
   order_items: OrderItem[];
@@ -33,14 +32,17 @@ const FILTER_OPTIONS = [
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
-  const { round, loading: roundLoading, refreshRound } = useAdminRound();
+  const { round, loading: roundLoading, refreshRound, adjustPendingCount } =
+    useAdminRound();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
+  const revalidateTimerRef = useRef<number | null>(null);
 
   const [orders, setOrders] = useState<OrderWithRelations[]>([]);
   const [products, setProducts] = useState<ProductWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>(
     searchParams.get("status") ?? "all",
   );
@@ -49,39 +51,107 @@ export default function OrdersPage() {
   const [batchActing, setBatchActing] = useState(false);
   const [showPOS, setShowPOS] = useState(searchParams.get("showPOS") === "1");
 
-  const fetchData = useCallback(async () => {
-    setError(null);
-    if (!round) {
-      setOrders([]);
-      setProducts([]);
-      setLoading(false);
-      return;
-    }
+  const fetchData = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (silent) {
+        setSyncError(null);
+      } else {
+        setError(null);
+      }
+      if (!round) {
+        setOrders([]);
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const [ordersData, productsData] = await Promise.all([
-        adminFetch<{ orders: OrderWithRelations[] }>(
-          `/api/orders?roundId=${round.id}`,
-        ),
-        adminFetch<{ products: ProductWithProgress[] }>(
-          `/api/products?roundId=${round.id}&all=true`,
-        ),
-      ]);
+      if (!silent) {
+        setLoading(true);
+      }
 
-      setOrders(ordersData.orders);
-      setProducts(productsData.products);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "資料載入失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, [adminFetch, round]);
+      try {
+        const [ordersData, productsData] = await Promise.all([
+          adminFetch<{ orders: OrderWithRelations[] }>(
+            `/api/orders?roundId=${round.id}`,
+          ),
+          adminFetch<{ products: ProductWithProgress[] }>(
+            `/api/products?roundId=${round.id}&all=true`,
+          ),
+        ]);
+
+        setOrders(ordersData.orders);
+        setProducts(productsData.products);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "資料載入失敗";
+        if (silent) {
+          setSyncError(message);
+        } else {
+          setError(message);
+        }
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [adminFetch, round],
+  );
 
   useEffect(() => {
     if (roundLoading) return;
     void fetchData();
   }, [fetchData, roundLoading]);
+
+  const scheduleRevalidate = useCallback(() => {
+    if (revalidateTimerRef.current !== null) {
+      window.clearTimeout(revalidateTimerRef.current);
+    }
+
+    revalidateTimerRef.current = window.setTimeout(() => {
+      void Promise.all([fetchData({ silent: true }), refreshRound()]);
+      revalidateTimerRef.current = null;
+    }, 2000);
+  }, [fetchData, refreshRound]);
+
+  useEffect(() => {
+    return () => {
+      if (revalidateTimerRef.current !== null) {
+        window.clearTimeout(revalidateTimerRef.current);
+      }
+    };
+  }, []);
+
+  const clearSelectionForOrder = useCallback((orderId: string) => {
+    setBatchSel((prev) => {
+      if (!prev.has(orderId)) {
+        return prev;
+      }
+
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+  }, []);
+
+  const handleOrderMutated = useCallback(
+    (previousOrder: OrderWithRelations, updatedOrder: OrderWithRelations) => {
+      setOrders((currentOrders) => replaceItemById(currentOrders, updatedOrder));
+      clearSelectionForOrder(updatedOrder.id);
+
+      const pendingCountDelta = getPendingConfirmCountDelta(
+        previousOrder.status,
+        updatedOrder.status,
+      );
+      if (pendingCountDelta !== 0) {
+        adjustPendingCount(pendingCountDelta);
+      }
+
+      setSyncError(null);
+      scheduleRevalidate();
+    },
+    [adjustPendingCount, clearSelectionForOrder, scheduleRevalidate],
+  );
 
   // Filter + search
   const filtered = orders.filter((o) => {
@@ -115,6 +185,7 @@ export default function OrdersPage() {
 
   const batchConfirm = async () => {
     if (batchSel.size === 0) return;
+    const selectedIds = Array.from(batchSel);
     setBatchActing(true);
     try {
       const res = await adminFetch<{
@@ -122,7 +193,7 @@ export default function OrdersPage() {
         skipped?: string[];
       }>("/api/batch-confirm", {
         method: "POST",
-        body: JSON.stringify({ orderIds: Array.from(batchSel) }),
+        body: JSON.stringify({ orderIds: selectedIds }),
       });
       const skipped = res.skipped?.length ?? 0;
       toast({
@@ -131,8 +202,23 @@ export default function OrdersPage() {
             ? `已確認 ${res.confirmed} 筆訂單，略過 ${skipped} 筆`
             : `已確認 ${res.confirmed} 筆訂單`,
       });
+
+      const confirmedAt = new Date().toISOString();
+      setOrders((currentOrders) =>
+        applyBatchStatusTransition(currentOrders, {
+          ids: selectedIds,
+          skippedIds: res.skipped,
+          fromStatus: "pending_confirm",
+          toStatus: "confirmed",
+          patch: (order) => ({ ...order, confirmed_at: confirmedAt }),
+        }),
+      );
       setBatchSel(new Set());
-      await Promise.all([fetchData(), refreshRound()]);
+      if (res.confirmed > 0) {
+        adjustPendingCount(-res.confirmed);
+      }
+      setSyncError(null);
+      scheduleRevalidate();
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "批次確認失敗",
@@ -252,6 +338,12 @@ export default function OrdersPage() {
         </button>
       </div>
 
+      {syncError && (
+        <div className="rounded-[1.1rem] border border-[rgba(184,132,71,0.26)] bg-[rgba(242,228,203,0.72)] px-4 py-3 text-sm text-[rgb(120,84,39)]">
+          背景同步失敗，畫面保留目前資料。{syncError}
+        </div>
+      )}
+
       {/* Filter tabs */}
       <div className="lux-panel flex flex-wrap items-center gap-2 p-3">
         {FILTER_OPTIONS.map((s) => (
@@ -291,7 +383,7 @@ export default function OrdersPage() {
               order={o}
               selected={batchSel.has(o.id)}
               onToggleSelect={toggleSelect}
-              onRefresh={fetchData}
+              onOrderMutated={handleOrderMutated}
               adminFetch={adminFetch}
             />
           ))}

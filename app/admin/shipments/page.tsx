@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAdminRound } from "@/contexts/AdminRoundContext";
+import {
+  removeBatchItemsById,
+  removeItemsById,
+} from "@/lib/admin/order-state";
 import {
   matchesOrderSearch,
   groupOrdersByPickup,
@@ -10,17 +14,19 @@ import {
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { ShipmentCard } from "@/components/admin/ShipmentCard";
-import type { Round, OrderWithItems } from "@/types";
+import type { OrderWithItems } from "@/types";
 
 export default function ShipmentsPage() {
   const searchParams = useSearchParams();
-  const { round, loading: roundLoading, refreshRound } = useAdminRound();
+  const { round, loading: roundLoading } = useAdminRound();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
+  const revalidateTimerRef = useRef<number | null>(null);
 
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [batchSel, setBatchSel] = useState<Set<string>>(new Set());
   const [batchActing, setBatchActing] = useState(false);
@@ -32,31 +38,89 @@ export default function ShipmentsPage() {
   const productFilterId = searchParams.get("productId") ?? "";
   const productFilterName = searchParams.get("productName") ?? "";
 
-  const fetchData = useCallback(async () => {
-    setError(null);
-    if (!round) {
-      setOrders([]);
-      setLoading(false);
-      return;
-    }
+  const fetchData = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (silent) {
+        setSyncError(null);
+      } else {
+        setError(null);
+      }
+      if (!round) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const ordersData = await adminFetch<{ orders: OrderWithItems[] }>(
-        `/api/orders?roundId=${round.id}&status=confirmed`,
-      );
-      setOrders(ordersData.orders);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "資料載入失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, [adminFetch, round]);
+      if (!silent) {
+        setLoading(true);
+      }
+      try {
+        const ordersData = await adminFetch<{ orders: OrderWithItems[] }>(
+          `/api/orders?roundId=${round.id}&status=confirmed`,
+        );
+        setOrders(ordersData.orders);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "資料載入失敗";
+        if (silent) {
+          setSyncError(message);
+        } else {
+          setError(message);
+        }
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [adminFetch, round],
+  );
 
   useEffect(() => {
     if (roundLoading) return;
     void fetchData();
   }, [fetchData, roundLoading]);
+
+  const scheduleRevalidate = useCallback(() => {
+    if (revalidateTimerRef.current !== null) {
+      window.clearTimeout(revalidateTimerRef.current);
+    }
+
+    revalidateTimerRef.current = window.setTimeout(() => {
+      void fetchData({ silent: true });
+      revalidateTimerRef.current = null;
+    }, 2000);
+  }, [fetchData]);
+
+  useEffect(() => {
+    return () => {
+      if (revalidateTimerRef.current !== null) {
+        window.clearTimeout(revalidateTimerRef.current);
+      }
+    };
+  }, []);
+
+  const clearSelectionForOrder = useCallback((orderId: string) => {
+    setBatchSel((prev) => {
+      if (!prev.has(orderId)) {
+        return prev;
+      }
+
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+  }, []);
+
+  const handleShipmentConfirmed = useCallback(
+    (orderId: string) => {
+      setOrders((currentOrders) => removeItemsById(currentOrders, [orderId]));
+      clearSelectionForOrder(orderId);
+      setSyncError(null);
+      scheduleRevalidate();
+    },
+    [clearSelectionForOrder, scheduleRevalidate],
+  );
 
   // Filter by search + optional product filter
   const filtered = orders.filter((o) => {
@@ -109,22 +173,15 @@ export default function ShipmentsPage() {
 
   const batchConfirmShipment = async () => {
     if (batchSel.size === 0) return;
+    const selectedIds = Array.from(batchSel);
     setBatchActing(true);
     try {
       const res = await adminFetch<{
         shipped: number;
         skipped: string[];
-        results: Array<{
-          orderId: string;
-          orderNumber: string;
-          notifications: {
-            line?: { success: boolean; error?: string };
-            email?: { success: boolean; error?: string } | null;
-          };
-        }>;
       }>("/api/confirm-shipment", {
         method: "POST",
-        body: JSON.stringify({ orderIds: Array.from(batchSel) }),
+        body: JSON.stringify({ orderIds: selectedIds }),
       });
 
       const skipped = res.skipped?.length ?? 0;
@@ -135,8 +192,12 @@ export default function ShipmentsPage() {
             : `已出貨 ${res.shipped} 筆`,
       });
 
+      setOrders((currentOrders) =>
+        removeBatchItemsById(currentOrders, selectedIds, res.skipped),
+      );
       setBatchSel(new Set());
-      await Promise.all([fetchData(), refreshRound()]);
+      setSyncError(null);
+      scheduleRevalidate();
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "批次出貨失敗",
@@ -315,6 +376,12 @@ export default function ShipmentsPage() {
         )}
       </div>
 
+      {syncError && (
+        <div className="rounded-[1.1rem] border border-[rgba(184,132,71,0.26)] bg-[rgba(242,228,203,0.72)] px-4 py-3 text-sm text-[rgb(120,84,39)]">
+          背景同步失敗，畫面保留目前資料。{syncError}
+        </div>
+      )}
+
       {/* Grouped orders */}
       {filtered.length === 0 ? (
         <div className="lux-panel p-12 text-center text-[hsl(var(--muted-foreground))]">
@@ -347,7 +414,7 @@ export default function ShipmentsPage() {
                       order={o}
                       selected={batchSel.has(o.id)}
                       onToggleSelect={toggleSelect}
-                      onRefresh={fetchData}
+                      onShipmentConfirmed={handleShipmentConfirmed}
                       adminFetch={adminFetch}
                     />
                   ))}

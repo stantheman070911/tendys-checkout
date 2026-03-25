@@ -19,15 +19,11 @@ Read these first, in this order:
 
 Continue the performance work from the previous session.
 
-Phases 1 through 4 from `implementation_plan.md` are already implemented and verified.
+Phases 1 through 5 from `implementation_plan.md` are already implemented and verified.
 
 Do **not** redo them unless you find a real regression.
 
-The remaining scoped work is:
-
-- **Phase 5 only**: optimistic admin updates to remove the remaining full refetches after mutations
-
-Do **not** start Phase 6 in this session unless the user explicitly asks.
+The current implementation plan has no remaining in-scope work. Phase 6 remains future/out-of-scope unless the user explicitly asks for it.
 
 ## Important Product/Behavior Constraints
 
@@ -106,6 +102,34 @@ Do **not** start Phase 6 in this session unless the user explicitly asks.
   - `/Users/stanleylu/workspace/tendycheckout/app/api/cancel-order/route.test.ts`
   - `/Users/stanleylu/workspace/tendycheckout/app/api/lookup/order/route.test.ts`
 
+### Phase 5
+
+- Admin orders and shipments no longer do immediate full-page refetches after successful single-item mutations
+- Added shared optimistic-state helper:
+  - `/Users/stanleylu/workspace/tendycheckout/lib/admin/order-state.ts`
+- Added focused helper coverage:
+  - `/Users/stanleylu/workspace/tendycheckout/lib/admin/order-state.test.ts`
+- `OrderCard` now reports `previousOrder + updatedOrder` back to the parent page:
+  - `/Users/stanleylu/workspace/tendycheckout/components/admin/OrderCard.tsx`
+- `ShipmentCard` now reports confirmed shipment IDs back to the parent page:
+  - `/Users/stanleylu/workspace/tendycheckout/components/admin/ShipmentCard.tsx`
+- Orders page now:
+  - patches single-order state locally after confirm / quick-confirm / cancel / ship
+  - patches batch confirm locally
+  - updates the pending-confirm badge immediately via `AdminRoundContext`
+  - uses debounced silent background revalidation
+  - preserves the optimistic UI if background sync fails, showing a non-blocking inline warning instead
+  - file: `/Users/stanleylu/workspace/tendycheckout/app/admin/orders/page.tsx`
+- Shipments page now:
+  - removes shipped orders locally after single and batch shipment confirms
+  - uses debounced silent background revalidation
+  - preserves the current queue if background sync fails, showing a non-blocking inline warning instead
+  - file: `/Users/stanleylu/workspace/tendycheckout/app/admin/shipments/page.tsx`
+- `AdminRoundContext` now exposes local pending-count adjustment for immediate badge updates:
+  - `/Users/stanleylu/workspace/tendycheckout/contexts/AdminRoundContext.tsx`
+- Residual full refresh intentionally remains in admin POS success flow only; that was left out of Phase 5 by design
+- Follow-up review findings on “silent revalidation” and skipped-id shipment test coverage were fixed before sign-off
+
 ## Verification Status
 
 These all passed at the end of the previous session:
@@ -117,100 +141,11 @@ npm run lint
 npx vitest run
 ```
 
-## Remaining Work: Phase 5
+## Suggested Next Work
 
-Implement optimistic admin updates so pages stop doing full data refetches after every mutation.
-
-### Main Objective
-
-Remove the remaining `fetchData()`-style full refreshes after order/payment/shipment/cancel actions and replace them with local state patching plus optional background revalidation.
-
-### Files Most Likely To Change
-
-- `/Users/stanleylu/workspace/tendycheckout/components/admin/OrderCard.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/components/admin/ShipmentCard.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/app/admin/orders/page.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/app/admin/shipments/page.tsx`
-
-You may also need small coordinated changes in:
-
-- `/Users/stanleylu/workspace/tendycheckout/app/admin/dashboard/page.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/contexts/AdminRoundContext.tsx`
-
-### Recommended Implementation Plan
-
-1. Inspect current mutation flows in `OrderCard` and `ShipmentCard`
-   - identify where they still call `onRefresh()`
-   - identify which status transitions should remove an order from the current list vs mutate it in place
-
-2. Add parent-managed optimistic mutation callbacks
-   - in orders page, add something like `onOptimisticOrderChange`
-   - in shipments page, add something like `onOptimisticShipmentConfirmed`
-   - avoid nested state churn; patch arrays by `id`
-
-3. Keep local UI responsive immediately
-   - `pending_confirm -> confirmed`
-   - `pending_payment -> confirmed` for quick confirm
-   - any status -> cancelled`
-   - `confirmed -> shipped`
-
-4. Decide whether to also patch derived UI state
-   - batch selection sets
-   - filtered visible list
-   - counts shown in local pills
-   - possibly shared pending badge via `refreshRound()` or targeted local decrement
-
-5. Add a light background sync if needed
-   - only after the optimistic patch
-   - debounced or delayed, not blocking the interaction
-
-6. Update tests if the UI-level logic requires it
-   - likely minimal for API tests
-   - maybe add focused component behavior tests only if the repo already supports that pattern cleanly
-
-## Specific Things To Watch
-
-- Do not break the accepted Phase 2 mutation behavior by reintroducing notification waits
-- Do not overwrite the existing user-owned edits in:
-  - `/Users/stanleylu/workspace/tendycheckout/app/layout.tsx`
-  - `/Users/stanleylu/workspace/tendycheckout/app/page.tsx`
-- Keep `lib/` pure TypeScript
-- Preserve current public/admin behavior unless directly related to Phase 5
-- Be careful with admin orders vs shipments list semantics:
-  - orders page may still need cancelled/shipped items depending on current filter
-  - shipments page should likely remove an item immediately after `confirmed -> shipped`
-
-## Good First Reads For Phase 5
-
-- `/Users/stanleylu/workspace/tendycheckout/components/admin/OrderCard.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/components/admin/ShipmentCard.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/app/admin/orders/page.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/app/admin/shipments/page.tsx`
-- `/Users/stanleylu/workspace/tendycheckout/contexts/AdminRoundContext.tsx`
-
-## Suggested Prompt To Continue
-
-Continue Phase 5 of the performance implementation in `/Users/stanleylu/workspace/tendycheckout`.
-
-Context:
-- Phases 1 through 4 are already implemented and verified.
-- Phase 2 notification detachment is approved and must remain.
-- The Phase 1 DB indexes were already applied manually in Supabase.
-- The remaining task is to remove the last full-page admin refetches after mutations by implementing optimistic local state updates for orders and shipments.
-
-Requirements:
-- Read `claude.md`, `whatwearebuilding.md`, `roadmap.md`, `performance_audit.md`, `implementation_plan.md`, and `next_session_handoff.md`.
-- Work only on Phase 5 unless you discover a regression that must be fixed.
-- Preserve existing behavior and be careful not to overwrite unrelated uncommitted changes.
-- Update tests if needed.
-- Run:
-  - `npm run build`
-  - `npx tsc --noEmit`
-  - `npm run lint`
-  - `npx vitest run`
-
-Deliverables:
-- optimistic update flow for admin orders and shipments
-- reduced reliance on full `fetchData()` refreshes after single-item actions
-- concise summary of what changed, any tradeoffs, and whether any residual full refreshes remain
-
+- Run the remaining real-Supabase manual smoke test in `roadmap.md` Phase 7.1
+- If the user wants more performance work, start a fresh scoped plan for one of the current deferred items:
+  - dashboard stats endpoint
+  - pagination for orders/logs
+  - local JWT verification
+  - device/browser visual QA

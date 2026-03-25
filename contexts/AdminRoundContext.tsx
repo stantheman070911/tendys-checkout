@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { applyPendingCountDelta } from "@/lib/admin/order-state";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import type { Round } from "@/types";
 
@@ -16,6 +17,7 @@ interface AdminRoundContextValue {
   pendingCount: number;
   loading: boolean;
   error: string | null;
+  adjustPendingCount: (delta: number) => void;
   refreshRound: () => Promise<void>;
 }
 
@@ -31,6 +33,10 @@ export function AdminRoundProvider({
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const adjustPendingCount = useCallback((delta: number) => {
+    setPendingCount((currentCount) => applyPendingCountDelta(currentCount, delta));
+  }, []);
 
   const refreshRound = useCallback(async () => {
     setError(null);
@@ -72,9 +78,10 @@ export function AdminRoundProvider({
       pendingCount,
       loading,
       error,
+      adjustPendingCount,
       refreshRound,
     }),
-    [round, pendingCount, loading, error, refreshRound],
+    [round, pendingCount, loading, error, adjustPendingCount, refreshRound],
   );
 
   return (

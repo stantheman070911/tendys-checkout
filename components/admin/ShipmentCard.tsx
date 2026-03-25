@@ -10,7 +10,7 @@ interface ShipmentCardProps {
   order: OrderWithItems;
   selected: boolean;
   onToggleSelect: (id: string) => void;
-  onRefresh: () => void;
+  onShipmentConfirmed: (orderId: string) => void;
   adminFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
 }
 
@@ -18,12 +18,11 @@ export function ShipmentCard({
   order,
   selected,
   onToggleSelect,
-  onRefresh,
+  onShipmentConfirmed,
   adminFetch,
 }: ShipmentCardProps) {
   const { toast } = useToast();
   const [acting, setActing] = useState(false);
-  const [shipped, setShipped] = useState(false);
 
   const o = order;
   const isPickup = !!o.pickup_location;
@@ -36,9 +35,8 @@ export function ShipmentCard({
         body: JSON.stringify({ orderId: o.id }),
       });
 
-      setShipped(true);
       toast({ title: isPickup ? "已確認取貨" : "已確認寄出" });
-      await onRefresh();
+      onShipmentConfirmed(o.id);
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "操作失敗",
@@ -48,8 +46,6 @@ export function ShipmentCard({
       setActing(false);
     }
   };
-
-  if (shipped) return null;
 
   return (
     <div className="lux-panel space-y-3 p-4">
