@@ -1,77 +1,61 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
-  parsePublicOrderAccess,
-  serializePublicOrderAccess,
+  buildPublicOrderAccessPath,
+  createPublicOrderAccessToken,
+  getPublicOrderAccessCookieName,
+  normalizePublicOrderAccessIdentity,
+  verifyPublicOrderAccessToken,
 } from "@/lib/public-order-access";
 
-describe("public order access payloads", () => {
-  it("parses a lookup payload and keeps it reusable", () => {
-    const payload = serializePublicOrderAccess(
-      {
-        purchaser_name: "王小美",
-        phone_last3: "678",
-      },
-      "lookup",
-    );
-
-    expect(parsePublicOrderAccess(payload)).toEqual({
-      identity: {
-        purchaser_name: "王小美",
-        phone_last3: "678",
-      },
-      source: "lookup",
-      consumeOnUse: false,
-    });
+describe("public order access tokens", () => {
+  beforeEach(() => {
+    process.env.ADMIN_SESSION_SECRET = "test-secret";
   });
 
-  it("parses a checkout payload and marks it one-time", () => {
-    const payload = serializePublicOrderAccess(
-      {
-        purchaser_name: "王小美",
-        phone_last3: "678",
-      },
-      "checkout",
-    );
-
-    expect(parsePublicOrderAccess(payload)).toEqual({
-      identity: {
-        purchaser_name: "王小美",
-        phone_last3: "678",
-      },
-      source: "checkout",
-      consumeOnUse: true,
-    });
-  });
-
-  it("keeps legacy payloads backward compatible", () => {
+  it("normalizes purchaser identity", () => {
     expect(
-      parsePublicOrderAccess(
-        JSON.stringify({
-          recipient_name: "王小美",
-          phone_last3: "678",
-        }),
-      ),
+      normalizePublicOrderAccessIdentity({
+        purchaser_name: " 王小美 ",
+        phone_last3: "6-7-8",
+      }),
     ).toEqual({
-      identity: {
-        purchaser_name: "王小美",
-        phone_last3: "678",
-      },
-      source: "legacy",
-      consumeOnUse: true,
+      purchaser_name: "王小美",
+      phone_last3: "678",
     });
   });
 
-  it("rejects invalid payloads", () => {
-    expect(parsePublicOrderAccess(null)).toBeNull();
-    expect(parsePublicOrderAccess("not-json")).toBeNull();
-    expect(
-      parsePublicOrderAccess(
-        JSON.stringify({
-          purchaser_name: "王小美",
-          phone_last3: "67",
-          source: "lookup",
-        }),
-      ),
-    ).toBeNull();
+  it("creates and verifies a signed token", () => {
+    const token = createPublicOrderAccessToken({
+      orderNumber: "ord-001",
+      purchaserName: "王小美",
+      phoneLast3: "678",
+    });
+
+    expect(verifyPublicOrderAccessToken(token)).toEqual(
+      expect.objectContaining({
+        order_number: "ORD-001",
+        purchaser_name: "王小美",
+        phone_last3: "678",
+      }),
+    );
+  });
+
+  it("builds cookie-safe helpers", () => {
+    const token = createPublicOrderAccessToken({
+      orderNumber: "ORD-001",
+      purchaserName: "王小美",
+      phoneLast3: "678",
+    });
+
+    expect(buildPublicOrderAccessPath(token)).toContain(
+      "/api/public-order/access?token=",
+    );
+    expect(getPublicOrderAccessCookieName("ORD-001")).toMatch(
+      /^tendy_order_access_/,
+    );
+  });
+
+  it("rejects invalid tokens", () => {
+    expect(verifyPublicOrderAccessToken("bad-token")).toBeNull();
   });
 });

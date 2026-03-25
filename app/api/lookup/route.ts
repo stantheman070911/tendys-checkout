@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findOrdersByPurchaserNameAndPhoneLast3 } from "@/lib/db/orders";
+import {
+  buildPublicOrderAccessPath,
+  createPublicOrderAccessToken,
+} from "@/lib/public-order-access";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
 
@@ -61,12 +65,20 @@ export async function POST(request: NextRequest) {
       total_amount: order.total_amount,
       shipping_fee: order.shipping_fee,
       created_at: order.created_at,
+      access_token: createPublicOrderAccessToken({
+        orderNumber: order.order_number,
+        purchaserName,
+        phoneLast3,
+      }),
       order_items: order.order_items.map((item) => ({
         id: item.id,
         product_name: item.product_name,
         quantity: item.quantity,
         subtotal: item.subtotal,
       })),
+    })).map((order) => ({
+      ...order,
+      detail_url: buildPublicOrderAccessPath(order.access_token),
     }));
 
     return NextResponse.json({ orders: safeOrders });

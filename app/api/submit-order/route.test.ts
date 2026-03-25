@@ -10,6 +10,11 @@ const ordersMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
+vi.mock("@/lib/public-order-access", () => ({
+  createPublicOrderAccessToken: vi.fn(() => "public-token"),
+  buildPublicOrderAccessPath: vi.fn(() => "/api/public-order/access?token=public-token"),
+}));
+
 import { POST } from "./route";
 
 const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
@@ -61,6 +66,8 @@ describe("POST /api/submit-order", () => {
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.order.id).toBe("o1");
+    expect(data.access_token).toBe("public-token");
+    expect(data.detail_url).toContain("/api/public-order/access");
     expect(ordersMock.createCheckoutOrder).toHaveBeenCalledWith(
       expect.objectContaining({
         round_id: VALID_ROUND_ID,

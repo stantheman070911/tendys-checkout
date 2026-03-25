@@ -18,12 +18,21 @@ const orderWithRelationsInclude = {
   round: true,
 } as const satisfies Prisma.OrderInclude;
 
+const orderWithAdminListInclude = {
+  order_items: true,
+  user: true,
+} as const satisfies Prisma.OrderInclude;
+
 type OrderWithItems = Prisma.OrderGetPayload<{
   include: typeof orderWithItemsInclude;
 }>;
 
 type OrderWithRelations = Prisma.OrderGetPayload<{
   include: typeof orderWithRelationsInclude;
+}>;
+
+type OrderWithAdminListRelations = Prisma.OrderGetPayload<{
+  include: typeof orderWithAdminListInclude;
 }>;
 
 type CheckoutUserRecord = {
@@ -55,6 +64,14 @@ interface CreateOrderData {
 interface CreateOrderItem {
   product_id: string;
   quantity: number;
+}
+
+export interface PaginatedOrdersResult {
+  items: OrderWithAdminListRelations[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 }
 
 export interface CreateCheckoutOrderInput {
@@ -113,6 +130,19 @@ class OrderValidationError extends Error {
 
 function normalizePersonName(value: string | null | undefined): string {
   return (value ?? "").trim().toLocaleLowerCase();
+}
+
+function buildNormalizedUserLookupFields(input: {
+  purchaser_name: string | null | undefined;
+  phone: string | null | undefined;
+}) {
+  const phoneDigits = normalizePhoneDigits(input.phone);
+
+  return {
+    purchaser_name_lower: normalizePersonName(input.purchaser_name),
+    phone_digits: phoneDigits,
+    phone_last3: phoneDigits.length >= 3 ? phoneDigits.slice(-3) : "",
+  };
 }
 
 function buildLogicalCustomerIdentityKey(order: {
@@ -193,40 +223,6 @@ function isUniqueConstraintError(
   );
 }
 
-async function findPublicOrderIdsByIdentity(
-  purchaserName: string,
-  phoneLast3: string,
-): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-    SELECT o.id
-    FROM orders o
-    INNER JOIN users u ON u.id = o.user_id
-    WHERE lower(COALESCE(u.purchaser_name, '')) = lower(${purchaserName})
-      AND RIGHT(REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g'), 3) = ${phoneLast3}
-    ORDER BY o.created_at DESC
-  `;
-
-  return rows.map((row) => row.id);
-}
-
-async function findPublicOrderIdByOrderNumberAndIdentity(
-  orderNumber: string,
-  purchaserName: string,
-  phoneLast3: string,
-): Promise<string | null> {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-    SELECT o.id
-    FROM orders o
-    INNER JOIN users u ON u.id = o.user_id
-    WHERE o.order_number = ${orderNumber}
-      AND lower(COALESCE(u.purchaser_name, '')) = lower(${purchaserName})
-      AND RIGHT(REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g'), 3) = ${phoneLast3}
-    LIMIT 1
-  `;
-
-  return rows[0]?.id ?? null;
-}
-
 async function findBySubmissionKeyTx(
   tx: TxClient,
   key: string,
@@ -249,6 +245,7 @@ async function createUserSnapshot(
     data: {
       nickname: data.nickname,
       purchaser_name: data.purchaser_name,
+      ...buildNormalizedUserLookupFields(data),
       recipient_name: data.recipient_name,
       phone: data.phone,
       address: data.address ?? null,
@@ -341,8 +338,11 @@ async function createOrderInTx(
 
   const resolvedItems = [];
   let itemsTotal = 0;
+  const sortedItems = [...items].sort((left, right) =>
+    left.product_id.localeCompare(right.product_id),
+  );
 
-  for (const item of items) {
+  for (const item of sortedItems) {
     const product = productMap.get(item.product_id)!;
 
     const updated = await tx.$executeRaw`
@@ -501,13 +501,15 @@ export async function findOrdersByPurchaserNameAndPhoneLast3(
   purchaserName: string,
   phoneLast3: string,
 ): Promise<OrderWithRelations[]> {
-  const orderIds = await findPublicOrderIdsByIdentity(purchaserName, phoneLast3);
-  if (orderIds.length === 0) {
-    return [];
-  }
-
   return prisma.order.findMany({
-    where: { id: { in: orderIds } },
+    where: {
+      user: {
+        is: {
+          purchaser_name_lower: normalizePersonName(purchaserName),
+          phone_last3: phoneLast3,
+        },
+      },
+    },
     include: orderWithRelationsInclude,
     orderBy: { created_at: "desc" },
   });
@@ -518,18 +520,16 @@ export async function findPublicOrderByOrderNumberAndIdentity(
   purchaserName: string,
   phoneLast3: string,
 ): Promise<OrderWithRelations | null> {
-  const orderId = await findPublicOrderIdByOrderNumberAndIdentity(
-    orderNumber,
-    purchaserName,
-    phoneLast3,
-  );
-
-  if (!orderId) {
-    return null;
-  }
-
-  return prisma.order.findUnique({
-    where: { id: orderId },
+  return prisma.order.findFirst({
+    where: {
+      order_number: orderNumber,
+      user: {
+        is: {
+          purchaser_name_lower: normalizePersonName(purchaserName),
+          phone_last3: phoneLast3,
+        },
+      },
+    },
     include: orderWithRelationsInclude,
   });
 }
@@ -540,13 +540,179 @@ export async function listByRound(roundId: string, statusFilter?: string) {
       round_id: roundId,
       ...(statusFilter ? { status: statusFilter } : {}),
     },
-    include: { order_items: true, user: true },
+    include: orderWithAdminListInclude,
     orderBy: { created_at: "desc" },
   });
 }
 
 export async function listConfirmedByRound(roundId: string) {
   return listByRound(roundId, "confirmed");
+}
+
+function buildAdminOrderWhere(input: {
+  roundId: string;
+  status?: string;
+  search?: string;
+  productId?: string;
+}): Prisma.OrderWhereInput {
+  const trimmedSearch = input.search?.trim();
+  const where: Prisma.OrderWhereInput = {
+    round_id: input.roundId,
+    ...(input.status ? { status: input.status } : {}),
+  };
+
+  if (input.productId) {
+    where.order_items = {
+      some: {
+        product_id: input.productId,
+      },
+    };
+  }
+
+  if (trimmedSearch) {
+    where.OR = [
+      {
+        order_number: {
+          contains: trimmedSearch,
+          mode: "insensitive",
+        },
+      },
+      {
+        user: {
+          is: {
+            nickname: {
+              contains: trimmedSearch,
+              mode: "insensitive",
+            },
+          },
+        },
+      },
+      {
+        user: {
+          is: {
+            purchaser_name: {
+              contains: trimmedSearch,
+              mode: "insensitive",
+            },
+          },
+        },
+      },
+      {
+        user: {
+          is: {
+            recipient_name: {
+              contains: trimmedSearch,
+              mode: "insensitive",
+            },
+          },
+        },
+      },
+      {
+        user: {
+          is: {
+            phone: {
+              contains: trimmedSearch,
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  return where;
+}
+
+export async function listPageByRound(input: {
+  roundId: string;
+  status?: string;
+  search?: string;
+  productId?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedOrdersResult> {
+  const page = Math.max(1, input.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 50));
+  const where = buildAdminOrderWhere(input);
+
+  const [total, items] = await prisma.$transaction([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      include: orderWithAdminListInclude,
+      orderBy: { created_at: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    hasMore: page * pageSize < total,
+  };
+}
+
+export async function listRoundOrdersBatch(
+  roundId: string,
+  input?: {
+    skip?: number;
+    take?: number;
+  },
+) {
+  return prisma.order.findMany({
+    where: { round_id: roundId },
+    include: orderWithAdminListInclude,
+    orderBy: { created_at: "desc" },
+    skip: input?.skip ?? 0,
+    take: input?.take ?? 500,
+  });
+}
+
+export async function getPendingConfirmCount(roundId: string) {
+  return prisma.order.count({
+    where: {
+      round_id: roundId,
+      status: "pending_confirm",
+    },
+  });
+}
+
+export async function getRoundOrderStatusCounts(roundId: string) {
+  return prisma.order.groupBy({
+    by: ["status"],
+    where: { round_id: roundId },
+    _count: { _all: true },
+  });
+}
+
+export async function getRoundRevenueTotal(roundId: string) {
+  const result = await prisma.order.aggregate({
+    where: {
+      round_id: roundId,
+      status: { not: "cancelled" },
+    },
+    _sum: { total_amount: true },
+  });
+
+  return result._sum.total_amount ?? 0;
+}
+
+export async function getRoundProductDemand(roundId: string) {
+  return prisma.orderItem.groupBy({
+    by: ["product_id", "product_name"],
+    where: {
+      order: {
+        round_id: roundId,
+        status: { not: "cancelled" },
+      },
+    },
+    _sum: {
+      quantity: true,
+      subtotal: true,
+    },
+  });
 }
 
 export async function getOrdersByProduct(productId: string, roundId: string) {

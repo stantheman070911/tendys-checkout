@@ -1,20 +1,11 @@
-"use client";
-
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { PaymentReportForm } from "@/components/PaymentReportForm";
 import { CancelOrderButton } from "@/components/CancelOrderButton";
 import { SharePanel } from "@/components/SharePanel";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { CopyTextButton } from "@/components/CopyTextButton";
 import { BANK_INFO } from "@/constants";
-import { parsePublicOrderAccess } from "@/lib/public-order-access";
-import {
-  buildShareUrl,
-  formatCurrency,
-  getPublicOrderAccessSessionKey,
-} from "@/lib/utils";
+import { buildShareUrl, formatCurrency, maskPhone } from "@/lib/utils";
 import type { OrderStatus } from "@/types";
 
 const LINE_OA_URL = "https://lin.ee/Q1Ma43N";
@@ -34,208 +25,59 @@ interface PublicOrder {
   round_id: string | null;
   total_amount: number;
   shipping_fee: number | null;
-  status: OrderStatus;
+  status: OrderStatus | string;
   payment_amount: number | null;
   payment_last5: string | null;
-  payment_reported_at: string | null;
-  confirmed_at: string | null;
-  shipped_at: string | null;
+  payment_reported_at: string | null | Date;
+  confirmed_at: string | null | Date;
+  shipped_at: string | null | Date;
   note: string | null;
   pickup_location: string | null;
   cancel_reason: string | null;
   line_user_id: string | null;
-  created_at: string;
+  created_at: string | Date;
   user: {
     nickname: string | null;
     purchaser_name: string | null;
     recipient_name: string | null;
     phone: string | null;
     address: string | null;
-    masked_phone: string;
   } | null;
   order_items: PublicOrderItem[];
 }
 
-interface PublicOrderResponse {
-  any_under_goal: boolean;
-  order: PublicOrder;
-}
-
-interface PublicIdentity {
-  purchaser_name: string;
-  phone_last3: string;
+function getErrorMessage(error: string | null | undefined) {
+  switch (error) {
+    case "not_found":
+      return "找不到符合資料的訂單，請確認訂購人姓名與手機末三碼。";
+    case "rate_limited":
+      return "嘗試次數過多，請稍後再試。";
+    case "invalid":
+      return "驗證資訊無效，請重新輸入。";
+    default:
+      return null;
+  }
 }
 
 export function PublicOrderPage({
   orderNumber,
+  order,
+  anyUnderGoal,
+  identity,
+  error,
 }: {
   orderNumber: string;
+  order: PublicOrder | null;
+  anyUnderGoal: boolean;
+  identity: {
+    purchaser_name: string;
+    phone_last3: string;
+  } | null;
+  error?: string | null;
 }) {
-  const { toast } = useToast();
-  const [purchaserName, setPurchaserName] = useState("");
-  const [phoneLast3, setPhoneLast3] = useState("");
-  const [order, setOrder] = useState<PublicOrder | null>(null);
-  const [anyUnderGoal, setAnyUnderGoal] = useState(false);
-  const [identity, setIdentity] = useState<PublicIdentity | null>(null);
-  const [unlocking, setUnlocking] = useState(false);
-  const [autoUnlockChecked, setAutoUnlockChecked] = useState(false);
+  if (!order || !identity) {
+    const errorMessage = getErrorMessage(error);
 
-  const unlockOrder = useCallback(
-    async (
-      nextIdentity: PublicIdentity,
-      options?: {
-        consumeStoredAccessOnSuccess?: boolean;
-        clearStoredAccessOnFailure?: boolean;
-        showErrorToast?: boolean;
-      },
-    ) => {
-      setUnlocking(true);
-      try {
-        const res = await fetch("/api/lookup/order", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            order_number: orderNumber,
-            purchaser_name: nextIdentity.purchaser_name,
-            phone_last3: nextIdentity.phone_last3,
-          }),
-        });
-
-        if (!res.ok) {
-          setOrder(null);
-          if (options?.clearStoredAccessOnFailure) {
-            sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
-          }
-          if (options?.showErrorToast !== false) {
-            toast({ title: "找不到訂單", variant: "destructive" });
-          }
-          return;
-        }
-
-        const data = (await res.json()) as PublicOrderResponse;
-        setPurchaserName(nextIdentity.purchaser_name);
-        setPhoneLast3(nextIdentity.phone_last3);
-        setIdentity(nextIdentity);
-        setOrder(data.order);
-        setAnyUnderGoal(data.any_under_goal);
-
-        if (options?.consumeStoredAccessOnSuccess) {
-          sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
-        }
-      } catch {
-        if (options?.showErrorToast !== false) {
-          toast({ title: "網路錯誤，請稍後再試", variant: "destructive" });
-        }
-      } finally {
-        setUnlocking(false);
-        setAutoUnlockChecked(true);
-      }
-    },
-    [orderNumber, toast],
-  );
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem(
-      getPublicOrderAccessSessionKey(orderNumber),
-    );
-    if (!stored) {
-      setAutoUnlockChecked(true);
-      return;
-    }
-
-    try {
-      const resolved = parsePublicOrderAccess(stored);
-      if (!resolved) {
-        sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
-        setAutoUnlockChecked(true);
-        return;
-      }
-      void unlockOrder(
-        resolved.identity,
-        {
-          consumeStoredAccessOnSuccess: resolved.consumeOnUse,
-          clearStoredAccessOnFailure: true,
-          showErrorToast: false,
-        },
-      );
-    } catch {
-      sessionStorage.removeItem(getPublicOrderAccessSessionKey(orderNumber));
-      setAutoUnlockChecked(true);
-    }
-  }, [orderNumber, unlockOrder]);
-
-  async function handleUnlock(e: React.FormEvent) {
-    e.preventDefault();
-    const nextIdentity = {
-      purchaser_name: purchaserName.trim(),
-      phone_last3: phoneLast3.replace(/\D/g, "").slice(0, 3),
-    };
-
-    if (!nextIdentity.purchaser_name) {
-      toast({ title: "請輸入訂購人姓名", variant: "destructive" });
-      return;
-    }
-    if (nextIdentity.phone_last3.length !== 3) {
-      toast({ title: "請輸入手機末三碼", variant: "destructive" });
-      return;
-    }
-
-    await unlockOrder(nextIdentity);
-  }
-
-  function handleCopyLineBindMessage(message: string) {
-    if (!navigator.clipboard) {
-      toast({ title: "複製失敗", variant: "destructive" });
-      return;
-    }
-
-    navigator.clipboard.writeText(message).then(
-      () => {
-        toast({ title: "已複製綁定內容" });
-      },
-      () => {
-        toast({ title: "複製失敗", variant: "destructive" });
-      },
-    );
-  }
-
-  if (!autoUnlockChecked && !order) {
-    return (
-      <div className="lux-shell">
-        <header className="sticky top-0 z-20 border-b border-[rgba(177,140,92,0.18)] bg-[rgba(246,241,233,0.72)] backdrop-blur-xl">
-          <div className="lux-page flex items-center justify-between gap-3 py-3">
-            <div>
-              <div className="lux-kicker">Order Access</div>
-              <span className="font-display text-xl text-[hsl(var(--ink))]">
-                訂單詳情
-              </span>
-            </div>
-            <span className="rounded-full border border-[rgba(177,140,92,0.2)] bg-[rgba(255,251,246,0.88)] px-3 py-1.5 font-mono text-xs text-[hsl(var(--muted-foreground))]">
-              {orderNumber}
-            </span>
-          </div>
-        </header>
-        <main className="lux-page">
-          <section className="mx-auto max-w-3xl">
-            <div className="lux-panel-strong flex flex-col items-center justify-center gap-4 p-10 text-center md:p-14">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
-              <div className="space-y-2">
-                <div className="lux-kicker">Opening Order</div>
-                <h1 className="font-display text-3xl text-[hsl(var(--ink))] md:text-4xl">
-                  正在開啟你的訂單
-                </h1>
-                <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                  正在驗證剛才送出的訂單資訊，完成後會直接帶你進入訂單頁。
-                </p>
-              </div>
-            </div>
-          </section>
-        </main>
-      </div>
-    );
-  }
-
-  if (!order) {
     return (
       <div className="lux-shell">
         <header className="sticky top-0 z-20 border-b border-[rgba(177,140,92,0.18)] bg-[rgba(246,241,233,0.72)] backdrop-blur-xl">
@@ -263,9 +105,15 @@ export function PublicOrderPage({
                   <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                     若你不是從訂單查詢頁或剛下單後直接進來，請重新輸入訂購人姓名與手機末三碼。
                   </p>
+                  {errorMessage && (
+                    <div className="rounded-[1rem] border border-[rgba(189,111,98,0.22)] bg-[rgba(246,225,220,0.82)] px-4 py-3 text-sm text-[rgb(140,67,56)]">
+                      {errorMessage}
+                    </div>
+                  )}
                 </div>
 
-                <form onSubmit={handleUnlock} className="space-y-3">
+                <form action="/api/public-order/access" method="post" className="space-y-3">
+                  <input type="hidden" name="order_number" value={orderNumber} />
                   <div>
                     <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                       訂單編號
@@ -278,37 +126,31 @@ export function PublicOrderPage({
                     <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                       訂購人姓名
                     </label>
-                    <Input
-                      value={purchaserName}
-                      onChange={(e) => setPurchaserName(e.target.value)}
+                    <input
+                      name="purchaser_name"
                       placeholder="王小美"
+                      className="lux-input"
+                      required
                     />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.16em] text-[hsl(var(--bronze))]">
                       手機末三碼
                     </label>
-                    <Input
-                      value={phoneLast3}
-                      onChange={(e) =>
-                        setPhoneLast3(e.target.value.replace(/\D/g, "").slice(0, 3))
-                      }
+                    <input
+                      name="phone_last3"
                       inputMode="numeric"
                       maxLength={3}
                       placeholder="678"
-                      className="font-mono tracking-[0.35em]"
+                      className="lux-input font-mono tracking-[0.35em]"
+                      required
                     />
                   </div>
                   <button
                     type="submit"
-                    disabled={unlocking}
-                    className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] px-5 py-4 text-sm font-semibold text-[hsl(var(--mist))] shadow-[0_24px_46px_-32px_rgba(22,31,26,0.78)] disabled:opacity-50"
+                    className="w-full rounded-[1.2rem] bg-[hsl(var(--forest))] px-5 py-4 text-sm font-semibold text-[hsl(var(--mist))] shadow-[0_24px_46px_-32px_rgba(22,31,26,0.78)]"
                   >
-                    {unlocking
-                      ? autoUnlockChecked
-                        ? "驗證中..."
-                        : "載入中..."
-                      : "查看訂單"}
+                    查看訂單
                   </button>
                 </form>
               </div>
@@ -328,10 +170,8 @@ export function PublicOrderPage({
 
   const items = order.order_items;
   const itemsTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const status = order.status;
-  const lineBindMessage =
-    identity &&
-    `${order.order_number} ${identity.purchaser_name} ${identity.phone_last3}`;
+  const status = order.status as OrderStatus;
+  const lineBindMessage = `${order.order_number} ${identity.purchaser_name} ${identity.phone_last3}`;
 
   return (
     <div className="lux-shell">
@@ -366,7 +206,7 @@ export function PublicOrderPage({
                     {order.user?.recipient_name
                       ? ` · 收貨人 ${order.user.recipient_name}`
                       : ""}
-                    {order.user?.masked_phone ? ` · ${order.user.masked_phone}` : ""}
+                    {order.user?.phone ? ` · ${maskPhone(order.user.phone)}` : ""}
                   </span>
                 )}
               </div>
@@ -519,7 +359,7 @@ export function PublicOrderPage({
               </div>
             )}
 
-            {status !== "cancelled" && !order.line_user_id && lineBindMessage && (
+            {status !== "cancelled" && !order.line_user_id && (
               <div className="lux-panel p-5 md:p-6">
                 <div className="lux-kicker">LINE Binding</div>
                 <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
@@ -532,13 +372,10 @@ export function PublicOrderPage({
                   <span className="select-all cursor-text">{lineBindMessage}</span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleCopyLineBindMessage(lineBindMessage)}
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] px-4 py-2.5 text-sm font-semibold text-[hsl(var(--ink))]"
-                  >
-                    一鍵複製綁定內容
-                  </button>
+                  <CopyTextButton
+                    text={lineBindMessage}
+                    label="一鍵複製綁定內容"
+                  />
                   <a
                     href={LINE_OA_URL}
                     target="_blank"
@@ -551,7 +388,7 @@ export function PublicOrderPage({
               </div>
             )}
 
-            {status === "pending_payment" && identity && (
+            {status === "pending_payment" && (
               <div className="lux-panel p-5 md:p-6">
                 <div className="lux-kicker">Payment Report</div>
                 <div className="mt-2 font-display text-2xl text-[hsl(var(--ink))]">
@@ -563,7 +400,6 @@ export function PublicOrderPage({
                     purchaserName={identity.purchaser_name}
                     phoneLast3={identity.phone_last3}
                     orderTotal={order.total_amount}
-                    onSuccess={() => unlockOrder(identity, { showErrorToast: false })}
                   />
                 </div>
               </div>
@@ -582,13 +418,12 @@ export function PublicOrderPage({
               繼續選購
             </a>
           )}
-          {status === "pending_payment" && identity ? (
+          {status === "pending_payment" ? (
             <div className="flex-1">
               <CancelOrderButton
                 orderNumber={order.order_number}
                 purchaserName={identity.purchaser_name}
                 phoneLast3={identity.phone_last3}
-                onSuccess={() => unlockOrder(identity, { showErrorToast: false })}
               />
             </div>
           ) : (
@@ -601,16 +436,13 @@ export function PublicOrderPage({
           )}
         </section>
 
-        {status !== "pending_payment" && identity && (
-          <button
-            onClick={() => {
-              setOrder(null);
-              setIdentity(null);
-            }}
-            className="w-full text-sm text-[hsl(var(--muted-foreground))] underline underline-offset-4"
+        {status !== "pending_payment" && (
+          <Link
+            href="/lookup"
+            className="block text-center text-sm text-[hsl(var(--muted-foreground))] underline underline-offset-4"
           >
-            重新驗證其他訂單
-          </button>
+            重新查詢其他訂單
+          </Link>
         )}
       </main>
     </div>

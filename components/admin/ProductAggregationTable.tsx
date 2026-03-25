@@ -2,19 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { buildAdminPath } from "@/lib/admin/paths";
 import type { OrderByProduct, ProductWithProgress } from "@/types";
 
 interface ProductAggregationTableProps {
   products: ProductWithProgress[];
-  orderItems: Array<{
+  productDemand: Array<{
     product_id: string | null;
     product_name: string;
     quantity: number;
-    unit_price: number;
+    revenue: number;
   }>;
   roundId: string;
-  adminFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
 }
 
 interface AggRow {
@@ -28,11 +28,11 @@ interface AggRow {
 
 export function ProductAggregationTable({
   products,
-  orderItems,
+  productDemand,
   roundId,
-  adminFetch,
 }: ProductAggregationTableProps) {
   const { toast } = useToast();
+  const { adminFetch } = useAdminFetch();
   const [expandedProd, setExpandedProd] = useState<string | null>(null);
   const [customersByProduct, setCustomersByProduct] = useState<
     Record<string, OrderByProduct[]>
@@ -49,13 +49,13 @@ export function ProductAggregationTable({
   const rows = useMemo(() => {
     const aggMap = new Map<string, AggRow>();
 
-    for (const item of orderItems) {
+    for (const item of productDemand) {
       if (!item.product_id) continue;
 
       const existing = aggMap.get(item.product_id);
       if (existing) {
         existing.qty += item.quantity;
-        existing.revenue += item.quantity * item.unit_price;
+        existing.revenue += item.revenue;
         continue;
       }
 
@@ -66,7 +66,7 @@ export function ProductAggregationTable({
         supplierName: product?.supplier_name ?? null,
         unit: product?.unit ?? "份",
         qty: item.quantity,
-        revenue: item.quantity * item.unit_price,
+        revenue: item.revenue,
       });
     }
 
@@ -85,7 +85,7 @@ export function ProductAggregationTable({
     }
 
     return Array.from(aggMap.values());
-  }, [orderItems, productById, products]);
+  }, [productDemand, productById, products]);
 
   const loadCustomers = async (
     productId: string,
@@ -133,30 +133,21 @@ export function ProductAggregationTable({
     try {
       const result = await adminFetch<{
         customersNotified: number;
-        line: { success: boolean; error?: string };
-        emailResults: Array<{
-          email: string;
-          result: { success: boolean; error?: string };
-        }>;
+        queued: boolean;
       }>("/api/notify-arrival", {
         method: "POST",
         body: JSON.stringify({ productId, roundId }),
       });
 
-      const emailSuccesses = result.emailResults.filter(
-        (entry) => entry.result.success,
-      ).length;
-      const emailFailures = result.emailResults.length - emailSuccesses;
-      const lineStatus = result.line.success
-        ? "成功"
-        : result.line.error === "No customers have linked LINE accounts"
-          ? "略過"
-          : "失敗";
-
       setArrivalSent((prev) => new Set([...prev, productId]));
       toast({
-        title: `已通知 ${result.customersNotified} 位客戶`,
-        description: `LINE ${lineStatus} · Email ${emailSuccesses} 成功${emailFailures > 0 ? ` / ${emailFailures} 失敗` : ""}`,
+        title:
+          result.customersNotified > 0
+            ? `已排入 ${result.customersNotified} 位客戶通知`
+            : "沒有可通知的客戶",
+        description: result.queued
+          ? "通知已在背景發送。"
+          : undefined,
       });
       setTimeout(() => {
         setArrivalSent((prev) => {

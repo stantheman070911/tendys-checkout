@@ -1,62 +1,22 @@
-"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { useAdminSession } from "@/hooks/use-admin-session";
-import { useAdminFetch } from "@/hooks/use-admin-fetch";
+import { AutoPrint } from "@/components/admin/AutoPrint";
+import { requireAdminPageSession } from "@/lib/admin/server";
+import { getOrderWithItems } from "@/lib/db/orders";
 import { formatCurrency } from "@/lib/utils";
-import type { Order, OrderItem, User } from "@/types";
 
-type OrderWithDetails = Order & {
-  order_items: OrderItem[];
-  user: User | null;
-};
+export default async function PrintOrderPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  await requireAdminPageSession();
 
-export default function PrintOrderPage() {
-  const { id } = useParams<{ id: string }>();
-  const { session, authorized, loading: authLoading } = useAdminSession();
-  const { adminFetch } = useAdminFetch();
-  const [order, setOrder] = useState<OrderWithDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { id } = await params;
+  const order = await getOrderWithItems(id);
 
-  const fetchOrder = useCallback(async () => {
-    try {
-      const data = await adminFetch<{ order: OrderWithDetails }>(
-        `/api/orders/${id}`,
-      );
-      setOrder(data.order);
-    } catch {
-      setErrorMsg("Failed to load order");
-    } finally {
-      setLoading(false);
-    }
-  }, [id, adminFetch]);
-
-  useEffect(() => {
-    if (!authLoading && session && authorized) {
-      fetchOrder();
-    }
-  }, [authLoading, session, authorized, fetchOrder]);
-
-  useEffect(() => {
-    if (order) {
-      window.print();
-    }
-  }, [order]);
-
-  if (authLoading || loading) {
-    return <div className="p-8 text-center text-gray-400">載入中...</div>;
-  }
-
-  if (!session || !authorized) {
-    return <div className="p-8 text-center text-red-500">Unauthorized</div>;
-  }
-
-  if (errorMsg || !order) {
+  if (!order) {
     return (
       <div className="p-8 text-center text-red-500">
-        {errorMsg ?? "Order not found"}
+        Order not found
       </div>
     );
   }
@@ -74,6 +34,7 @@ export default function PrintOrderPage() {
 
   return (
     <div className="p-8 max-w-2xl mx-auto bg-white min-h-screen text-black">
+      <AutoPrint />
       <div className="mb-8 text-center border-b pb-4">
         <h1 className="text-2xl font-bold mb-2">Tendy Checkout 裝箱單</h1>
         <p className="font-mono text-gray-500">{order.order_number}</p>
@@ -141,9 +102,7 @@ export default function PrintOrderPage() {
             運費：{formatCurrency(order.shipping_fee)}
           </div>
         )}
-        <div className="text-xl">
-          總計：{formatCurrency(order.total_amount)}
-        </div>
+        <div className="text-xl">總計：{formatCurrency(order.total_amount)}</div>
       </div>
     </div>
   );

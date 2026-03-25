@@ -5,9 +5,7 @@ import Link from "next/link";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { serializePublicOrderAccess } from "@/lib/public-order-access";
 import { formatCurrency } from "@/lib/utils";
-import { getPublicOrderAccessSessionKey } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Order, OrderItem, OrderStatus } from "@/types";
 
@@ -15,6 +13,7 @@ interface OrderResult extends Pick<
   Order,
   "order_number" | "status" | "total_amount" | "shipping_fee" | "created_at"
 > {
+  detail_url: string;
   order_items: OrderItem[];
 }
 
@@ -44,23 +43,6 @@ export default function LookupPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        for (const order of data.orders ?? []) {
-          if (
-            typeof order.order_number === "string" &&
-            order.order_number.trim()
-          ) {
-            sessionStorage.setItem(
-              getPublicOrderAccessSessionKey(order.order_number),
-              serializePublicOrderAccess(
-                {
-                  purchaser_name: trimmedPurchaserName,
-                  phone_last3: trimmedPhoneLast3,
-                },
-                "lookup",
-              ),
-            );
-          }
-        }
         setResults(data.orders ?? []);
       } else {
         setResults([]);
@@ -147,7 +129,7 @@ export default function LookupPage() {
             {results.map((result) => (
               <Link
                 key={result.order_number}
-                href={`/order/${encodeURIComponent(result.order_number)}`}
+                href={result.detail_url}
               >
                 <div className="lux-panel lux-card-hover cursor-pointer space-y-3 p-4 md:p-5">
                   <div className="flex items-start justify-between gap-3">

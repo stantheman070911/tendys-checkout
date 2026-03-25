@@ -6,6 +6,10 @@ const ordersMock = vi.hoisted(() => ({
   findOrdersByPurchaserNameAndPhoneLast3: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
+vi.mock("@/lib/public-order-access", () => ({
+  createPublicOrderAccessToken: vi.fn(() => "public-token"),
+  buildPublicOrderAccessPath: vi.fn(() => "/api/public-order/access?token=public-token"),
+}));
 
 import { POST } from "./route";
 
@@ -45,7 +49,8 @@ describe("POST /api/lookup", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.orders[0].order_number).toBe("ORD-001");
-    expect(data.orders[0].detail_url).toBeUndefined();
+    expect(data.orders[0].detail_url).toContain("/api/public-order/access");
+    expect(data.orders[0].access_token).toBe("public-token");
   });
 
   it("returns 404 when no match", async () => {

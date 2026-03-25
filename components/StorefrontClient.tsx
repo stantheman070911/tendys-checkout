@@ -27,12 +27,10 @@ import {
   formatCurrency,
   calcOrderTotal,
   generateSubmissionKey,
-  getPublicOrderAccessSessionKey,
   getPhoneLast3,
   normalizePhoneDigits,
   PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS,
 } from "@/lib/utils";
-import { serializePublicOrderAccess } from "@/lib/public-order-access";
 import { useToast } from "@/hooks/use-toast";
 import type { Round, ProductWithProgress, CartItem } from "@/types";
 
@@ -262,19 +260,15 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
         return;
       }
 
-      const orderNumber = data.order.order_number as string;
-      sessionStorage.setItem(
-        getPublicOrderAccessSessionKey(orderNumber),
-        serializePublicOrderAccess(
-          {
-            purchaser_name: trimmedPurchaserName,
-            phone_last3: getPhoneLast3(trimmedPhone),
-          },
-          "checkout",
-        ),
-      );
+      const detailUrl =
+        typeof data.detail_url === "string" && data.detail_url.trim()
+          ? data.detail_url
+          : null;
+      if (!detailUrl) {
+        throw new Error("Missing order access link");
+      }
 
-      router.push(`/order/${encodeURIComponent(orderNumber)}`);
+      router.replace(detailUrl);
     } catch {
       toast({ title: "網路錯誤，請重試", variant: "destructive" });
       setSubmitting(false);

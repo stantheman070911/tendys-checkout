@@ -1,19 +1,21 @@
+import { verifyToken, signToken } from "@/lib/auth/signed-token";
 import { normalizePhoneDigits } from "@/lib/utils";
 
-export type PublicOrderAccessSource = "lookup" | "checkout";
+export const PUBLIC_ORDER_ACCESS_TTL_SECONDS = 60 * 60 * 24;
 
 export interface PublicOrderAccessIdentity {
   purchaser_name: string;
   phone_last3: string;
 }
 
-export interface ResolvedPublicOrderAccess {
-  identity: PublicOrderAccessIdentity;
-  source: PublicOrderAccessSource | "legacy";
-  consumeOnUse: boolean;
+export interface PublicOrderAccessClaims {
+  order_number: string;
+  purchaser_name: string;
+  phone_last3: string;
+  exp: number;
 }
 
-function normalizeIdentity(
+export function normalizePublicOrderAccessIdentity(
   value: Partial<PublicOrderAccessIdentity> | null | undefined,
 ): PublicOrderAccessIdentity | null {
   const purchaserName =
@@ -33,58 +35,85 @@ function normalizeIdentity(
   };
 }
 
-export function serializePublicOrderAccess(
-  identity: PublicOrderAccessIdentity,
-  source: PublicOrderAccessSource,
-): string {
-  const normalized = normalizeIdentity(identity);
-  if (!normalized) {
+function getPublicOrderAccessSecret() {
+  return (
+    process.env.PUBLIC_ORDER_ACCESS_SECRET ||
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    ""
+  );
+}
+
+export function getPublicOrderAccessCookieName(orderNumber: string) {
+  return `tendy_order_access_${Buffer.from(
+    orderNumber.trim().toUpperCase(),
+    "utf8",
+  ).toString("base64url")}`;
+}
+
+export function createPublicOrderAccessToken(args: {
+  orderNumber: string;
+  purchaserName: string;
+  phoneLast3: string;
+}) {
+  const secret = getPublicOrderAccessSecret();
+  if (!secret) {
+    throw new Error(
+      "Missing PUBLIC_ORDER_ACCESS_SECRET, ADMIN_SESSION_SECRET, or SUPABASE_SERVICE_ROLE_KEY",
+    );
+  }
+
+  const identity = normalizePublicOrderAccessIdentity({
+    purchaser_name: args.purchaserName,
+    phone_last3: args.phoneLast3,
+  });
+  if (!identity) {
     throw new Error("Invalid public order access identity");
   }
 
-  return JSON.stringify({
-    ...normalized,
-    source,
-  });
+  return signToken(
+    {
+      order_number: args.orderNumber.trim().toUpperCase(),
+      purchaser_name: identity.purchaser_name,
+      phone_last3: identity.phone_last3,
+      exp: Math.floor(Date.now() / 1000) + PUBLIC_ORDER_ACCESS_TTL_SECONDS,
+    } satisfies PublicOrderAccessClaims,
+    secret,
+  );
 }
 
-export function parsePublicOrderAccess(
-  raw: string | null | undefined,
-): ResolvedPublicOrderAccess | null {
-  if (!raw) return null;
+export function verifyPublicOrderAccessToken(
+  token: string | null | undefined,
+): PublicOrderAccessClaims | null {
+  const secret = getPublicOrderAccessSecret();
+  if (!secret) return null;
 
-  try {
-    const parsed = JSON.parse(raw) as
-      | (Partial<PublicOrderAccessIdentity> & {
-          source?: PublicOrderAccessSource;
-        })
-      | null;
-
-    const identity = normalizeIdentity(parsed);
-    if (!identity) return null;
-
-    if (parsed?.source === "lookup") {
-      return {
-        identity,
-        source: "lookup",
-        consumeOnUse: false,
-      };
-    }
-
-    if (parsed?.source === "checkout") {
-      return {
-        identity,
-        source: "checkout",
-        consumeOnUse: true,
-      };
-    }
-
-    return {
-      identity,
-      source: "legacy",
-      consumeOnUse: true,
-    };
-  } catch {
+  const claims = verifyToken<PublicOrderAccessClaims>(token, secret);
+  if (
+    !claims?.order_number ||
+    !claims.purchaser_name ||
+    typeof claims.exp !== "number"
+  ) {
     return null;
   }
+
+  if (claims.exp <= Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+
+  const identity = normalizePublicOrderAccessIdentity(claims);
+  if (!identity) {
+    return null;
+  }
+
+  return {
+    order_number: claims.order_number.trim().toUpperCase(),
+    purchaser_name: identity.purchaser_name,
+    phone_last3: identity.phone_last3,
+    exp: claims.exp,
+  };
+}
+
+export function buildPublicOrderAccessPath(token: string) {
+  return `/api/public-order/access?token=${encodeURIComponent(token)}`;
 }

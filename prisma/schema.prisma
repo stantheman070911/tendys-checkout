@@ -77,8 +77,11 @@ model User {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   nickname       String
   purchaser_name String?
+  purchaser_name_lower String?
   recipient_name String?
   phone          String?
+  phone_digits   String?
+  phone_last3    String?
   address        String?
   email          String?
   created_at     DateTime @default(now()) @db.Timestamptz(6)
@@ -87,6 +90,7 @@ model User {
   orders Order[]
 
   @@index([nickname])
+  @@index([purchaser_name_lower, phone_last3])
   @@map("users")
 }
 

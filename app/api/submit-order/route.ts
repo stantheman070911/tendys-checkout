@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { createCheckoutOrder } from "@/lib/db/orders";
+import {
+  buildPublicOrderAccessPath,
+  createPublicOrderAccessToken,
+} from "@/lib/public-order-access";
+import { getPhoneLast3 } from "@/lib/utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const UUID_RE =
@@ -288,11 +293,21 @@ export async function POST(request: NextRequest) {
     });
 
     switch (result.kind) {
-      case "success":
+      case "success": {
+        const access_token = createPublicOrderAccessToken({
+          orderNumber: result.order.order_number,
+          purchaserName: trimmedPurchaserName,
+          phoneLast3: getPhoneLast3(trimmedPhone),
+        });
         return NextResponse.json(
-          { order: result.order },
+          {
+            order: result.order,
+            access_token,
+            detail_url: buildPublicOrderAccessPath(access_token),
+          },
           { status: result.deduplicated ? 200 : 201 },
         );
+      }
       case "validation_error":
         return NextResponse.json({ error: result.error }, { status: 400 });
       case "saved_profile_phone_mismatch":
