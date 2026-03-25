@@ -9,6 +9,7 @@ import {
   sendProductArrivalEmail,
   sendOrderCancelledEmail,
 } from "@/lib/notifications/email";
+import { mapWithConcurrency } from "@/lib/async";
 import { logNotification } from "@/lib/db/notification-logs";
 import { formatCurrency, formatOrderItems } from "@/lib/utils";
 
@@ -212,10 +213,16 @@ export async function sendProductArrivalNotifications(
     errorMessage: lineStatus === "skipped" ? null : lineResult.error,
   });
 
-  // Per-email — send concurrently, never stop on single failure
-  const settled = await Promise.allSettled(
-    recipients.emails.map(async (email) => {
-      const result = await sendProductArrivalEmail(email, productName);
+  // Per-email — send in bounded batches, never stop on single failure
+  const emailResults = await mapWithConcurrency(
+    recipients.emails,
+    10,
+    async (email) => {
+      const result =
+        (await sendProductArrivalEmail(email, productName).catch((error) => ({
+          success: false,
+          error: error instanceof Error ? error.message : "Email send failed",
+        }))) satisfies NotifyResult;
       await logNotification({
         roundId,
         productId,
@@ -225,15 +232,8 @@ export async function sendProductArrivalNotifications(
         errorMessage: result.error,
       });
       return { email, result };
-    }),
+    },
   );
-  const emailResults: Array<{ email: string; result: NotifyResult }> = [];
-  for (const entry of settled) {
-    if (entry.status === "fulfilled") {
-      emailResults.push(entry.value);
-    }
-    // Rejected promises are swallowed — already logged individually
-  }
 
   return { line: lineResult, emailResults };
 }

@@ -21,6 +21,11 @@ const notifyMock = vi.hoisted(() => ({
   sendProductArrivalNotifications: vi.fn(),
 }));
 vi.mock("@/lib/notifications/send", () => notifyMock);
+vi.mock("@/lib/notifications/fire-and-forget", () => ({
+  fireAndForget: (task: () => Promise<unknown>) => {
+    void task();
+  },
+}));
 
 import { POST } from "./route";
 
@@ -52,6 +57,7 @@ describe("POST /api/notify-arrival", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.customersNotified).toBe(0);
+    expect(data.queued).toBe(false);
     expect(notifyMock.sendProductArrivalNotifications).not.toHaveBeenCalled();
   });
 
@@ -72,15 +78,13 @@ describe("POST /api/notify-arrival", () => {
     };
     productsMock.findById.mockResolvedValue({ id: "p1", name: "地瓜" });
     ordersMock.getCustomersForArrivalNotification.mockResolvedValue(recipients);
-    notifyMock.sendProductArrivalNotifications.mockResolvedValue({
-      line: { success: true },
-      emailResults: [],
-    });
+    notifyMock.sendProductArrivalNotifications.mockResolvedValue(undefined);
 
     const res = await POST(makeRequest({ productId: "p1", roundId: "r1" }));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.customersNotified).toBe(2);
+    expect(data.queued).toBe(true);
     expect(notifyMock.sendProductArrivalNotifications).toHaveBeenCalledWith(
       "p1",
       "地瓜",

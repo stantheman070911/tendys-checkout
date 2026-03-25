@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { findById as findProductById } from "@/lib/db/products";
 import { getCustomersForArrivalNotification } from "@/lib/db/orders";
+import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendProductArrivalNotifications } from "@/lib/notifications/send";
 
 export async function POST(request: NextRequest) {
@@ -49,22 +50,22 @@ export async function POST(request: NextRequest) {
     if (recipients.customerCount === 0) {
       return NextResponse.json({
         customersNotified: 0,
-        line: { success: true },
-        emailResults: [],
+        queued: false,
       });
     }
 
-    const result = await sendProductArrivalNotifications(
-      product.id,
-      product.name,
-      roundId.trim(),
-      recipients,
+    fireAndForget(() =>
+      sendProductArrivalNotifications(
+        product.id,
+        product.name,
+        roundId.trim(),
+        recipients,
+      ),
     );
 
     return NextResponse.json({
       customersNotified: recipients.customerCount,
-      line: result.line,
-      emailResults: result.emailResults,
+      queued: true,
     });
   } catch {
     return NextResponse.json(

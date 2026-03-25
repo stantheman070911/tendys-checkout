@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ProgressBar";
 import { deriveStockLimitQty } from "@/lib/progress-bar";
@@ -40,9 +41,12 @@ export function ProductCard({
       <div className="grid gap-0 md:grid-cols-[1.2fr_1fr]">
         <div className="relative min-h-[220px]">
           {hasImage ? (
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url("${product.image_url}")` }}
+            <Image
+              src={product.image_url!}
+              alt={product.name}
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
             />
           ) : (
             <div

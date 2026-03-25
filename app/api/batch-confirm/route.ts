@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { batchConfirm } from "@/lib/db/orders";
+import { mapWithConcurrency } from "@/lib/async";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendPaymentConfirmedNotifications } from "@/lib/notifications/send";
 
@@ -37,10 +38,8 @@ export async function POST(request: NextRequest) {
     const skipped = trimmedIds.filter((id) => !changedIds.has(id));
 
     fireAndForget(() =>
-      Promise.allSettled(
-        confirmedOrders.map((order) =>
-          sendPaymentConfirmedNotifications(order, order.order_items),
-        ),
+      mapWithConcurrency(confirmedOrders, 10, (order) =>
+        sendPaymentConfirmedNotifications(order, order.order_items),
       ).then(() => undefined),
     );
 

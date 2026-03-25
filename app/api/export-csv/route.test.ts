@@ -9,7 +9,7 @@ vi.mock("@/lib/auth/supabase-admin", () => ({
 }));
 
 const ordersMock = vi.hoisted(() => ({
-  listByRound: vi.fn(),
+  listRoundOrdersBatch: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
@@ -61,7 +61,9 @@ describe("GET /api/export-csv", () => {
   });
 
   it("CSV starts with UTF-8 BOM", async () => {
-    ordersMock.listByRound.mockResolvedValue(fakeOrders);
+    ordersMock.listRoundOrdersBatch
+      .mockResolvedValueOnce(fakeOrders)
+      .mockResolvedValueOnce([]);
 
     const res = await GET(makeRequest("r1"));
     const buf = await res.arrayBuffer();
@@ -73,7 +75,9 @@ describe("GET /api/export-csv", () => {
   });
 
   it("CSV header includes shipping fee column", async () => {
-    ordersMock.listByRound.mockResolvedValue(fakeOrders);
+    ordersMock.listRoundOrdersBatch
+      .mockResolvedValueOnce(fakeOrders)
+      .mockResolvedValueOnce([]);
 
     const res = await GET(makeRequest("r1"));
     const text = await res.text();
@@ -82,7 +86,9 @@ describe("GET /api/export-csv", () => {
   });
 
   it("preserves Chinese content", async () => {
-    ordersMock.listByRound.mockResolvedValue(fakeOrders);
+    ordersMock.listRoundOrdersBatch
+      .mockResolvedValueOnce(fakeOrders)
+      .mockResolvedValueOnce([]);
 
     const res = await GET(makeRequest("r1"));
     const text = await res.text();

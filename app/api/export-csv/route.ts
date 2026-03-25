@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
-import { listByRound } from "@/lib/db/orders";
+import { listRoundOrdersBatch } from "@/lib/db/orders";
 import { STATUS_LABELS } from "@/constants";
 import type { OrderStatus } from "@/types";
+
+const CSV_BATCH_SIZE = 500;
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,9 +20,6 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
-
-    const orders = await listByRound(roundId.trim());
-
     const headers = [
       "訂單編號",
       "暱稱",
@@ -45,14 +44,28 @@ export async function GET(request: NextRequest) {
     ];
 
     const encoder = new TextEncoder();
+    let offset = 0;
+    let wroteHeader = false;
     const stream = new ReadableStream({
-      start(controller) {
-        // UTF-8 BOM for Excel
-        controller.enqueue(encoder.encode("\uFEFF"));
-        controller.enqueue(
-          encoder.encode(headers.map(escapeCsvField).join(",") + "\r\n"),
-        );
+      async pull(controller) {
+        if (!wroteHeader) {
+          wroteHeader = true;
+          controller.enqueue(encoder.encode("\uFEFF"));
+          controller.enqueue(
+            encoder.encode(headers.map(escapeCsvField).join(",") + "\r\n"),
+          );
+        }
 
+        const orders = await listRoundOrdersBatch(roundId.trim(), {
+          skip: offset,
+          take: CSV_BATCH_SIZE,
+        });
+        if (orders.length === 0) {
+          controller.close();
+          return;
+        }
+
+        offset += orders.length;
         for (const order of orders) {
           const itemsText = order.order_items
             .map((i) => `${i.product_name}x${i.quantity}`)
@@ -95,8 +108,6 @@ export async function GET(request: NextRequest) {
             encoder.encode(row.map(escapeCsvField).join(",") + "\r\n"),
           );
         }
-
-        controller.close();
       },
     });
 
