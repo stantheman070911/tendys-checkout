@@ -1,23 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
+import type { CSSProperties } from "react";
+import "@fontsource/noto-sans-tc/chinese-traditional-400.css";
+import "@fontsource/noto-sans-tc/chinese-traditional-500.css";
+import "@fontsource/noto-sans-tc/chinese-traditional-600.css";
+import "@fontsource/noto-sans-tc/chinese-traditional-700.css";
+import "@fontsource/noto-serif-tc/chinese-traditional-400.css";
+import "@fontsource/noto-serif-tc/chinese-traditional-600.css";
+import "@fontsource/noto-serif-tc/chinese-traditional-700.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
-const sans = Noto_Sans_TC({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-sans",
-});
-
-const serif = Noto_Serif_TC({
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  display: "swap",
-  variable: "--font-serif",
-});
+const fontVariables = {
+  "--font-sans": '"Noto Sans TC"',
+  "--font-serif": '"Noto Serif TC"',
+} as CSSProperties;
 
 export const metadata: Metadata = {
   title: "生鮮團購訂購系統",
@@ -37,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-TW" className={`${sans.variable} ${serif.variable}`}>
+    <html lang="zh-TW" style={fontVariables}>
       <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
         <Toaster />

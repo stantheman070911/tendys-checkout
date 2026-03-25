@@ -1,11 +1,44 @@
 import type { NextConfig } from "next";
 
+function normalizeAllowedImageHost(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    return new URL(trimmed).hostname;
+  } catch {
+    return trimmed;
+  }
+}
+
+function getAllowedImageHosts() {
+  const hosts = new Set<string>(["example.com"]);
+  const configuredHosts = process.env.PRODUCT_IMAGE_REMOTE_HOSTS ?? "";
+
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    try {
+      hosts.add(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname);
+    } catch {
+      // Ignore invalid URL env values; the app will surface broken image hosts at runtime.
+    }
+  }
+
+  for (const value of configuredHosts.split(",")) {
+    const host = normalizeAllowedImageHost(value);
+    if (host) {
+      hosts.add(host);
+    }
+  }
+
+  return [...hosts].map((hostname) => ({
+    protocol: "https" as const,
+    hostname,
+  }));
+}
+
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**" },
-      { protocol: "http", hostname: "**" },
-    ],
+    remotePatterns: getAllowedImageHosts(),
   },
   async headers() {
     return [
