@@ -1,17 +1,51 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { getSupabaseBrowser } from "@/lib/auth/supabase-browser";
 
 export function useAdminFetch() {
+  const tokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      tokenRef.current = data.session?.access_token ?? null;
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      tokenRef.current = session?.access_token ?? null;
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const resolveAccessToken = useCallback(async () => {
+    if (tokenRef.current) {
+      return tokenRef.current;
+    }
+
+    const supabase = getSupabaseBrowser();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    tokenRef.current = session?.access_token ?? null;
+    return tokenRef.current;
+  }, []);
+
   const adminFetch = useCallback(
     async <T = unknown>(url: string, options?: RequestInit): Promise<T> => {
-      const supabase = getSupabaseBrowser();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const token = await resolveAccessToken();
 
-      if (!session?.access_token) {
+      if (!token) {
         throw new Error("Not authenticated");
       }
 
@@ -19,7 +53,7 @@ export function useAdminFetch() {
       if (options?.body && !headers.has("Content-Type")) {
         headers.set("Content-Type", "application/json");
       }
-      headers.set("Authorization", `Bearer ${session.access_token}`);
+      headers.set("Authorization", `Bearer ${token}`);
 
       const res = await fetch(url, {
         ...options,
@@ -49,7 +83,7 @@ export function useAdminFetch() {
 
       return payload as T;
     },
-    [],
+    [resolveAccessToken],
   );
 
   return { adminFetch };

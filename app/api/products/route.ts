@@ -7,6 +7,8 @@ import {
   update,
 } from "@/lib/db/products";
 
+const PUBLIC_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=60";
+
 // Public — storefront needs product list. Admin with ?all=true gets inactive products too.
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +31,14 @@ export async function GET(request: NextRequest) {
     }
 
     const products = await listActiveByRound(roundId.trim());
-    return NextResponse.json({ products });
+    return NextResponse.json(
+      { products },
+      {
+        headers: {
+          "Cache-Control": PUBLIC_CACHE_CONTROL,
+        },
+      },
+    );
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

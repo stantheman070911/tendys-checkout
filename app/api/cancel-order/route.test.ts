@@ -18,6 +18,11 @@ const notifyMock = vi.hoisted(() => ({
   sendOrderCancelledNotifications: vi.fn(),
 }));
 vi.mock("@/lib/notifications/send", () => notifyMock);
+vi.mock("@/lib/notifications/fire-and-forget", () => ({
+  fireAndForget: (task: () => Promise<unknown>) => {
+    void task();
+  },
+}));
 
 import { POST } from "./route";
 

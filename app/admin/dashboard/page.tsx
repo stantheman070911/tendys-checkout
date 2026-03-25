@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminRound } from "@/contexts/AdminRoundContext";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { ADMIN_BASE } from "@/constants";
 import { summarizeNotificationLogs } from "@/lib/admin/notification-summary";
@@ -22,8 +23,8 @@ type OrderWithItems = Order & {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { round, loading: roundLoading } = useAdminRound();
   const { adminFetch } = useAdminFetch();
-  const [round, setRound] = useState<Round | null>(null);
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [products, setProducts] = useState<ProductWithProgress[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
@@ -32,28 +33,25 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     setError(null);
-    try {
-      // Get open round first
-      const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true",
-      );
-      const openRound = roundsData.rounds.find((r) => r.is_open);
-      if (!openRound) {
-        setLoading(false);
-        return;
-      }
-      setRound(openRound);
+    if (!round) {
+      setOrders([]);
+      setProducts([]);
+      setLogs([]);
+      setLoading(false);
+      return;
+    }
 
-      // Fetch orders, products, logs in parallel
+    setLoading(true);
+    try {
       const [ordersData, productsData, logsData] = await Promise.all([
         adminFetch<{ orders: OrderWithItems[] }>(
-          `/api/orders?roundId=${openRound.id}`,
+          `/api/orders?roundId=${round.id}`,
         ),
         adminFetch<{ products: ProductWithProgress[] }>(
-          `/api/products?roundId=${openRound.id}&all=true`,
+          `/api/products?roundId=${round.id}&all=true`,
         ),
         adminFetch<{ logs: NotificationLog[] }>(
-          `/api/notification-logs?roundId=${openRound.id}`,
+          `/api/notification-logs?roundId=${round.id}`,
         ),
       ]);
 
@@ -65,13 +63,14 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [adminFetch]);
+  }, [adminFetch, round]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (roundLoading) return;
+    void fetchData();
+  }, [fetchData, roundLoading]);
 
-  if (loading) {
+  if (loading || roundLoading) {
     return (
       <div className="flex justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />

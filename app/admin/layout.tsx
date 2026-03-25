@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ClipboardList,
@@ -10,10 +10,12 @@ import {
   RefreshCw,
   Tag,
 } from "lucide-react";
+import {
+  AdminRoundProvider,
+  useAdminRound,
+} from "@/contexts/AdminRoundContext";
 import { useAdminSession } from "@/hooks/use-admin-session";
-import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { ADMIN_BASE } from "@/constants";
-import type { Round } from "@/types";
 
 const TABS: Array<{
   key: string;
@@ -36,31 +38,9 @@ export default function AdminLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { session, authorized, loading, signOut } = useAdminSession();
-  const { adminFetch } = useAdminFetch();
-  const [round, setRound] = useState<Round | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
 
   // Detect login page: pathname is exactly /admin (file system path from rewrite)
   const isLoginPage = pathname === "/admin" || pathname === ADMIN_BASE;
-
-  // Fetch current round + pending count for nav
-  useEffect(() => {
-    if (!session || !authorized || isLoginPage) return;
-    adminFetch<{ rounds: Round[] }>("/api/rounds?all=true")
-      .then(({ rounds }) => {
-        const open = rounds.find((r) => r.is_open);
-        if (open) {
-          setRound(open);
-          // Fetch pending confirm count for badge
-          adminFetch<{ orders: Array<{ status: string }> }>(
-            `/api/orders?roundId=${open.id}&status=pending_confirm`,
-          )
-            .then(({ orders }) => setPendingCount(orders.length))
-            .catch(() => {});
-        }
-      })
-      .catch(() => {});
-  }, [session, authorized, isLoginPage, adminFetch]);
 
   // Auth guard
   useEffect(() => {
@@ -89,6 +69,27 @@ export default function AdminLayout({
 
   // Not authenticated — show nothing while redirecting
   if (!session || !authorized) return null;
+
+  return (
+    <AdminRoundProvider>
+      <AdminLayoutChrome pathname={pathname} signOut={signOut}>
+        {children}
+      </AdminLayoutChrome>
+    </AdminRoundProvider>
+  );
+}
+
+function AdminLayoutChrome({
+  pathname,
+  signOut,
+  children,
+}: {
+  pathname: string;
+  signOut: () => Promise<void>;
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const { round, pendingCount } = useAdminRound();
 
   // Active tab detection
   const activeTab =

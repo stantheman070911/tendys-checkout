@@ -4,18 +4,7 @@ import { useState } from "react";
 import { buildAdminPath } from "@/lib/admin/paths";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  mapNotifyStatus,
-  renderNotifyIcon,
-  type NotifyStatus,
-} from "@/lib/admin/shipment-status";
 import type { OrderWithItems } from "@/types";
-
-interface ShipmentConfirmResult {
-  orderNumber: string;
-  line: NotifyStatus;
-  email: NotifyStatus;
-}
 
 interface ShipmentCardProps {
   order: OrderWithItems;
@@ -23,7 +12,6 @@ interface ShipmentCardProps {
   onToggleSelect: (id: string) => void;
   onRefresh: () => void;
   adminFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
-  onConfirmed?: (result: ShipmentConfirmResult) => void;
 }
 
 export function ShipmentCard({
@@ -32,7 +20,6 @@ export function ShipmentCard({
   onToggleSelect,
   onRefresh,
   adminFetch,
-  onConfirmed,
 }: ShipmentCardProps) {
   const { toast } = useToast();
   const [acting, setActing] = useState(false);
@@ -44,31 +31,14 @@ export function ShipmentCard({
   const confirmShipment = async () => {
     setActing(true);
     try {
-      const res = await adminFetch<{
-        notifications?: {
-          line?: { success: boolean; error?: string };
-          email?: { success: boolean; error?: string } | null;
-        };
-      }>("/api/confirm-shipment", {
+      await adminFetch("/api/confirm-shipment", {
         method: "POST",
         body: JSON.stringify({ orderId: o.id }),
       });
 
-      const { line: lineStatus, email: emailStatus } = mapNotifyStatus(
-        res.notifications,
-      );
-
       setShipped(true);
-      onConfirmed?.({
-        orderNumber: o.order_number,
-        line: lineStatus,
-        email: emailStatus,
-      });
-      toast({
-        title: isPickup ? "已確認取貨" : "已確認寄出",
-        description: `LINE ${renderNotifyIcon(lineStatus)} · Email ${renderNotifyIcon(emailStatus)}`,
-      });
-      onRefresh();
+      toast({ title: isPickup ? "已確認取貨" : "已確認寄出" });
+      await onRefresh();
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "操作失敗",

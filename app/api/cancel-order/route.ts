@@ -4,6 +4,7 @@ import {
   cancelOrder,
   findPublicOrderByOrderNumberAndIdentity,
 } from "@/lib/db/orders";
+import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendOrderCancelledNotifications } from "@/lib/notifications/send";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
@@ -112,16 +113,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Admin cancel: send cancellation notifications only if status actually changed
-    let notifications = null;
     if (isAdmin && result.changed && result.order.order_items) {
-      notifications = await sendOrderCancelledNotifications(
-        result.order,
-        result.order.order_items,
-        reason,
+      fireAndForget(() =>
+        sendOrderCancelledNotifications(
+          result.order,
+          result.order.order_items,
+          reason,
+        ),
       );
     }
 
-    return NextResponse.json({ order: result.order, notifications });
+    return NextResponse.json({ order: result.order });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findPublicOrderByOrderNumberAndIdentity } from "@/lib/db/orders";
-import { listActiveByRound } from "@/lib/db/products";
+import { hasUnderGoalProductsByRound } from "@/lib/db/products";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { maskPhone, normalizePhoneDigits } from "@/lib/utils";
 
@@ -66,12 +66,7 @@ export async function POST(request: NextRequest) {
 
     let anyUnderGoal = false;
     if (order.round_id) {
-      const products = await listActiveByRound(order.round_id);
-      anyUnderGoal = products.some(
-        (product) =>
-          product.goal_qty !== null &&
-          Number(product.current_qty) < Number(product.goal_qty),
-      );
+      anyUnderGoal = await hasUnderGoalProductsByRound(order.round_id);
     }
 
     return NextResponse.json({

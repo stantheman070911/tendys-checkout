@@ -154,6 +154,7 @@ model OrderItem {
   product Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
 
   @@index([order_id])
+  @@index([product_id])
   @@map("order_items")
 }
 

@@ -6,7 +6,7 @@ const ordersMock = vi.hoisted(() => ({
 vi.mock("@/lib/db/orders", () => ordersMock);
 
 const productsMock = vi.hoisted(() => ({
-  listActiveByRound: vi.fn(),
+  hasUnderGoalProductsByRound: vi.fn(),
 }));
 vi.mock("@/lib/db/products", () => productsMock);
 
@@ -23,7 +23,7 @@ function makeRequest(body: unknown) {
 describe("POST /api/lookup/order", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    productsMock.listActiveByRound.mockResolvedValue([]);
+    productsMock.hasUnderGoalProductsByRound.mockResolvedValue(false);
   });
 
   it("returns 200 with a matching public order", async () => {

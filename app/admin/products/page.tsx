@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAdminRound } from "@/contexts/AdminRoundContext";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { deriveStockLimitQty } from "@/lib/progress-bar";
@@ -10,9 +11,9 @@ import { ProductForm } from "@/components/admin/ProductForm";
 import type { Round, ProductWithProgress, Supplier } from "@/types";
 
 export default function ProductsPage() {
+  const { round, loading: roundLoading } = useAdminRound();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
-  const [round, setRound] = useState<Round | null>(null);
   const [products, setProducts] = useState<ProductWithProgress[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,20 +25,18 @@ export default function ProductsPage() {
 
   const fetchData = useCallback(async () => {
     setError(null);
-    try {
-      const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true",
-      );
-      const openRound = roundsData.rounds.find((r) => r.is_open);
-      if (!openRound) {
-        setLoading(false);
-        return;
-      }
-      setRound(openRound);
+    if (!round) {
+      setProducts([]);
+      setSuppliers([]);
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true);
+    try {
       const [productsData, suppliersData] = await Promise.all([
         adminFetch<{ products: ProductWithProgress[] }>(
-          `/api/products?roundId=${openRound.id}&all=true`,
+          `/api/products?roundId=${round.id}&all=true`,
         ),
         adminFetch<{ suppliers: Supplier[] }>("/api/suppliers"),
       ]);
@@ -49,11 +48,12 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [adminFetch]);
+  }, [adminFetch, round]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (roundLoading) return;
+    void fetchData();
+  }, [fetchData, roundLoading]);
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
@@ -73,7 +73,7 @@ export default function ProductsPage() {
     }
   };
 
-  if (loading) {
+  if (loading || roundLoading) {
     return (
       <div className="flex justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />

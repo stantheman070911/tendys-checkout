@@ -149,7 +149,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
           setAutofillStatus("idle");
         }
       }
-    }, 450);
+    }, 300);
 
     return () => {
       cancelled = true;

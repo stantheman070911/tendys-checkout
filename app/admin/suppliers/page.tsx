@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAdminRound } from "@/contexts/AdminRoundContext";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { buildAdminPath } from "@/lib/admin/paths";
@@ -24,10 +25,10 @@ import type {
 type SupplierWithCount = Supplier & { _count: { products: number } };
 
 export default function SuppliersPage() {
+  const { round, loading: roundLoading } = useAdminRound();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
 
-  const [round, setRound] = useState<Round | null>(null);
   const [suppliers, setSuppliers] = useState<SupplierWithCount[]>([]);
   const [products, setProducts] = useState<ProductWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,38 +58,31 @@ export default function SuppliersPage() {
 
   const fetchData = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
-      // Always fetch suppliers
-      const suppliersData = await adminFetch<{
-        suppliers: SupplierWithCount[];
-      }>("/api/suppliers");
+      const [suppliersData, productsData] = await Promise.all([
+        adminFetch<{
+          suppliers: SupplierWithCount[];
+        }>("/api/suppliers"),
+        round
+          ? adminFetch<{
+              products: ProductWithProgress[];
+            }>(`/api/products?roundId=${round.id}&all=true`)
+          : Promise.resolve({ products: [] as ProductWithProgress[] }),
+      ]);
       setSuppliers(suppliersData.suppliers);
-
-      // Try to get open round + products
-      const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true",
-      );
-      const openRound = roundsData.rounds.find((r) => r.is_open);
-      setRound(openRound ?? null);
-
-      if (openRound) {
-        const productsData = await adminFetch<{
-          products: ProductWithProgress[];
-        }>(`/api/products?roundId=${openRound.id}&all=true`);
-        setProducts(productsData.products);
-      } else {
-        setProducts([]);
-      }
+      setProducts(productsData.products);
     } catch (error) {
       setError(error instanceof Error ? error.message : "資料載入失敗");
     } finally {
       setLoading(false);
     }
-  }, [adminFetch]);
+  }, [adminFetch, round]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (roundLoading) return;
+    void fetchData();
+  }, [fetchData, roundLoading]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -195,7 +189,7 @@ export default function SuppliersPage() {
     }
   };
 
-  if (loading) {
+  if (loading || roundLoading) {
     return (
       <div className="flex justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />

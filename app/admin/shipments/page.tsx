@@ -2,32 +2,22 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useAdminRound } from "@/contexts/AdminRoundContext";
 import {
   matchesOrderSearch,
   groupOrdersByPickup,
 } from "@/lib/admin/order-search";
-import {
-  mapNotifyStatus,
-  renderNotifyIcon,
-  type NotifyStatus,
-} from "@/lib/admin/shipment-status";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
 import { ShipmentCard } from "@/components/admin/ShipmentCard";
 import type { Round, OrderWithItems } from "@/types";
 
-interface RecentResult {
-  orderNumber: string;
-  line: NotifyStatus;
-  email: NotifyStatus;
-}
-
 export default function ShipmentsPage() {
   const searchParams = useSearchParams();
+  const { round, loading: roundLoading, refreshRound } = useAdminRound();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
 
-  const [round, setRound] = useState<Round | null>(null);
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +27,6 @@ export default function ShipmentsPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set(),
   );
-  const [recentResults, setRecentResults] = useState<RecentResult[]>([]);
 
   // Product filter from query param (e.g., from dashboard "前往出貨" shortcut)
   const productFilterId = searchParams.get("productId") ?? "";
@@ -45,19 +34,16 @@ export default function ShipmentsPage() {
 
   const fetchData = useCallback(async () => {
     setError(null);
-    try {
-      const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true",
-      );
-      const openRound = roundsData.rounds.find((r) => r.is_open);
-      if (!openRound) {
-        setLoading(false);
-        return;
-      }
-      setRound(openRound);
+    if (!round) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true);
+    try {
       const ordersData = await adminFetch<{ orders: OrderWithItems[] }>(
-        `/api/orders?roundId=${openRound.id}&status=confirmed`,
+        `/api/orders?roundId=${round.id}&status=confirmed`,
       );
       setOrders(ordersData.orders);
     } catch (error) {
@@ -65,11 +51,12 @@ export default function ShipmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [adminFetch]);
+  }, [adminFetch, round]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (roundLoading) return;
+    void fetchData();
+  }, [fetchData, roundLoading]);
 
   // Filter by search + optional product filter
   const filtered = orders.filter((o) => {
@@ -148,19 +135,8 @@ export default function ShipmentsPage() {
             : `已出貨 ${res.shipped} 筆`,
       });
 
-      // Store recent results for feedback panel
-      if (res.results?.length > 0) {
-        setRecentResults((prev) => [
-          ...res.results.map((r) => ({
-            orderNumber: r.orderNumber,
-            ...mapNotifyStatus(r.notifications),
-          })),
-          ...prev,
-        ]);
-      }
-
       setBatchSel(new Set());
-      fetchData();
+      await Promise.all([fetchData(), refreshRound()]);
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "批次出貨失敗",
@@ -240,7 +216,7 @@ export default function ShipmentsPage() {
     printWindow.document.close();
   };
 
-  if (loading) {
+  if (loading || roundLoading) {
     return (
       <div className="flex justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />
@@ -339,37 +315,6 @@ export default function ShipmentsPage() {
         )}
       </div>
 
-      {/* Recent notification results */}
-      {recentResults.length > 0 && (
-        <div className="lux-panel space-y-2 p-4">
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--bronze))]">
-              最近出貨通知結果
-            </span>
-            <button
-              onClick={() => setRecentResults([])}
-              className="text-xs text-[hsl(var(--muted-foreground))]"
-            >
-              清除
-            </button>
-          </div>
-          {recentResults.slice(0, 10).map((r, i) => (
-            <div
-              key={i}
-              className="flex gap-2 text-xs text-[hsl(var(--muted-foreground))]"
-            >
-              <span className="font-mono text-[hsl(var(--ink))]">
-                {r.orderNumber}
-              </span>
-              <span>
-                LINE {renderNotifyIcon(r.line)} · Email{" "}
-                {renderNotifyIcon(r.email)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Grouped orders */}
       {filtered.length === 0 ? (
         <div className="lux-panel p-12 text-center text-[hsl(var(--muted-foreground))]">
@@ -404,9 +349,6 @@ export default function ShipmentsPage() {
                       onToggleSelect={toggleSelect}
                       onRefresh={fetchData}
                       adminFetch={adminFetch}
-                      onConfirmed={(result) =>
-                        setRecentResults((prev) => [result, ...prev])
-                      }
                     />
                   ))}
                 </div>

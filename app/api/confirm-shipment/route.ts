@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { confirmShipment, batchConfirmShipment } from "@/lib/db/orders";
+import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendShipmentNotifications } from "@/lib/notifications/send";
 
 export async function POST(request: NextRequest) {
@@ -31,11 +32,8 @@ export async function POST(request: NextRequest) {
           { status: 404 },
         );
       }
-      const notifications = await sendShipmentNotifications(
-        order,
-        order.order_items,
-      );
-      return NextResponse.json({ order, notifications });
+      fireAndForget(() => sendShipmentNotifications(order, order.order_items));
+      return NextResponse.json({ order });
     }
 
     // Batch mode
@@ -49,38 +47,17 @@ export async function POST(request: NextRequest) {
       const changedIds = new Set(shippedOrders.map((order) => order.id));
       const skipped = trimmedIds.filter((id) => !changedIds.has(id));
 
-      // Send notifications concurrently (EFF-1)
-      const settled = await Promise.allSettled(
-        shippedOrders.map(async (order) => {
-          const notifications = await sendShipmentNotifications(
-            order,
-            order.order_items,
-          );
-          return {
-            success: true,
-            orderId: order.id,
-            orderNumber: order.order_number,
-            notifications,
-          };
-        }),
+      fireAndForget(() =>
+        Promise.allSettled(
+          shippedOrders.map((order) =>
+            sendShipmentNotifications(order, order.order_items),
+          ),
+        ).then(() => undefined),
       );
-      const notificationResults = settled
-        .filter((r) => r.status === "fulfilled")
-        .map(
-          (r) =>
-            (
-              r as PromiseFulfilledResult<{
-                orderId: string;
-                orderNumber: string;
-                notifications: unknown;
-              }>
-            ).value,
-        );
 
       return NextResponse.json({
         shipped: shippedOrders.length,
         skipped,
-        results: notificationResults,
       });
     }
 

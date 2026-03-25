@@ -13,6 +13,8 @@ import {
   validatePickupOptionLabels,
 } from "@/lib/pickup-options";
 
+const PUBLIC_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=60";
+
 // Public — storefront needs open round
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +32,14 @@ export async function GET(request: NextRequest) {
 
     // Public: get current open round
     const round = await getOpenRound();
-    return NextResponse.json({ round });
+    return NextResponse.json(
+      { round },
+      {
+        headers: {
+          "Cache-Control": PUBLIC_CACHE_CONTROL,
+        },
+      },
+    );
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

@@ -193,6 +193,40 @@ function isUniqueConstraintError(
   );
 }
 
+async function findPublicOrderIdsByIdentity(
+  purchaserName: string,
+  phoneLast3: string,
+): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT o.id
+    FROM orders o
+    INNER JOIN users u ON u.id = o.user_id
+    WHERE lower(COALESCE(u.purchaser_name, '')) = lower(${purchaserName})
+      AND RIGHT(REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g'), 3) = ${phoneLast3}
+    ORDER BY o.created_at DESC
+  `;
+
+  return rows.map((row) => row.id);
+}
+
+async function findPublicOrderIdByOrderNumberAndIdentity(
+  orderNumber: string,
+  purchaserName: string,
+  phoneLast3: string,
+): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT o.id
+    FROM orders o
+    INNER JOIN users u ON u.id = o.user_id
+    WHERE o.order_number = ${orderNumber}
+      AND lower(COALESCE(u.purchaser_name, '')) = lower(${purchaserName})
+      AND RIGHT(REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g'), 3) = ${phoneLast3}
+    LIMIT 1
+  `;
+
+  return rows[0]?.id ?? null;
+}
+
 async function findBySubmissionKeyTx(
   tx: TxClient,
   key: string,
@@ -467,24 +501,16 @@ export async function findOrdersByPurchaserNameAndPhoneLast3(
   purchaserName: string,
   phoneLast3: string,
 ): Promise<OrderWithRelations[]> {
-  const orders = await prisma.order.findMany({
-    where: {
-      user: {
-        is: {
-          purchaser_name: {
-            equals: purchaserName,
-            mode: "insensitive",
-          },
-        },
-      },
-    },
+  const orderIds = await findPublicOrderIdsByIdentity(purchaserName, phoneLast3);
+  if (orderIds.length === 0) {
+    return [];
+  }
+
+  return prisma.order.findMany({
+    where: { id: { in: orderIds } },
     include: orderWithRelationsInclude,
     orderBy: { created_at: "desc" },
   });
-
-  return orders.filter((order) =>
-    orderMatchesPublicIdentity(order, purchaserName, phoneLast3),
-  );
 }
 
 export async function findPublicOrderByOrderNumberAndIdentity(
@@ -492,26 +518,20 @@ export async function findPublicOrderByOrderNumberAndIdentity(
   purchaserName: string,
   phoneLast3: string,
 ): Promise<OrderWithRelations | null> {
-  const order = await prisma.order.findFirst({
-    where: {
-      order_number: orderNumber,
-      user: {
-        is: {
-          purchaser_name: {
-            equals: purchaserName,
-            mode: "insensitive",
-          },
-        },
-      },
-    },
-    include: orderWithRelationsInclude,
-  });
+  const orderId = await findPublicOrderIdByOrderNumberAndIdentity(
+    orderNumber,
+    purchaserName,
+    phoneLast3,
+  );
 
-  if (!order || !orderMatchesPublicIdentity(order, purchaserName, phoneLast3)) {
+  if (!orderId) {
     return null;
   }
 
-  return order;
+  return prisma.order.findUnique({
+    where: { id: orderId },
+    include: orderWithRelationsInclude,
+  });
 }
 
 export async function listByRound(roundId: string, statusFilter?: string) {

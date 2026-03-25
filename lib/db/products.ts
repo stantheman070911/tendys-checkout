@@ -61,6 +61,22 @@ export const listActiveByRound = (roundId: string) =>
   listByRound(roundId, true);
 export const listAllByRound = (roundId: string) => listByRound(roundId, false);
 
+export async function hasUnderGoalProductsByRound(roundId: string) {
+  const rows = await prisma.$queryRaw<Array<{ has_under_goal: boolean }>>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM products p
+      LEFT JOIN product_progress pp ON pp.product_id = p.id
+      WHERE p.round_id = ${roundId}::uuid
+        AND p.is_active = true
+        AND p.goal_qty IS NOT NULL
+        AND COALESCE(pp.current_qty, 0) < p.goal_qty
+    ) AS has_under_goal
+  `;
+
+  return rows[0]?.has_under_goal ?? false;
+}
+
 export async function decrementStock(
   productId: string,
   qty: number,

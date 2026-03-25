@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useAdminRound } from "@/contexts/AdminRoundContext";
 import { matchesOrderSearch } from "@/lib/admin/order-search";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useToast } from "@/hooks/use-toast";
@@ -32,10 +33,10 @@ const FILTER_OPTIONS = [
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
+  const { round, loading: roundLoading, refreshRound } = useAdminRound();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
 
-  const [round, setRound] = useState<Round | null>(null);
   const [orders, setOrders] = useState<OrderWithRelations[]>([]);
   const [products, setProducts] = useState<ProductWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,23 +51,21 @@ export default function OrdersPage() {
 
   const fetchData = useCallback(async () => {
     setError(null);
-    try {
-      const roundsData = await adminFetch<{ rounds: Round[] }>(
-        "/api/rounds?all=true",
-      );
-      const openRound = roundsData.rounds.find((r) => r.is_open);
-      if (!openRound) {
-        setLoading(false);
-        return;
-      }
-      setRound(openRound);
+    if (!round) {
+      setOrders([]);
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true);
+    try {
       const [ordersData, productsData] = await Promise.all([
         adminFetch<{ orders: OrderWithRelations[] }>(
-          `/api/orders?roundId=${openRound.id}`,
+          `/api/orders?roundId=${round.id}`,
         ),
         adminFetch<{ products: ProductWithProgress[] }>(
-          `/api/products?roundId=${openRound.id}&all=true`,
+          `/api/products?roundId=${round.id}&all=true`,
         ),
       ]);
 
@@ -77,11 +76,12 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [adminFetch]);
+  }, [adminFetch, round]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (roundLoading) return;
+    void fetchData();
+  }, [fetchData, roundLoading]);
 
   // Filter + search
   const filtered = orders.filter((o) => {
@@ -118,22 +118,21 @@ export default function OrdersPage() {
     setBatchActing(true);
     try {
       const res = await adminFetch<{
-        results?: Array<{ orderId: string; success: boolean }>;
+        confirmed: number;
         skipped?: string[];
       }>("/api/batch-confirm", {
         method: "POST",
         body: JSON.stringify({ orderIds: Array.from(batchSel) }),
       });
-      const confirmed = res.results?.filter((r) => r.success).length ?? 0;
       const skipped = res.skipped?.length ?? 0;
       toast({
         title:
           skipped > 0
-            ? `已確認 ${confirmed} 筆訂單，略過 ${skipped} 筆`
-            : `已確認 ${confirmed} 筆訂單`,
+            ? `已確認 ${res.confirmed} 筆訂單，略過 ${skipped} 筆`
+            : `已確認 ${res.confirmed} 筆訂單`,
       });
       setBatchSel(new Set());
-      fetchData();
+      await Promise.all([fetchData(), refreshRound()]);
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "批次確認失敗",
@@ -184,7 +183,7 @@ export default function OrdersPage() {
     }
   };
 
-  if (loading) {
+  if (loading || roundLoading) {
     return (
       <div className="flex justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--forest))] border-t-transparent" />

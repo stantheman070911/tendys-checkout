@@ -1,15 +1,23 @@
 import type { Metadata, Viewport } from "next";
+import { Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/toaster";
-import "@fontsource/noto-sans-tc/400.css";
-import "@fontsource/noto-sans-tc/500.css";
-import "@fontsource/noto-sans-tc/600.css";
-import "@fontsource/noto-sans-tc/700.css";
-import "@fontsource/noto-serif-tc/400.css";
-import "@fontsource/noto-serif-tc/600.css";
-import "@fontsource/noto-serif-tc/700.css";
 import "./globals.css";
+
+const sans = Noto_Sans_TC({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-sans",
+});
+
+const serif = Noto_Serif_TC({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  display: "swap",
+  variable: "--font-serif",
+});
 
 export const metadata: Metadata = {
   title: "生鮮團購訂購系統",
@@ -29,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-TW">
+    <html lang="zh-TW" className={`${sans.variable} ${serif.variable}`}>
       <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
         <Toaster />

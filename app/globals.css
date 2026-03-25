@@ -40,8 +40,15 @@
     --shadow-card:
       0 24px 60px -32px rgba(31, 40, 32, 0.25),
       0 10px 22px -18px rgba(31, 40, 32, 0.18);
-    --font-display: "Noto Serif TC", "Songti TC", "PMingLiU", "Times New Roman", serif;
+    --font-display:
+      var(--font-serif),
+      "Noto Serif TC",
+      "Songti TC",
+      "PMingLiU",
+      "Times New Roman",
+      serif;
     --font-body:
+      var(--font-sans),
       "Noto Sans TC",
       "PingFang TC",
       "Microsoft JhengHei",
