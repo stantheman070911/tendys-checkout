@@ -3,7 +3,7 @@ import { ShipmentsPageClient } from "@/components/admin/ShipmentsPageClient";
 import { getAdminChromeContext, requireAdminPageSession } from "@/lib/admin/server";
 import { listPageByRound } from "@/lib/db/orders";
 import { serializeForClient } from "@/lib/server-serialize";
-import type { OrderWithItems, Round } from "@/types";
+import type { AdminOrderListRow, Round } from "@/types";
 
 export default async function ShipmentsPage({
   searchParams,
@@ -54,7 +54,7 @@ export default async function ShipmentsPage({
     >
       <ShipmentsPageClient
         round={clientRound}
-        initialOrders={serializeForClient<OrderWithItems[]>(ordersPage.items)}
+        initialOrders={serializeForClient<AdminOrderListRow[]>(ordersPage.items)}
         total={ordersPage.total}
         page={ordersPage.page}
         pageSize={ordersPage.pageSize}

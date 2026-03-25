@@ -69,6 +69,23 @@ export const listActiveByRound = (roundId: string) =>
   listByRound(roundId, true);
 export const listAllByRound = (roundId: string) => listByRound(roundId, false);
 
+export async function listDashboardByRound(roundId: string) {
+  return prisma.product.findMany({
+    where: { round_id: roundId },
+    select: {
+      id: true,
+      name: true,
+      unit: true,
+      supplier: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: { created_at: "asc" },
+  });
+}
+
 export async function hasUnderGoalProductsByRound(roundId: string) {
   const rows = await measureAsync(
     "db.products.hasUnderGoalProductsByRound",

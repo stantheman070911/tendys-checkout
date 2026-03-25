@@ -162,6 +162,33 @@ export interface ProductWithProgress extends Product {
   progress_pct: number | null;
 }
 
+export interface AdminOrderListUser {
+  nickname: string | null;
+  purchaser_name: string | null;
+  recipient_name: string | null;
+  phone: string | null;
+}
+
+export interface AdminOrderListRow extends Pick<
+  Order,
+  | "id"
+  | "order_number"
+  | "round_id"
+  | "total_amount"
+  | "shipping_fee"
+  | "status"
+  | "payment_amount"
+  | "payment_last5"
+  | "payment_reported_at"
+  | "confirmed_at"
+  | "shipped_at"
+  | "pickup_location"
+  | "created_at"
+> {
+  user: AdminOrderListUser | null;
+  items_preview: string;
+}
+
 // ─── View Types ─────────────────────────────────────────────
 
 export interface ProductProgress {
@@ -188,9 +215,20 @@ export interface OrderByProduct {
   round_id: string;
 }
 
+export interface AdminDashboardProductRow {
+  productId: string;
+  name: string;
+  supplierName: string | null;
+  unit: string;
+  qty: number;
+  revenue: number;
+}
+
 // ─── Phase 6: Shipments Page Types ─────────────────────────
 
 export type OrderWithItems = Order & {
   order_items: OrderItem[];
   user: User | null;
 };
+
+export type AdminOrderDetail = OrderWithItems;

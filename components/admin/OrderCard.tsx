@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
-import { buildAdminPath } from "@/lib/admin/paths";
-import { formatCurrency, formatOrderItems } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -11,27 +9,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { buildAdminPath } from "@/lib/admin/paths";
+import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { Order, OrderItem, User } from "@/types";
-
-type OrderWithRelations = Order & {
-  order_items: OrderItem[];
-  user: User | null;
-};
+import type { AdminOrderDetail, AdminOrderListRow } from "@/types";
 
 interface OrderCardProps {
-  order: OrderWithRelations;
+  order: AdminOrderListRow;
+  detail?: AdminOrderDetail;
+  loadingDetail: boolean;
+  onLoadDetail: (orderId: string) => Promise<AdminOrderDetail>;
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onOrderMutated: (
-    previousOrder: OrderWithRelations,
-    updatedOrder: OrderWithRelations,
+    previousOrder: AdminOrderListRow,
+    updatedOrder: AdminOrderDetail,
   ) => void;
   adminFetch: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
 }
 
 export function OrderCard({
   order,
+  detail,
+  loadingDetail,
+  onLoadDetail,
   selected,
   onToggleSelect,
   onOrderMutated,
@@ -43,12 +44,30 @@ export function OrderCard({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
-  const o = order;
-  const showCheckbox = o.status === "pending_confirm";
+  const showCheckbox = order.status === "pending_confirm";
   const amtMatch =
-    o.payment_amount != null && o.payment_amount === o.total_amount;
+    order.payment_amount != null &&
+    order.payment_amount === order.total_amount;
   const amtMismatch =
-    o.payment_amount != null && o.payment_amount !== o.total_amount;
+    order.payment_amount != null &&
+    order.payment_amount !== order.total_amount;
+  const detailOrder = detail ?? null;
+  const shippedAt = detailOrder?.shipped_at ?? order.shipped_at;
+  const cancelReasonText = detailOrder?.cancel_reason ?? null;
+
+  const toggleExpanded = () => {
+    const nextExpanded = !expanded;
+    setExpanded(nextExpanded);
+
+    if (nextExpanded && !detailOrder && !loadingDetail) {
+      void onLoadDetail(order.id).catch((error) => {
+        toast({
+          title: error instanceof Error ? error.message : "明細載入失敗",
+          variant: "destructive",
+        });
+      });
+    }
+  };
 
   const doAction = async (
     url: string,
@@ -57,13 +76,13 @@ export function OrderCard({
   ) => {
     setActing(true);
     try {
-      const response = await adminFetch<{ order: OrderWithRelations }>(url, {
+      const response = await adminFetch<{ order: AdminOrderDetail }>(url, {
         method: "POST",
         body: JSON.stringify(body),
       });
       toast({ title: successMsg });
       setExpanded(false);
-      onOrderMutated(o, response.order);
+      onOrderMutated(order, response.order);
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "操作失敗",
@@ -75,31 +94,31 @@ export function OrderCard({
   };
 
   const confirmPayment = () =>
-    doAction("/api/confirm-order", { orderId: o.id }, "已確認付款");
+    doAction("/api/confirm-order", { orderId: order.id }, "已確認付款");
 
   const quickConfirm = () =>
     doAction(
       "/api/quick-confirm",
-      { orderId: o.id, paymentAmount: o.total_amount },
+      { orderId: order.id, paymentAmount: order.total_amount },
       "已現場收款",
     );
 
   const confirmShipment = () =>
     doAction(
       "/api/confirm-shipment",
-      { orderId: o.id },
-      o.pickup_location ? "已確認取貨" : "已確認寄出",
+      { orderId: order.id },
+      order.pickup_location ? "已確認取貨" : "已確認寄出",
     );
 
   const handleCancel = async () => {
     setActing(true);
     try {
-      const response = await adminFetch<{ order: OrderWithRelations }>(
+      const response = await adminFetch<{ order: AdminOrderDetail }>(
         "/api/cancel-order",
         {
           method: "POST",
           body: JSON.stringify({
-            orderId: o.id,
+            orderId: order.id,
             isAdmin: true,
             cancel_reason: cancelReason.trim() || undefined,
           }),
@@ -109,7 +128,7 @@ export function OrderCard({
       setCancelOpen(false);
       setCancelReason("");
       setExpanded(false);
-      onOrderMutated(o, response.order);
+      onOrderMutated(order, response.order);
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "取消失敗",
@@ -129,29 +148,28 @@ export function OrderCard({
             : "lux-card-hover"
         }`}
       >
-        {/* Collapsed row */}
         <div
-          onClick={() => setExpanded(!expanded)}
+          onClick={toggleExpanded}
           className="flex cursor-pointer items-start gap-3 p-4 select-none sm:items-center"
         >
           {showCheckbox && (
             <input
               type="checkbox"
               checked={selected}
-              onChange={() => onToggleSelect(o.id)}
-              onClick={(e) => e.stopPropagation()}
+              onChange={() => onToggleSelect(order.id)}
+              onClick={(event) => event.stopPropagation()}
               className="h-4 w-4 shrink-0 accent-[hsl(var(--forest))]"
             />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
-                {o.order_number}
+                {order.order_number}
               </span>
               <span className="text-sm font-semibold text-[hsl(var(--ink))]">
-                {o.user?.nickname ?? "—"}
+                {order.user?.nickname ?? "—"}
               </span>
-              {o.pickup_location ? (
+              {order.pickup_location ? (
                 <span className="rounded-full border border-[rgba(115,107,153,0.18)] bg-[rgba(230,228,242,0.74)] px-2 py-0.5 text-[11px] font-medium text-[rgb(74,70,113)]">
                   面交
                 </span>
@@ -162,56 +180,102 @@ export function OrderCard({
               )}
             </div>
             <div className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">
-              {formatOrderItems(o.order_items)}
+              {order.items_preview || "無商品明細"}
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
             <span className="font-display text-lg text-[hsl(var(--ink))] sm:text-xl">
-              {formatCurrency(o.total_amount)}
+              {formatCurrency(order.total_amount)}
             </span>
-            <OrderStatusBadge status={o.status} />
+            <OrderStatusBadge status={order.status} />
             <span className="text-xs text-[hsl(var(--muted-foreground))]">
               {expanded ? "▲" : "▼"}
             </span>
           </div>
         </div>
 
-        {/* Expanded detail */}
         {expanded && (
           <div className="space-y-4 border-t border-[rgba(177,140,92,0.14)] px-4 pb-4">
-            {/* Items breakdown */}
-            <div className="space-y-2 pt-4 text-sm">
-              {o.order_items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex justify-between text-[hsl(var(--ink))]"
-                >
-                  <span>
-                    {item.product_name} ×{item.quantity}
-                  </span>
-                  <span>{formatCurrency(item.subtotal)}</span>
+            {detailOrder ? (
+              <>
+                <div className="space-y-2 pt-4 text-sm">
+                  {detailOrder.order_items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex justify-between text-[hsl(var(--ink))]"
+                    >
+                      <span>
+                        {item.product_name} ×{item.quantity}
+                      </span>
+                      <span>{formatCurrency(item.subtotal)}</span>
+                    </div>
+                  ))}
+                  {detailOrder.shipping_fee != null && detailOrder.shipping_fee > 0 && (
+                    <div className="flex justify-between text-[rgb(74,96,136)]">
+                      <span>宅配運費</span>
+                      <span>{formatCurrency(detailOrder.shipping_fee)}</span>
+                    </div>
+                  )}
+                  {detailOrder.pickup_location && !detailOrder.shipping_fee && (
+                    <div className="flex justify-between text-[rgb(65,98,61)]">
+                      <span>面交免運</span>
+                      <span>$0</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-[rgba(177,140,92,0.16)] pt-2 font-semibold text-[hsl(var(--ink))]">
+                    <span>合計</span>
+                    <span>{formatCurrency(detailOrder.total_amount)}</span>
+                  </div>
                 </div>
-              ))}
-              {o.shipping_fee != null && o.shipping_fee > 0 && (
-                <div className="flex justify-between text-[rgb(74,96,136)]">
-                  <span>宅配運費</span>
-                  <span>{formatCurrency(o.shipping_fee)}</span>
-                </div>
-              )}
-              {o.pickup_location && !o.shipping_fee && (
-                <div className="flex justify-between text-[rgb(65,98,61)]">
-                  <span>面交免運</span>
-                  <span>$0</span>
-                </div>
-              )}
-              <div className="flex justify-between border-t border-[rgba(177,140,92,0.16)] pt-2 font-semibold text-[hsl(var(--ink))]">
-                <span>合計</span>
-                <span>{formatCurrency(o.total_amount)}</span>
-              </div>
-            </div>
 
-            {/* Payment info */}
-            {o.payment_amount != null && (
+                <div className="lux-panel-muted space-y-1 p-3 text-xs text-[hsl(var(--muted-foreground))]">
+                  <div>
+                    暱稱：{" "}
+                    <span className="font-medium text-[hsl(var(--ink))]">
+                      {detailOrder.user?.nickname ?? "—"}
+                    </span>
+                  </div>
+                  <div>
+                    訂購人：{" "}
+                    <span className="font-medium text-[hsl(var(--ink))]">
+                      {detailOrder.user?.purchaser_name ?? "—"}
+                    </span>
+                  </div>
+                  <div>
+                    收貨人：{" "}
+                    <span className="font-medium text-[hsl(var(--ink))]">
+                      {detailOrder.user?.recipient_name ?? "—"}
+                    </span>{" "}
+                    · {detailOrder.user?.phone ?? "—"}
+                  </div>
+                  {detailOrder.pickup_location ? (
+                    <div className="text-[rgb(74,70,113)]">
+                      {detailOrder.pickup_location}
+                    </div>
+                  ) : (
+                    <div className="text-[rgb(74,96,136)]">
+                      {detailOrder.user?.address ?? "—"}
+                    </div>
+                  )}
+                  {detailOrder.cancel_reason && (
+                    <div className="mt-0.5 text-[rgb(140,67,56)]">
+                      {detailOrder.cancel_reason}
+                    </div>
+                  )}
+                  {detailOrder.shipped_at && (
+                    <div className="mt-0.5 text-[rgb(74,70,113)]">
+                      {new Date(detailOrder.shipped_at).toLocaleString("zh-TW")}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+                {loadingDetail ? "載入明細中…" : "展開後載入訂單明細"}
+              </div>
+            )}
+
+            {order.payment_amount != null && (
               <div
                 className={`rounded-[1.25rem] p-3 text-sm ${
                   amtMatch
@@ -221,65 +285,28 @@ export function OrderCard({
               >
                 <div className="flex flex-wrap gap-4 text-[hsl(var(--ink))]">
                   <span>
-                    匯款 <b>{formatCurrency(o.payment_amount)}</b>
+                    匯款 <b>{formatCurrency(order.payment_amount)}</b>
                   </span>
                   <span>
-                    後五碼 <b>{o.payment_last5 ?? "—"}</b>
+                    後五碼 <b>{order.payment_last5 ?? "—"}</b>
                   </span>
-                  {o.payment_reported_at && (
+                  {order.payment_reported_at && (
                     <span className="text-[hsl(var(--muted-foreground))]">
-                      {new Date(o.payment_reported_at).toLocaleString("zh-TW")}
+                      {new Date(order.payment_reported_at).toLocaleString("zh-TW")}
                     </span>
                   )}
                 </div>
                 {amtMismatch && (
                   <div className="mt-1 text-xs text-[rgb(120,84,39)]">
-                    金額不符：訂單 {formatCurrency(o.total_amount)} ≠ 匯款{" "}
-                    {formatCurrency(o.payment_amount)}
+                    金額不符：訂單 {formatCurrency(order.total_amount)} ≠ 匯款{" "}
+                    {formatCurrency(order.payment_amount)}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Customer info */}
-            <div className="lux-panel-muted space-y-1 p-3 text-xs text-[hsl(var(--muted-foreground))]">
-              <div>
-                暱稱：{" "}
-                <span className="font-medium text-[hsl(var(--ink))]">
-                  {o.user?.nickname ?? "—"}
-                </span>
-              </div>
-              <div>
-                訂購人：{" "}
-                <span className="font-medium text-[hsl(var(--ink))]">
-                  {o.user?.purchaser_name ?? "—"}
-                </span>
-              </div>
-              <div>
-                收貨人：{" "}
-                <span className="font-medium text-[hsl(var(--ink))]">
-                  {o.user?.recipient_name ?? "—"}
-                </span>{" "}
-                · {o.user?.phone ?? "—"}
-              </div>
-              {o.pickup_location ? (
-                <div className="text-[rgb(74,70,113)]">{o.pickup_location}</div>
-              ) : (
-                <div className="text-[rgb(74,96,136)]">{o.user?.address ?? "—"}</div>
-              )}
-              {o.cancel_reason && (
-                <div className="mt-0.5 text-[rgb(140,67,56)]">{o.cancel_reason}</div>
-              )}
-              {o.shipped_at && (
-                <div className="mt-0.5 text-[rgb(74,70,113)]">
-                  {new Date(o.shipped_at).toLocaleString("zh-TW")}
-                </div>
-              )}
-            </div>
-
-            {/* Action buttons */}
             <div className="flex gap-2 flex-wrap">
-              {o.status === "pending_confirm" && (
+              {order.status === "pending_confirm" && (
                 <>
                   <button
                     onClick={confirmPayment}
@@ -297,7 +324,7 @@ export function OrderCard({
                   </button>
                 </>
               )}
-              {o.status === "pending_payment" && (
+              {order.status === "pending_payment" && (
                 <>
                   <button
                     onClick={quickConfirm}
@@ -315,14 +342,14 @@ export function OrderCard({
                   </button>
                 </>
               )}
-              {o.status === "confirmed" && (
+              {order.status === "confirmed" && (
                 <>
                   <button
                     onClick={confirmShipment}
                     disabled={acting}
                     className="basis-full rounded-[1.1rem] bg-[rgb(74,70,113)] py-3 text-sm font-semibold text-white disabled:opacity-50 sm:basis-auto sm:flex-1"
                   >
-                    {o.pickup_location ? "確認取貨" : "確認寄出"}
+                    {order.pickup_location ? "確認取貨" : "確認寄出"}
                   </button>
                   <button
                     onClick={() => setCancelOpen(true)}
@@ -333,30 +360,24 @@ export function OrderCard({
                   </button>
                 </>
               )}
-              {o.status !== "cancelled" && (
+              {order.status !== "cancelled" && (
                 <button
                   onClick={() =>
-                    window.open(
-                      buildAdminPath(`/orders/${o.id}/print`),
-                      "_blank",
-                    )
+                    window.open(buildAdminPath(`/orders/${order.id}/print`), "_blank")
                   }
                   className="flex items-center gap-1.5 rounded-[1.1rem] border border-[rgba(177,140,92,0.28)] bg-[rgba(255,251,246,0.9)] px-4 py-3 text-sm font-medium text-[hsl(var(--ink))]"
                 >
                   列印裝箱單
                 </button>
               )}
-              {o.status === "shipped" && (
+              {order.status === "shipped" && (
                 <span className="py-2 text-sm text-[hsl(var(--muted-foreground))]">
-                  出貨{" "}
-                  {o.shipped_at
-                    ? new Date(o.shipped_at).toLocaleString("zh-TW")
-                    : ""}
+                  出貨 {shippedAt ? new Date(shippedAt).toLocaleString("zh-TW") : ""}
                 </span>
               )}
-              {o.status === "cancelled" && (
+              {order.status === "cancelled" && (
                 <span className="py-2 text-sm text-[rgb(140,67,56)]">
-                  {o.cancel_reason ?? "已取消"}
+                  {cancelReasonText ?? "已取消"}
                 </span>
               )}
             </div>
@@ -364,15 +385,14 @@ export function OrderCard({
         )}
       </div>
 
-      {/* Cancel Dialog */}
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>取消訂單 {o.order_number}</DialogTitle>
+            <DialogTitle>取消訂單 {order.order_number}</DialogTitle>
           </DialogHeader>
           <textarea
             value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
+            onChange={(event) => setCancelReason(event.target.value)}
             placeholder="取消原因（選填）"
             className="lux-textarea"
           />

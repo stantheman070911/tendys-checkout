@@ -5,7 +5,7 @@ import { listPageByRound } from "@/lib/db/orders";
 import { listAllByRound } from "@/lib/db/products";
 import { serializeForClient } from "@/lib/server-serialize";
 import { ORDER_STATUS } from "@/constants";
-import type { OrderWithItems, ProductWithProgress, Round } from "@/types";
+import type { AdminOrderListRow, ProductWithProgress, Round } from "@/types";
 
 const VALID_STATUSES = new Set([
   "all",
@@ -66,7 +66,7 @@ export default async function OrdersPage({
     >
       <OrdersPageClient
         round={clientRound}
-        initialOrders={serializeForClient<OrderWithItems[]>(ordersPage.items)}
+        initialOrders={serializeForClient<AdminOrderListRow[]>(ordersPage.items)}
         total={ordersPage.total}
         page={ordersPage.page}
         pageSize={ordersPage.pageSize}

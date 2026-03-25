@@ -1,23 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { OrderCard } from "@/components/admin/OrderCard";
+import { POSForm } from "@/components/admin/POSForm";
+import { useAdminChrome } from "@/components/admin/AdminChromeState";
+import { STATUS_LABELS } from "@/constants";
+import { getCsvExportErrorMessage } from "@/lib/admin/csv-export";
+import { detailToAdminOrderListRow } from "@/lib/admin/order-view";
 import {
   applyBatchStatusTransition,
+  applyPendingCountDelta,
+  getPendingConfirmCountDelta,
   replaceItemById,
 } from "@/lib/admin/order-state";
 import { buildAdminPath } from "@/lib/admin/paths";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
+import { useAdminOrderDetails } from "@/hooks/use-admin-order-details";
 import { useToast } from "@/hooks/use-toast";
-import { STATUS_LABELS } from "@/constants";
-import { OrderCard } from "@/components/admin/OrderCard";
-import { POSForm } from "@/components/admin/POSForm";
-import type { Order, OrderItem, ProductWithProgress, Round, User } from "@/types";
-
-type OrderWithRelations = Order & {
-  order_items: OrderItem[];
-  user: User | null;
-};
+import type {
+  AdminOrderDetail,
+  AdminOrderListRow,
+  ProductWithProgress,
+  Round,
+} from "@/types";
 
 const FILTER_OPTIONS = [
   "all",
@@ -59,7 +65,7 @@ export function OrdersPageClient({
   products,
 }: {
   round: Round;
-  initialOrders: OrderWithRelations[];
+  initialOrders: AdminOrderListRow[];
   total: number;
   page: number;
   pageSize: number;
@@ -72,14 +78,25 @@ export function OrdersPageClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { adminFetch } = useAdminFetch();
+  const { setPendingCount } = useAdminChrome();
   const { toast } = useToast();
+  const {
+    detailsById,
+    loadingDetailIds,
+    loadOrderDetail,
+    setOrderDetail,
+    removeOrderDetails,
+  } = useAdminOrderDetails(adminFetch);
 
   const [orders, setOrders] = useState(initialOrders);
   const [searchDraft, setSearchDraft] = useState(initialSearch);
   const [batchSel, setBatchSel] = useState<Set<string>>(new Set());
   const [batchActing, setBatchActing] = useState(false);
   const [showPOS, setShowPOS] = useState(initialShowPos);
+  const [csvCooldown, setCsvCooldown] = useState(false);
   const [csvExporting, setCsvExporting] = useState(false);
+  const csvCooldownTimerRef = useRef<number | null>(null);
+  const csvFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     setOrders(initialOrders);
@@ -92,6 +109,19 @@ export function OrdersPageClient({
   useEffect(() => {
     setShowPOS(initialShowPos);
   }, [initialShowPos]);
+
+  useEffect(
+    () => () => {
+      if (csvCooldownTimerRef.current != null) {
+        window.clearTimeout(csvCooldownTimerRef.current);
+      }
+      if (csvFrameRef.current) {
+        csvFrameRef.current.remove();
+        csvFrameRef.current = null;
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const trimmed = searchDraft.trim();
@@ -131,25 +161,39 @@ export function OrdersPageClient({
   }
 
   function handleOrderMutated(
-    previousOrder: OrderWithRelations,
-    updatedOrder: OrderWithRelations,
+    previousOrder: AdminOrderListRow,
+    updatedOrder: AdminOrderDetail,
   ) {
+    const updatedRow = detailToAdminOrderListRow(updatedOrder);
+
     setOrders((currentOrders) => {
-      const nextOrders = replaceItemById(currentOrders, updatedOrder);
-      if (filter !== "all" && updatedOrder.status !== filter) {
-        return nextOrders.filter((entry) => entry.id !== updatedOrder.id);
+      const nextOrders = replaceItemById(currentOrders, updatedRow);
+      if (filter !== "all" && updatedRow.status !== filter) {
+        return nextOrders.filter((entry) => entry.id !== updatedRow.id);
       }
       return nextOrders;
     });
+    setOrderDetail(updatedOrder);
     setBatchSel((current) => {
-      if (!current.has(updatedOrder.id)) return current;
+      if (!current.has(updatedRow.id)) {
+        return current;
+      }
       const next = new Set(current);
-      next.delete(updatedOrder.id);
+      next.delete(updatedRow.id);
       return next;
     });
-    if (previousOrder.status !== updatedOrder.status) {
-      router.refresh();
+
+    const pendingDelta = getPendingConfirmCountDelta(
+      previousOrder.status,
+      updatedRow.status,
+    );
+    if (pendingDelta !== 0) {
+      setPendingCount((current) => applyPendingCountDelta(current, pendingDelta));
     }
+
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   function selectAllPending() {
@@ -179,7 +223,9 @@ export function OrdersPageClient({
     if (batchSel.size === 0) return;
 
     const selectedIds = Array.from(batchSel);
+    const selectedIdSet = new Set(selectedIds);
     setBatchActing(true);
+
     try {
       const res = await adminFetch<{
         confirmed: number;
@@ -198,6 +244,14 @@ export function OrdersPageClient({
       });
 
       const confirmedAt = new Date().toISOString();
+      const skippedIdSet = new Set(res.skipped ?? []);
+      const confirmedCount = orders.filter(
+        (order) =>
+          selectedIdSet.has(order.id) &&
+          !skippedIdSet.has(order.id) &&
+          order.status === "pending_confirm",
+      ).length;
+
       setOrders((currentOrders) => {
         const nextOrders = applyBatchStatusTransition(currentOrders, {
           ids: selectedIds,
@@ -213,8 +267,20 @@ export function OrdersPageClient({
 
         return nextOrders;
       });
+      removeOrderDetails(
+        selectedIds.filter((orderId) => !skippedIdSet.has(orderId)),
+      );
       setBatchSel(new Set());
-      router.refresh();
+
+      if (confirmedCount > 0) {
+        setPendingCount((current) =>
+          applyPendingCountDelta(current, -confirmedCount),
+        );
+      }
+
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "批次確認失敗",
@@ -226,27 +292,46 @@ export function OrdersPageClient({
   }
 
   async function handleCSVExport() {
+    if (csvCooldown || csvExporting) {
+      return;
+    }
+
     setCsvExporting(true);
+    const exportUrl = `/api/export-csv?roundId=${encodeURIComponent(round.id)}`;
+
     try {
-      const res = await fetch(`/api/export-csv?roundId=${round.id}`, {
+      const preflight = await fetch(exportUrl, {
+        method: "HEAD",
         credentials: "include",
       });
 
-      if (!res.ok) {
-        throw new Error("Export failed");
+      if (!preflight.ok) {
+        throw new Error(getCsvExportErrorMessage(preflight.status));
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `orders_${round.id}.csv`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(anchor);
-    } catch {
-      toast({ title: "匯出失敗", variant: "destructive" });
+      let iframe = csvFrameRef.current;
+      if (!iframe || !document.body.contains(iframe)) {
+        iframe = document.createElement("iframe");
+        iframe.name = "admin-csv-download";
+        iframe.setAttribute("aria-hidden", "true");
+        iframe.style.display = "none";
+        document.body.appendChild(iframe);
+        csvFrameRef.current = iframe;
+      }
+
+      iframe.src = "about:blank";
+      iframe.src = exportUrl;
+
+      setCsvCooldown(true);
+      csvCooldownTimerRef.current = window.setTimeout(() => {
+        setCsvCooldown(false);
+        csvCooldownTimerRef.current = null;
+      }, 1500);
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "匯出失敗",
+        variant: "destructive",
+      });
     } finally {
       setCsvExporting(false);
     }
@@ -286,14 +371,14 @@ export function OrdersPageClient({
         )}
         <button
           onClick={handleCSVExport}
-          disabled={csvExporting}
+          disabled={csvCooldown || csvExporting}
           className={`inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2.5 text-xs font-semibold tracking-[0.08em] whitespace-nowrap ${
-            csvExporting
+            csvCooldown || csvExporting
               ? "opacity-50 text-[hsl(var(--muted-foreground))]"
               : "text-[hsl(var(--ink))]"
           }`}
         >
-          {csvExporting ? "匯出中..." : "CSV"}
+          {csvExporting ? "準備中…" : csvCooldown ? "已開始" : "CSV"}
         </button>
       </div>
 
@@ -337,6 +422,9 @@ export function OrdersPageClient({
             <OrderCard
               key={order.id}
               order={order}
+              detail={detailsById[order.id]}
+              loadingDetail={loadingDetailIds.has(order.id)}
+              onLoadDetail={loadOrderDetail}
               selected={batchSel.has(order.id)}
               onToggleSelect={toggleSelect}
               onOrderMutated={handleOrderMutated}

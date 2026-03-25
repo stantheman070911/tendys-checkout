@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
+import { toAdminOrderListRow } from "@/lib/admin/order-view";
 import { prisma } from "@/lib/db/prisma";
 import { isValidRoundPickupLocation } from "@/lib/pickup-options";
 import { normalizePhoneDigits } from "@/lib/utils";
+import type { AdminOrderListRow } from "@/types";
 
 type TxClient = Omit<
   typeof prisma,
@@ -18,10 +20,43 @@ const orderWithRelationsInclude = {
   round: true,
 } as const satisfies Prisma.OrderInclude;
 
-const orderWithAdminListInclude = {
+const orderWithAdminExportInclude = {
   order_items: true,
   user: true,
 } as const satisfies Prisma.OrderInclude;
+
+const orderWithAdminListSelect = {
+  id: true,
+  order_number: true,
+  round_id: true,
+  total_amount: true,
+  shipping_fee: true,
+  status: true,
+  payment_amount: true,
+  payment_last5: true,
+  payment_reported_at: true,
+  confirmed_at: true,
+  shipped_at: true,
+  pickup_location: true,
+  created_at: true,
+  user: {
+    select: {
+      nickname: true,
+      purchaser_name: true,
+      recipient_name: true,
+      phone: true,
+    },
+  },
+  order_items: {
+    select: {
+      product_name: true,
+      quantity: true,
+    },
+    orderBy: {
+      id: "asc",
+    },
+  },
+} as const satisfies Prisma.OrderSelect;
 
 type OrderWithItems = Prisma.OrderGetPayload<{
   include: typeof orderWithItemsInclude;
@@ -32,7 +67,7 @@ type OrderWithRelations = Prisma.OrderGetPayload<{
 }>;
 
 type OrderWithAdminListRelations = Prisma.OrderGetPayload<{
-  include: typeof orderWithAdminListInclude;
+  select: typeof orderWithAdminListSelect;
 }>;
 
 type CheckoutUserRecord = {
@@ -67,7 +102,7 @@ interface CreateOrderItem {
 }
 
 export interface PaginatedOrdersResult {
-  items: OrderWithAdminListRelations[];
+  items: AdminOrderListRow[];
   total: number;
   page: number;
   pageSize: number;
@@ -497,6 +532,25 @@ export async function getOrderWithItems(
   });
 }
 
+export async function getConfirmedShipmentPrintOrdersByIds(
+  roundId: string,
+  orderIds: string[],
+) {
+  const orders = await prisma.order.findMany({
+    where: {
+      id: { in: orderIds },
+      round_id: roundId,
+      status: "confirmed",
+    },
+    include: orderWithAdminExportInclude,
+  });
+
+  const orderById = new Map(orders.map((order) => [order.id, order]));
+  return orderIds
+    .map((orderId) => orderById.get(orderId))
+    .filter((order): order is NonNullable<typeof order> => !!order);
+}
+
 export async function findOrdersByPurchaserNameAndPhoneLast3(
   purchaserName: string,
   phoneLast3: string,
@@ -535,14 +589,16 @@ export async function findPublicOrderByOrderNumberAndIdentity(
 }
 
 export async function listByRound(roundId: string, statusFilter?: string) {
-  return prisma.order.findMany({
+  const items = await prisma.order.findMany({
     where: {
       round_id: roundId,
       ...(statusFilter ? { status: statusFilter } : {}),
     },
-    include: orderWithAdminListInclude,
+    select: orderWithAdminListSelect,
     orderBy: { created_at: "desc" },
   });
+
+  return items.map((item) => toAdminOrderListRow(item));
 }
 
 export async function listConfirmedByRound(roundId: string) {
@@ -638,7 +694,7 @@ export async function listPageByRound(input: {
     prisma.order.count({ where }),
     prisma.order.findMany({
       where,
-      include: orderWithAdminListInclude,
+      select: orderWithAdminListSelect,
       orderBy: { created_at: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -646,7 +702,7 @@ export async function listPageByRound(input: {
   ]);
 
   return {
-    items,
+    items: items.map((item) => toAdminOrderListRow(item)),
     total,
     page,
     pageSize,
@@ -663,7 +719,7 @@ export async function listRoundOrdersBatch(
 ) {
   return prisma.order.findMany({
     where: { round_id: roundId },
-    include: orderWithAdminListInclude,
+    include: orderWithAdminExportInclude,
     orderBy: { created_at: "desc" },
     skip: input?.skip ?? 0,
     take: input?.take ?? 500,

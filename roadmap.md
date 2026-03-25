@@ -119,6 +119,13 @@
   - Public lookup/order access now uses normalized indexed identity columns plus signed access tokens/cookies; `/api/lookup/order` and the old `sessionStorage` unlock path were removed
   - Arrival notifications now dispatch in background with bounded concurrency, CSV export streams in batches, checkout stock updates acquire product locks in deterministic order, and storefront product cards use optimized `next/image`
   - Added `prisma/migration_011_public_lookup_indexes.sql` for live databases and opt-in query timing logs around the remaining `product_progress` / under-goal checks
+- [x] **7.21** Performance follow-up hardening + CTO sign-off
+  - Admin orders and shipments now consume explicit thin row view-models, while expanded detail loads lazily from `/api/orders/[id]`
+  - Admin dashboard now uses one server summary contract for status counts, revenue, product demand rows, and aggregated notification status instead of rebuilding those views in the browser
+  - CSV export now uses `HEAD` preflight + persistent hidden iframe download, and `/api/export-csv` marks both success and error responses with `Cache-Control: private, no-store`
+  - Shipment batch printing now uses `/api/orders/print-batch`, scoped to `roundId`, restricted to `confirmed` shipment rows, deduped, and capped to 50 orders per request
+  - After review, authoritative `router.refresh()` was restored for order/shipment mutation flows so totals and pagination metadata stay correct while the client chrome badge still updates immediately
+  - Verified on the final sign-off tree with `npm test` (35 files / 162 tests), `npm run lint`, `npx tsc --noEmit`, and `npm run build`
 
 ### Checkpoint 7 (Final)
 
@@ -148,8 +155,10 @@ npx vitest run       # must pass
 - [ ] **Historical analytics gap** — Older `product_arrival` logs without context columns cannot be back-attributed
 - [ ] **LINE ambiguity handling** — Reject or disambiguate messages with multiple order numbers (currently first-match-wins)
 - [ ] **Integration coverage** — Route-to-notification integration test
+- [ ] **Admin client-flow integration coverage** — Add browser/component coverage for CSV preflight/download and shipment batch print flows
 - [ ] **Dependency remediation** — `npm audit` issues in dedicated pass
 - [ ] **Visual QA pass** — Device-by-device screenshot / browser review for the new luxury theme on low-end mobile and Safari
+- [ ] **True DB-side thin rows** — Replace per-order `order_items` list hydration with SQL/precomputed preview data for the admin list hot path
 
 ---
 

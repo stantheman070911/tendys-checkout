@@ -13,7 +13,7 @@ const ordersMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
-import { GET } from "./route";
+import { GET, HEAD } from "./route";
 
 function makeRequest(roundId?: string) {
   const params = roundId ? `?roundId=${roundId}` : "";
@@ -21,6 +21,14 @@ function makeRequest(roundId?: string) {
   return {
     nextUrl: url,
   } as unknown as import("next/server").NextRequest;
+}
+
+function assertResponse(response: Response | undefined): Response {
+  expect(response).toBeDefined();
+  if (!response) {
+    throw new Error("Expected route handler to return a response");
+  }
+  return response;
 }
 
 const fakeOrders = [
@@ -65,7 +73,7 @@ describe("GET /api/export-csv", () => {
       .mockResolvedValueOnce(fakeOrders)
       .mockResolvedValueOnce([]);
 
-    const res = await GET(makeRequest("r1"));
+    const res = assertResponse(await GET(makeRequest("r1")));
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
     // UTF-8 BOM: EF BB BF
@@ -79,10 +87,11 @@ describe("GET /api/export-csv", () => {
       .mockResolvedValueOnce(fakeOrders)
       .mockResolvedValueOnce([]);
 
-    const res = await GET(makeRequest("r1"));
+    const res = assertResponse(await GET(makeRequest("r1")));
     const text = await res.text();
     const headerLine = text.split("\r\n")[0];
     expect(headerLine).toContain("運費");
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("preserves Chinese content", async () => {
@@ -90,7 +99,7 @@ describe("GET /api/export-csv", () => {
       .mockResolvedValueOnce(fakeOrders)
       .mockResolvedValueOnce([]);
 
-    const res = await GET(makeRequest("r1"));
+    const res = assertResponse(await GET(makeRequest("r1")));
     const text = await res.text();
     expect(text).toContain("王小明");
     expect(text).toContain("王大明");
@@ -101,7 +110,22 @@ describe("GET /api/export-csv", () => {
   it("returns 401 when not admin", async () => {
     authMock.mockResolvedValue(false);
 
-    const res = await GET(makeRequest("r1"));
+    const res = assertResponse(await GET(makeRequest("r1")));
     expect(res.status).toBe(401);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("HEAD preflight returns 204 when the request is valid", async () => {
+    const res = assertResponse(await HEAD(makeRequest("r1")));
+    expect(res.status).toBe(204);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("HEAD preflight returns 401 when the session is expired", async () => {
+    authMock.mockResolvedValue(false);
+
+    const res = assertResponse(await HEAD(makeRequest("r1")));
+    expect(res.status).toBe(401);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 });

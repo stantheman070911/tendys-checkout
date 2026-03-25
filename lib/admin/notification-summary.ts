@@ -1,4 +1,8 @@
 import type { NotificationLog, NotificationType } from "@/types";
+import type {
+  NotificationChannel,
+  NotificationLogStatus,
+} from "@/types";
 
 export interface NotificationChannelSummary {
   success: number;
@@ -16,26 +20,46 @@ function createChannelSummary(): NotificationChannelSummary {
   return { success: 0, failed: 0, skipped: 0 };
 }
 
-export function summarizeNotificationLogs(
-  logs: NotificationLog[],
+export interface NotificationSummaryCount {
+  type: NotificationType;
+  channel: NotificationChannel;
+  status: NotificationLogStatus;
+  count: number;
+}
+
+export function summarizeNotificationCounts(
+  counts: NotificationSummaryCount[],
 ): NotificationTypeSummary[] {
   const summaryByType = new Map<NotificationType, NotificationTypeSummary>();
 
-  for (const log of logs) {
-    if (!summaryByType.has(log.type)) {
-      summaryByType.set(log.type, {
-        type: log.type,
+  for (const entry of counts) {
+    if (!summaryByType.has(entry.type)) {
+      summaryByType.set(entry.type, {
+        type: entry.type,
         line: createChannelSummary(),
         email: createChannelSummary(),
       });
     }
 
-    const summary = summaryByType.get(log.type);
+    const summary = summaryByType.get(entry.type);
     if (!summary) continue;
 
-    const channelSummary = summary[log.channel];
-    channelSummary[log.status]++;
+    const channelSummary = summary[entry.channel];
+    channelSummary[entry.status] += entry.count;
   }
 
   return Array.from(summaryByType.values());
+}
+
+export function summarizeNotificationLogs(
+  logs: NotificationLog[],
+): NotificationTypeSummary[] {
+  return summarizeNotificationCounts(
+    logs.map((log) => ({
+      type: log.type,
+      channel: log.channel,
+      status: log.status,
+      count: 1,
+    })),
+  );
 }

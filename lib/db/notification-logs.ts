@@ -40,3 +40,13 @@ export async function getLogsByRound(roundId: string) {
     orderBy: { created_at: "desc" },
   });
 }
+
+export async function getNotificationSummaryByRound(roundId: string) {
+  return prisma.notificationLog.groupBy({
+    by: ["type", "channel", "status"],
+    where: {
+      OR: [{ round_id: roundId }, { order: { round_id: roundId } }],
+    },
+    _count: { _all: true },
+  });
+}

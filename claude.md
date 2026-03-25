@@ -21,6 +21,12 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
 - Admin auth is now a two-step model: Supabase still handles login, but `/api/admin/session` validates the access token once and establishes a signed `tendy_admin_session` cookie. Admin pages and routes now trust that cookie instead of re-checking Supabase on every request.
 - Admin pages now render server-first through `components/admin/AdminShell.tsx` and `lib/admin/server.ts`; the old client-only auth/round bootstrap waterfall was removed.
 - Admin dashboard/orders/shipments were reworked around backend aggregation and paginated list loaders instead of downloading full round datasets into the browser.
+- Admin efficiency follow-up landed after review:
+  - admin list routes now return explicit thin row view-models, while order/shipment detail expands lazily from `/api/orders/[id]`
+  - dashboard summary data now comes from `lib/admin/dashboard.ts` instead of rebuilding counts/product demand/notification summaries in the browser
+  - CSV export now uses `HEAD` preflight + a persistent hidden iframe transport, and `/api/export-csv` marks both success and error responses as `Cache-Control: private, no-store`
+  - batch shipment printing now goes through `/api/orders/print-batch`, which is `roundId`-scoped, deduped, capped at 50, and restricted to `confirmed` shipment rows
+  - after skeptical review, authoritative `router.refresh()` was restored for order/shipment mutation flows so totals and pagination metadata cannot drift
 - Public order access is now token/cookie based instead of `sessionStorage` based:
   - `/api/submit-order` returns a signed detail URL for the created order
   - `/api/lookup` returns signed detail URLs for each matched result
@@ -64,8 +70,11 @@ Read this file before writing or modifying any code. Then read `whatwearebuildin
   - `npm run build`
   - focused `npx vitest run ...` coverage for submit-order, round pickup config, public lookup/order detail flows, stock-cap progress math, and public-order access token handling
 - Verified after the performance remediation follow-up:
+  - `npm test` (35 files / 162 tests)
+  - `npm run lint`
+  - `npx tsc --noEmit`
   - `npm run build`
-  - focused `vitest run` coverage for submit-order, lookup, public-order access, notify-arrival, and export-csv
+  - focused route/helper coverage for export preflight/cache headers, bounded shipment batch print, dashboard summary mapping, shipment print document rendering, and order thin-row mapping
 
 ### Primary Redesign Files
 
@@ -155,6 +164,7 @@ app/
     suppliers/route.ts
     orders/route.ts             # List by round (optional status filter)
     orders/[id]/route.ts        # Single order detail
+    orders/print-batch/route.ts # Batch shipment print payload (round-scoped, confirmed-only, capped)
     orders-by-product/route.ts  # Group by product → customer list
     notification-logs/route.ts
     checkout-profile/lookup/route.ts # Public autofill: nickname + full phone
@@ -173,6 +183,7 @@ lib/                            # Pure TypeScript — NO React/Next imports
   notifications/email.ts, send.ts
   auth/signed-token.ts, auth/supabase-admin.ts, supabase-browser.ts
   admin/server.ts               # Server-only admin session + chrome loaders
+  admin/dashboard.ts, csv-export.ts, order-view.ts, shipment-print.ts
   admin/paths.ts, notification-summary.ts, order-search.ts, shipment-status.ts
   utils.ts                      # cn(), formatting, share URLs, calcOrderTotal
 components/
@@ -180,9 +191,9 @@ components/
   StorefrontClient.tsx, PublicOrderPage.tsx, ProductCard.tsx, ProgressBar.tsx
   CartBar.tsx, SharePanel.tsx, DeadlineBanner.tsx, OrderStatusBadge.tsx
   PaymentReportForm.tsx, CancelOrderButton.tsx, ShippingFeeNote.tsx
-  admin/AdminShell.tsx, OrderCard.tsx, POSForm.tsx, ProductAggregationTable.tsx
+  admin/AdminShell.tsx, AdminChromeState.tsx, OrderCard.tsx, POSForm.tsx, ProductAggregationTable.tsx
   admin/ProductForm.tsx, SupplierForm.tsx, ShipmentCard.tsx
-hooks/use-toast.ts, use-admin-fetch.ts
+hooks/use-toast.ts, use-admin-fetch.ts, use-admin-order-details.ts
 types/index.ts
 constants/index.ts              # Status enums, bank info keys
 prisma/

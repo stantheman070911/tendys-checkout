@@ -5,21 +5,61 @@ import { STATUS_LABELS } from "@/constants";
 import type { OrderStatus } from "@/types";
 
 const CSV_BATCH_SIZE = 500;
+const NO_STORE_HEADERS = {
+  "Cache-Control": "private, no-store",
+};
+
+async function validateCsvExportRequest(request: NextRequest) {
+  const isAdmin = await verifyAdminSession(request);
+  if (!isAdmin) {
+    return {
+      response: NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: NO_STORE_HEADERS },
+      ),
+    };
+  }
+
+  const roundId = request.nextUrl.searchParams.get("roundId");
+  if (!roundId || !roundId.trim()) {
+    return {
+      response: NextResponse.json(
+        { error: "roundId is required" },
+        { status: 400, headers: NO_STORE_HEADERS },
+      ),
+    };
+  }
+
+  return { roundId: roundId.trim() };
+}
+
+export async function HEAD(request: NextRequest) {
+  try {
+    const validation = await validateCsvExportRequest(request);
+    if ("response" in validation) {
+      return validation.response;
+    }
+
+    return new NextResponse(null, {
+      status: 204,
+      headers: NO_STORE_HEADERS,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500, headers: NO_STORE_HEADERS },
+    );
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const isAdmin = await verifyAdminSession(request);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const validation = await validateCsvExportRequest(request);
+    if ("response" in validation) {
+      return validation.response;
     }
 
-    const roundId = request.nextUrl.searchParams.get("roundId");
-    if (!roundId || !roundId.trim()) {
-      return NextResponse.json(
-        { error: "roundId is required" },
-        { status: 400 },
-      );
-    }
+    const roundId = validation.roundId;
     const headers = [
       "訂單編號",
       "暱稱",
@@ -56,7 +96,7 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        const orders = await listRoundOrdersBatch(roundId.trim(), {
+        const orders = await listRoundOrdersBatch(roundId, {
           skip: offset,
           take: CSV_BATCH_SIZE,
         });
@@ -68,10 +108,10 @@ export async function GET(request: NextRequest) {
         offset += orders.length;
         for (const order of orders) {
           const itemsText = order.order_items
-            .map((i) => `${i.product_name}x${i.quantity}`)
+            .map((item) => `${item.product_name}x${item.quantity}`)
             .join(", ");
           const itemsSubtotal = order.order_items.reduce(
-            (sum, i) => sum + i.subtotal,
+            (sum, item) => sum + item.subtotal,
             0,
           );
 
@@ -113,6 +153,7 @@ export async function GET(request: NextRequest) {
 
     return new Response(stream, {
       headers: {
+        ...NO_STORE_HEADERS,
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": 'attachment; filename="orders.csv"',
       },
@@ -120,7 +161,7 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 },
+      { status: 500, headers: NO_STORE_HEADERS },
     );
   }
 }

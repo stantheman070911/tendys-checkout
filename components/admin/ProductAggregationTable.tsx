@@ -1,34 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { buildAdminPath } from "@/lib/admin/paths";
-import type { OrderByProduct, ProductWithProgress } from "@/types";
+import type { AdminDashboardProductRow, OrderByProduct } from "@/types";
 
 interface ProductAggregationTableProps {
-  products: ProductWithProgress[];
-  productDemand: Array<{
-    product_id: string | null;
-    product_name: string;
-    quantity: number;
-    revenue: number;
-  }>;
+  rows: AdminDashboardProductRow[];
   roundId: string;
 }
 
-interface AggRow {
-  productId: string;
-  name: string;
-  supplierName: string | null;
-  unit: string;
-  qty: number;
-  revenue: number;
-}
-
 export function ProductAggregationTable({
-  products,
-  productDemand,
+  rows,
   roundId,
 }: ProductAggregationTableProps) {
   const { toast } = useToast();
@@ -40,52 +24,6 @@ export function ProductAggregationTable({
   const [loadingProductId, setLoadingProductId] = useState<string | null>(null);
   const [arrivalSending, setArrivalSending] = useState<string | null>(null);
   const [arrivalSent, setArrivalSent] = useState<Set<string>>(new Set());
-
-  const productById = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
-    [products],
-  );
-
-  const rows = useMemo(() => {
-    const aggMap = new Map<string, AggRow>();
-
-    for (const item of productDemand) {
-      if (!item.product_id) continue;
-
-      const existing = aggMap.get(item.product_id);
-      if (existing) {
-        existing.qty += item.quantity;
-        existing.revenue += item.revenue;
-        continue;
-      }
-
-      const product = productById.get(item.product_id);
-      aggMap.set(item.product_id, {
-        productId: item.product_id,
-        name: item.product_name,
-        supplierName: product?.supplier_name ?? null,
-        unit: product?.unit ?? "份",
-        qty: item.quantity,
-        revenue: item.revenue,
-      });
-    }
-
-    // Include zero-demand products so suppliers see the full product list
-    for (const product of products) {
-      if (!aggMap.has(product.id)) {
-        aggMap.set(product.id, {
-          productId: product.id,
-          name: product.name,
-          supplierName: product.supplier_name ?? null,
-          unit: product.unit,
-          qty: 0,
-          revenue: 0,
-        });
-      }
-    }
-
-    return Array.from(aggMap.values());
-  }, [productDemand, productById, products]);
 
   const loadCustomers = async (
     productId: string,
@@ -166,7 +104,7 @@ export function ProductAggregationTable({
     }
   };
 
-  const printAllocationList = async (row: AggRow) => {
+  const printAllocationList = async (row: AdminDashboardProductRow) => {
     const customers = await loadCustomers(row.productId);
     if (customers.length === 0) {
       toast({

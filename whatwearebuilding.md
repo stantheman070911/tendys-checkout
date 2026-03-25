@@ -191,7 +191,12 @@
   - 商品卡圖面標題已移到圖片垂直中段；round window 的 `開放中` badge 改為固定單行
   - admin dashboard / 訂單 / 待出貨 / 商品 / 開團 / 供應商頁已改成 server-first 載入，初始 round chrome 與 badge 不再卡在 client-side auth / hydration waterfall
   - admin 訂單與待出貨已改成 server-side pagination + URL filter state，不再一次抓整團所有訂單再在瀏覽器過濾
+  - admin 訂單 / 待出貨首屏現在吃 thin row view-model；展開明細時才透過 `/api/orders/[id]` lazy load 完整資料，dashboard 也改成一個 summary contract 載入
   - `通知到貨` 已改成背景派送，CSV 匯出改成分批串流，商品卡圖片改用 `next/image`
+  - CSV 匯出現在會先做 `HEAD` preflight，再以持久 hidden iframe 下載，不會因為 magic timeout 中斷；成功與錯誤回應都明確標記 `Cache-Control: private, no-store`
+  - 待出貨批次列印已改成 `/api/orders/print-batch` 一次取回資料，並限制為當前 round 的 `confirmed` 訂單、去重後最多 50 筆
+  - 經過效能清理後的實戰 review，訂單 / 出貨 mutation flow 仍保留 authoritative refresh，避免 total / page / hasMore 漂移；即時 badge 仍由 client chrome state 補強
+  - 目前剩餘的是 backlog，不是上線阻塞：`OrdersPageClient` / `ShipmentsPageClient` 的 browser-level integration coverage，以及 admin list query 真正 DB-side 的 preview 聚合瘦身
 - 這輪 UI 重構沒有改動核心流程或 API 契約；如果出現行為問題，先假設是既有邏輯問題，不是這次設計重構刻意改規格。
 
 ---

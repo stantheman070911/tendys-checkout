@@ -2,18 +2,11 @@ import Link from "next/link";
 import { ADMIN_BASE } from "@/constants";
 import { ProductAggregationTable } from "@/components/admin/ProductAggregationTable";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { getAdminDashboardSummary } from "@/lib/admin/dashboard";
 import { getAdminChromeContext, requireAdminPageSession } from "@/lib/admin/server";
-import { summarizeNotificationLogs } from "@/lib/admin/notification-summary";
-import { getLogsByRound } from "@/lib/db/notification-logs";
-import {
-  getRoundOrderStatusCounts,
-  getRoundProductDemand,
-  getRoundRevenueTotal,
-} from "@/lib/db/orders";
-import { listAllByRound } from "@/lib/db/products";
 import { serializeForClient } from "@/lib/server-serialize";
 import { formatCurrency } from "@/lib/utils";
-import type { NotificationLog, ProductWithProgress, Round } from "@/types";
+import type { Round } from "@/types";
 
 function buildRoundHref(path: string, roundId: string) {
   const params = new URLSearchParams({ roundId });
@@ -41,23 +34,10 @@ export default async function DashboardPage({
     );
   }
 
-  const [statusCounts, totalRevenue, products, productDemand, logs] =
-    await Promise.all([
-      getRoundOrderStatusCounts(round.id),
-      getRoundRevenueTotal(round.id),
-      listAllByRound(round.id),
-      getRoundProductDemand(round.id),
-      getLogsByRound(round.id),
-    ]);
-
-  const counts = Object.fromEntries(
-    statusCounts.map((entry) => [entry.status, entry._count._all]),
-  );
-  const totalOrders = statusCounts.reduce(
-    (sum, entry) => sum + entry._count._all,
-    0,
-  );
-  const activeOrders = totalOrders - (counts.cancelled ?? 0);
+  const summary = await getAdminDashboardSummary(round.id);
+  const counts = summary.counts;
+  const totalOrders = summary.totalOrders;
+  const activeOrders = summary.activeOrders;
   const pendingConfirm = counts.pending_confirm ?? 0;
   const pendingPayment = counts.pending_payment ?? 0;
   const confirmed = counts.confirmed ?? 0;
@@ -69,7 +49,7 @@ export default async function DashboardPage({
     href?: string;
   }> = [
     { label: "總訂單", value: `${totalOrders}` },
-    { label: "總營收", value: formatCurrency(totalRevenue) },
+    { label: "總營收", value: formatCurrency(summary.totalRevenue) },
     {
       label: "待確認",
       value: `${pendingConfirm}`,
@@ -92,11 +72,7 @@ export default async function DashboardPage({
     },
   ];
 
-  const notificationSummary = summarizeNotificationLogs(
-    serializeForClient<NotificationLog[]>(logs),
-  );
   const clientRound = serializeForClient<Round>(round);
-  const clientProducts = serializeForClient<ProductWithProgress[]>(products);
 
   return (
     <AdminShell
@@ -168,23 +144,17 @@ export default async function DashboardPage({
         </div>
 
         <ProductAggregationTable
-          products={clientProducts}
-          productDemand={productDemand.map((entry) => ({
-            product_id: entry.product_id,
-            product_name: entry.product_name,
-            quantity: entry._sum.quantity ?? 0,
-            revenue: entry._sum.subtotal ?? 0,
-          }))}
+          rows={summary.productRows}
           roundId={clientRound.id}
         />
 
-        {notificationSummary.length > 0 && (
+        {summary.notificationSummary.length > 0 && (
           <div className="lux-panel p-5">
             <div className="mb-3 font-display text-2xl text-[hsl(var(--ink))]">
               通知發送統計 (本團)
             </div>
             <div className="space-y-3">
-              {notificationSummary.map((entry) => (
+              {summary.notificationSummary.map((entry) => (
                 <div
                   key={entry.type}
                   className="border-b border-[rgba(177,140,92,0.14)] pb-3 last:border-0 last:pb-0"

@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  removeBatchItemsById,
-  removeItemsById,
-} from "@/lib/admin/order-state";
+import { ShipmentCard } from "@/components/admin/ShipmentCard";
 import { groupOrdersByPickup } from "@/lib/admin/order-search";
+import { buildShipmentPrintDocument } from "@/lib/admin/shipment-print";
+import { removeBatchItemsById, removeItemsById } from "@/lib/admin/order-state";
 import { buildAdminPath } from "@/lib/admin/paths";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
+import { useAdminOrderDetails } from "@/hooks/use-admin-order-details";
 import { useToast } from "@/hooks/use-toast";
-import { ShipmentCard } from "@/components/admin/ShipmentCard";
-import type { OrderWithItems, Round } from "@/types";
+import type { AdminOrderDetail, AdminOrderListRow, Round } from "@/types";
 
 function updateQueryString(
   searchParams: URLSearchParams,
@@ -43,7 +42,7 @@ export function ShipmentsPageClient({
   productFilterName,
 }: {
   round: Round;
-  initialOrders: OrderWithItems[];
+  initialOrders: AdminOrderListRow[];
   total: number;
   page: number;
   pageSize: number;
@@ -56,12 +55,19 @@ export function ShipmentsPageClient({
   const searchParams = useSearchParams();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
+  const {
+    detailsById,
+    loadingDetailIds,
+    loadOrderDetail,
+    removeOrderDetails,
+  } = useAdminOrderDetails(adminFetch);
 
   const [orders, setOrders] = useState(initialOrders);
   const [searchDraft, setSearchDraft] = useState(initialSearch);
   const [batchSel, setBatchSel] = useState<Set<string>>(new Set());
   const [batchActing, setBatchActing] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     setOrders(initialOrders);
@@ -106,13 +112,16 @@ export function ShipmentsPageClient({
 
   function handleShipmentConfirmed(orderId: string) {
     setOrders((currentOrders) => removeItemsById(currentOrders, [orderId]));
+    removeOrderDetails([orderId]);
     setBatchSel((current) => {
       if (!current.has(orderId)) return current;
       const next = new Set(current);
       next.delete(orderId);
       return next;
     });
-    router.refresh();
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   const groups = useMemo(() => {
@@ -177,11 +186,17 @@ export function ShipmentsPageClient({
             : `已出貨 ${res.shipped} 筆`,
       });
 
+      const skippedIdSet = new Set(res.skipped ?? []);
       setOrders((currentOrders) =>
         removeBatchItemsById(currentOrders, selectedIds, res.skipped),
       );
+      removeOrderDetails(
+        selectedIds.filter((orderId) => !skippedIdSet.has(orderId)),
+      );
       setBatchSel(new Set());
-      router.refresh();
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (error) {
       toast({
         title: error instanceof Error ? error.message : "批次出貨失敗",
@@ -192,72 +207,36 @@ export function ShipmentsPageClient({
     }
   }
 
-  function printCurrentPage() {
-    if (orders.length === 0) return;
+  async function printCurrentPage() {
+    if (orders.length === 0 || printing) return;
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
-    if (!printWindow) {
-      toast({ title: "無法開啟列印視窗", variant: "destructive" });
-      return;
+    setPrinting(true);
+    try {
+      const { orders: detailOrders } = await adminFetch<{
+        orders: AdminOrderDetail[];
+      }>("/api/orders/print-batch", {
+        method: "POST",
+        body: JSON.stringify({
+          roundId: round.id,
+          orderIds: orders.map((order) => order.id),
+        }),
+      });
+
+      const printWindow = window.open("", "_blank", "noopener,noreferrer");
+      if (!printWindow) {
+        toast({ title: "無法開啟列印視窗", variant: "destructive" });
+        return;
+      }
+      printWindow.document.write(buildShipmentPrintDocument(detailOrders));
+      printWindow.document.close();
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "列印資料載入失敗",
+        variant: "destructive",
+      });
+    } finally {
+      setPrinting(false);
     }
-
-    const escapeHtml = (value: string) =>
-      value
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-
-    const slips = orders
-      .map(
-        (order) => `
-      <div class="slip">
-        <h2>${escapeHtml(order.order_number)}</h2>
-        <div class="info">
-          <div><b>暱稱：</b>${escapeHtml(order.user?.nickname ?? "—")}</div>
-          <div><b>訂購人：</b>${escapeHtml(order.user?.purchaser_name ?? "—")}</div>
-          <div><b>收貨人：</b>${escapeHtml(order.user?.recipient_name ?? "—")} · ${escapeHtml(order.user?.phone ?? "—")}</div>
-          <div>${order.pickup_location ? `📍 ${escapeHtml(order.pickup_location)}` : `🚚 ${escapeHtml(order.user?.address ?? "—")}`}</div>
-        </div>
-        <table>
-          <thead><tr><th>品名</th><th>數量</th><th>小計</th></tr></thead>
-          <tbody>
-            ${order.order_items
-              .map(
-                (item) =>
-                  `<tr><td>${escapeHtml(item.product_name)}</td><td>${item.quantity}</td><td>$${item.subtotal}</td></tr>`,
-              )
-              .join("")}
-            ${order.shipping_fee ? `<tr><td>宅配運費</td><td></td><td>$${order.shipping_fee}</td></tr>` : ""}
-          </tbody>
-          <tfoot><tr><td colspan="2"><b>合計</b></td><td><b>$${order.total_amount}</b></td></tr></tfoot>
-        </table>
-      </div>
-    `,
-      )
-      .join("");
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>待出貨裝箱單</title>
-          <style>
-            body { font-family: sans-serif; padding: 0; margin: 0; color: #111827; }
-            .slip { padding: 24px; page-break-after: always; }
-            .slip:last-child { page-break-after: auto; }
-            h2 { margin: 0 0 8px; font-size: 18px; }
-            .info { margin-bottom: 12px; font-size: 14px; }
-            table { width: 100%; border-collapse: collapse; font-size: 14px; }
-            th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; }
-            th { background: #f3f4f6; }
-            tfoot td { border-top: 2px solid #111827; }
-          </style>
-        </head>
-        <body>${slips}</body>
-        <script>window.onload = function () { window.print(); };</script>
-      </html>
-    `);
-    printWindow.document.close();
   }
 
   return (
@@ -277,10 +256,11 @@ export function ShipmentsPageClient({
             <span className="lux-pill">{total} 筆待處理</span>
             {orders.length > 0 && (
               <button
-                onClick={printCurrentPage}
-                className="print:hidden inline-flex min-h-[40px] items-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2 text-xs font-semibold text-[hsl(var(--ink))]"
+                onClick={() => void printCurrentPage()}
+                disabled={printing}
+                className="print:hidden inline-flex min-h-[40px] items-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2 text-xs font-semibold text-[hsl(var(--ink))] disabled:opacity-50"
               >
-                列印本頁
+                {printing ? "準備中…" : "列印本頁"}
               </button>
             )}
           </div>
@@ -361,6 +341,9 @@ export function ShipmentsPageClient({
                     <ShipmentCard
                       key={order.id}
                       order={order}
+                      detail={detailsById[order.id]}
+                      loadingDetail={loadingDetailIds.has(order.id)}
+                      onLoadDetail={loadOrderDetail}
                       selected={batchSel.has(order.id)}
                       onToggleSelect={toggleSelect}
                       onShipmentConfirmed={handleShipmentConfirmed}
