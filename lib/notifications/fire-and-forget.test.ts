@@ -14,16 +14,26 @@ describe("fireAndForget", () => {
     delete (globalThis as typeof globalThis & { waitUntil?: unknown }).waitUntil;
   });
 
-  it("registers background work with next/server after when request context exists", async () => {
-    afterMock.mockImplementation(() => undefined);
+  it("registers deferred background work with next/server after", async () => {
+    const task = vi.fn(async () => undefined);
+    let scheduledTask: (() => Promise<void>) | undefined;
+    afterMock.mockImplementation((callback: () => Promise<void>) => {
+      scheduledTask = callback;
+    });
 
-    fireAndForget(async () => undefined);
+    fireAndForget(task);
 
     expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(task).not.toHaveBeenCalled();
+
+    await scheduledTask?.();
+
+    expect(task).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to waitUntil when after is unavailable", async () => {
     const waitUntil = vi.fn();
+    const task = vi.fn(async () => undefined);
     afterMock.mockImplementation(() => {
       throw new Error("outside request");
     });
@@ -33,8 +43,9 @@ describe("fireAndForget", () => {
       }
     ).waitUntil = waitUntil;
 
-    fireAndForget(async () => undefined);
+    fireAndForget(task);
 
     expect(waitUntil).toHaveBeenCalledTimes(1);
+    expect(task).toHaveBeenCalledTimes(1);
   });
 });

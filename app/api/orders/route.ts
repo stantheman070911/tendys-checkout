@@ -4,8 +4,9 @@ import { listPageByRound } from "@/lib/db/orders";
 import { ORDER_STATUS } from "@/constants";
 import {
   optionalTrimmedStringSchema,
+  optionalUuidStringSchema,
   parseSearchParams,
-  requiredTrimmedStringSchema,
+  uuidStringSchema,
   z,
 } from "@/lib/validation";
 
@@ -15,10 +16,10 @@ const DEFAULT_PAGE_SIZE = 50;
 
 const ordersQuerySchema = z
   .object({
-    roundId: requiredTrimmedStringSchema("roundId"),
+    roundId: uuidStringSchema("roundId"),
     status: optionalTrimmedStringSchema(),
     q: optionalTrimmedStringSchema(),
-    productId: optionalTrimmedStringSchema(),
+    productId: optionalUuidStringSchema("productId"),
     page: z.string().optional(),
     pageSize: z.string().optional(),
   })

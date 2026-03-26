@@ -1,0 +1,6 @@
+Starting staging smoke against https://tendys-checkout-48npf1b5w-letstanleycook911-4248s-projects.vercel.app/
+Run ID: 20260326105816
+No Vercel preview protection bypass secret is configured for this run.
+
+Automated staging smoke failed.
+POST /api/suppliers was blocked by Vercel Deployment Protection at https://tendys-checkout-48npf1b5w-letstanleycook911-4248s-projects.vercel.app/. Set STAGING_VERCEL_BYPASS_SECRET (or VERCEL_AUTOMATION_BYPASS_SECRET) and rerun.

@@ -9,12 +9,55 @@ import {
 import {
   nonNegativeIntegerOrNullSchema,
   parseJsonBody,
+  parseSearchParams,
   requiredTrimmedStringSchema,
   uuidStringSchema,
   z,
 } from "@/lib/validation";
 
 const PUBLIC_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=60";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const nullableSupplierIdSchema = (preserveUndefined: boolean) =>
+  z
+    .union([z.string(), z.null(), z.undefined()])
+    .superRefine((value, context) => {
+      if (value === undefined || value === null) {
+        return;
+      }
+
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      if (!UUID_RE.test(trimmed)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "supplier_id must be a valid UUID or null",
+        });
+      }
+    })
+    .transform((value) => {
+      if (value === undefined) {
+        return preserveUndefined ? undefined : null;
+      }
+      if (value === null) {
+        return null;
+      }
+
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    });
+
+const productsQuerySchema = z.object({
+  roundId: uuidStringSchema("roundId"),
+  all: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => value === "true"),
+});
 
 const productCreateSchema = z.object({
   name: requiredTrimmedStringSchema("name"),
@@ -24,23 +67,7 @@ const productCreateSchema = z.object({
     .positive("price must be a positive integer"),
   unit: requiredTrimmedStringSchema("unit"),
   round_id: uuidStringSchema("round_id"),
-  supplier_id: z
-    .union([z.string(), z.null(), z.undefined()])
-    .superRefine((value, context) => {
-      if (value === undefined || value === null || value.trim()) {
-        return;
-      }
-
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "supplier_id must be a non-empty string or null",
-      });
-    })
-    .transform((value) => {
-      if (typeof value !== "string") return null;
-      const trimmed = value.trim();
-      return trimmed ? trimmed : null;
-    }),
+  supplier_id: nullableSupplierIdSchema(false),
   stock: nonNegativeIntegerOrNullSchema("stock"),
   goal_qty: z
     .union([
@@ -62,7 +89,7 @@ const productCreateSchema = z.object({
 });
 
 const productUpdateSchema = z.object({
-  id: requiredTrimmedStringSchema("id"),
+  id: uuidStringSchema("id"),
   name: z
     .string()
     .transform((value) => value.trim())
@@ -83,24 +110,7 @@ const productUpdateSchema = z.object({
     .trim()
     .uuid({ message: "round_id must be a valid UUID" })
     .optional(),
-  supplier_id: z
-    .union([z.string(), z.null(), z.undefined()])
-    .superRefine((value, context) => {
-      if (value === undefined || value === null || value.trim()) {
-        return;
-      }
-
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "supplier_id must be a non-empty string or null",
-      });
-    })
-    .transform((value) => {
-      if (value === undefined) return undefined;
-      if (value === null) return null;
-      const trimmed = value.trim();
-      return trimmed ? trimmed : null;
-    }),
+  supplier_id: nullableSupplierIdSchema(true),
   is_active: z.boolean().optional(),
   stock: nonNegativeIntegerOrNullSchema("stock"),
   goal_qty: z
@@ -136,25 +146,25 @@ const productUpdateSchema = z.object({
 // Public — storefront needs product list. Admin with ?all=true gets inactive products too.
 export async function GET(request: NextRequest) {
   try {
-    const roundId = request.nextUrl.searchParams.get("roundId");
-    if (!roundId || !roundId.trim()) {
-      return NextResponse.json(
-        { error: "roundId is required" },
-        { status: 400 },
-      );
+    const parsedQuery = parseSearchParams(
+      request.nextUrl.searchParams,
+      productsQuerySchema,
+    );
+    if (!parsedQuery.success) {
+      return parsedQuery.response;
     }
 
-    const all = request.nextUrl.searchParams.get("all") === "true";
+    const { roundId, all } = parsedQuery.data;
     if (all) {
       const isAdmin = await verifyAdminSession(request);
       if (!isAdmin) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      const products = await listAllByRound(roundId.trim());
+      const products = await listAllByRound(roundId);
       return NextResponse.json({ products });
     }
 
-    const products = await listActiveByRound(roundId.trim());
+    const products = await listActiveByRound(roundId);
     return NextResponse.json(
       { products },
       {
@@ -265,7 +275,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const product = await update(
-      id.trim(),
+      id,
       data as Parameters<typeof update>[1],
     );
     return NextResponse.json({ product });

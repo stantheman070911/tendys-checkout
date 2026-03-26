@@ -6,8 +6,8 @@
 
 # testing
 /coverage
-/test-results/*
-!/test-results/.gitkeep
+test-results/
+/.playwright-artifacts/
 /playwright-report
 
 # next.js

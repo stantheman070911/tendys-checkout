@@ -103,6 +103,31 @@ export const uuidStringSchema = (field: string) =>
     .trim()
     .uuid({ message: `${field} must be a valid UUID` });
 
+export const optionalUuidStringSchema = (field: string) =>
+  z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform((value, context) => {
+      if (typeof value !== "string") {
+        return undefined;
+      }
+
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+
+      const parsed = z.string().uuid().safeParse(trimmed);
+      if (!parsed.success) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${field} must be a valid UUID`,
+        });
+        return z.NEVER;
+      }
+
+      return trimmed;
+    });
+
 export const requiredTrimmedStringSchema = (
   field: string,
   message = `${field} is required`,

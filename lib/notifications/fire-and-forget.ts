@@ -5,17 +5,19 @@ type WaitUntilCapableGlobal = typeof globalThis & {
 };
 
 export function fireAndForget(task: () => Promise<unknown>) {
-  const promise = task()
-    .catch((error) => {
-      console.error("Background notification task failed", error);
-    })
-    .then(() => undefined);
+  const runTask = () =>
+    task()
+      .catch((error) => {
+        console.error("Background notification task failed", error);
+      })
+      .then(() => undefined);
 
   try {
-    after(promise);
+    after(() => runTask());
     return;
   } catch {
     const runtime = globalThis as WaitUntilCapableGlobal;
+    const promise = runTask();
     runtime.waitUntil?.(promise);
   }
 }

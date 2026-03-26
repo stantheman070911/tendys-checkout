@@ -1,0 +1,12 @@
+{
+  "runId": "20260326110505",
+  "logPath": "artifacts/staging-smoke-20260326110505.log",
+  "summaryPath": "artifacts/staging-smoke-20260326110505.json",
+  "bypassConfigured": true,
+  "status": "failed",
+  "baseUrl": "https://tendys-checkout-48npf1b5w-letstanleycook911-4248s-projects.vercel.app/",
+  "supplierId": "f3457a37-cc02-4f94-aa6d-9b9ee4921f58",
+  "roundId": "fb3bc9f1-d481-49a5-8b3e-762bfa59b2ea",
+  "productId": "cee80a66-7a39-4d1e-b8db-b5da0d151e18",
+  "error": "POST /api/submit-order failed (503): Ordering is temporarily unavailable"
+}

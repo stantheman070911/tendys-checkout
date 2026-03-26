@@ -12,6 +12,9 @@ vi.mock("@/lib/db/orders", () => ordersMock);
 
 import { GET } from "./route";
 
+const VALID_ROUND_ID = "11111111-1111-4111-8111-111111111111";
+const VALID_PRODUCT_ID = "22222222-2222-4222-8222-222222222222";
+
 function makeRequest(query = "") {
   const suffix = query ? `?${query}` : "";
   return {
@@ -58,16 +61,18 @@ describe("GET /api/orders", () => {
     });
 
     const res = await GET(
-      makeRequest("roundId=r1&status=pending_confirm&page=2&pageSize=25&q=王"),
+      makeRequest(
+        `roundId=${VALID_ROUND_ID}&status=pending_confirm&page=2&pageSize=25&q=王&productId=${VALID_PRODUCT_ID}`,
+      ),
     );
     const data = await res.json();
 
     expect(res.status).toBe(200);
     expect(ordersMock.listPageByRound).toHaveBeenCalledWith({
-      roundId: "r1",
+      roundId: VALID_ROUND_ID,
       status: "pending_confirm",
       search: "王",
-      productId: undefined,
+      productId: VALID_PRODUCT_ID,
       page: 2,
       pageSize: 25,
     });
@@ -89,8 +94,24 @@ describe("GET /api/orders", () => {
   it("returns 401 when the admin session is invalid", async () => {
     authMock.mockResolvedValue(false);
 
-    const res = await GET(makeRequest("roundId=r1"));
+    const res = await GET(makeRequest(`roundId=${VALID_ROUND_ID}`));
 
     expect(res.status).toBe(401);
+  });
+
+  it("returns 400 for an invalid roundId UUID", async () => {
+    const res = await GET(makeRequest("roundId=not-a-uuid"));
+
+    expect(res.status).toBe(400);
+    expect(ordersMock.listPageByRound).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an invalid productId UUID", async () => {
+    const res = await GET(
+      makeRequest(`roundId=${VALID_ROUND_ID}&productId=not-a-uuid`),
+    );
+
+    expect(res.status).toBe(400);
+    expect(ordersMock.listPageByRound).not.toHaveBeenCalled();
   });
 });

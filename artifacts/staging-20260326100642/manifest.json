@@ -1,0 +1,16 @@
+{
+  "runId": "20260326100642",
+  "smokeLogPath": "artifacts/staging-smoke-20260326.log",
+  "siteUrl": "https://tendys-checkout.vercel.app/",
+  "roundId": "ce2b20ae-2e4f-4372-a5a4-40cd84e10a7a",
+  "deliveryOrderNumber": "ORD-20260326-002",
+  "pickupOrderNumber": "ORD-20260326-003",
+  "artifacts": [
+    "lookup-results.png",
+    "order-detail.png",
+    "orders-export.csv",
+    "notification-logs.json",
+    "shipment-print-popup.png",
+    "shipment-print-popup.html"
+  ]
+}

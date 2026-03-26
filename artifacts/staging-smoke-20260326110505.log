@@ -1,0 +1,11 @@
+Starting staging smoke against https://tendys-checkout-48npf1b5w-letstanleycook911-4248s-projects.vercel.app/
+Run ID: 20260326110505
+Vercel preview protection bypass is configured for this run.
+Created supplier f3457a37-cc02-4f94-aa6d-9b9ee4921f58
+Created round fb3bc9f1-d481-49a5-8b3e-762bfa59b2ea
+Created product cee80a66-7a39-4d1e-b8db-b5da0d151e18
+
+Automated staging smoke failed.
+POST /api/submit-order failed (503): Ordering is temporarily unavailable
+Smoke log written to artifacts/staging-smoke-20260326110505.log
+Smoke summary written to artifacts/staging-smoke-20260326110505.json

@@ -3,12 +3,12 @@ import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { getLogsByRound } from "@/lib/db/notification-logs";
 import {
   parseSearchParams,
-  requiredTrimmedStringSchema,
+  uuidStringSchema,
   z,
 } from "@/lib/validation";
 
 const notificationLogsQuerySchema = z.object({
-  roundId: requiredTrimmedStringSchema("roundId"),
+  roundId: uuidStringSchema("roundId"),
 });
 
 export async function GET(request: NextRequest) {

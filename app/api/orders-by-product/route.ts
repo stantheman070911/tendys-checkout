@@ -3,13 +3,13 @@ import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { getOrdersByProduct } from "@/lib/db/orders";
 import {
   parseSearchParams,
-  requiredTrimmedStringSchema,
+  uuidStringSchema,
   z,
 } from "@/lib/validation";
 
 const ordersByProductQuerySchema = z.object({
-  productId: requiredTrimmedStringSchema("productId"),
-  roundId: requiredTrimmedStringSchema("roundId"),
+  productId: uuidStringSchema("productId"),
+  roundId: uuidStringSchema("roundId"),
 });
 
 export async function GET(request: NextRequest) {

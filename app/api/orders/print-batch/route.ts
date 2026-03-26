@@ -3,23 +3,21 @@ import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { getConfirmedShipmentPrintOrdersByIds } from "@/lib/db/orders";
 import {
   parseJsonBody,
-  requiredTrimmedStringSchema,
+  uuidStringSchema,
   z,
 } from "@/lib/validation";
 
 const MAX_PRINT_BATCH_SIZE = 50;
 const printBatchSchema = z
   .object({
-    roundId: requiredTrimmedStringSchema("roundId"),
-    orderIds: z.array(z.string()).min(1, {
+    roundId: uuidStringSchema("roundId"),
+    orderIds: z.array(uuidStringSchema("orderId")).min(1, {
       message: "orderIds must be a non-empty array of strings",
     }),
   })
   .transform((value) => ({
     roundId: value.roundId,
-    orderIds: Array.from(
-      new Set(value.orderIds.map((id) => id.trim()).filter(Boolean)),
-    ),
+    orderIds: Array.from(new Set(value.orderIds)),
   }))
   .superRefine((value, context) => {
     if (value.orderIds.length === 0) {

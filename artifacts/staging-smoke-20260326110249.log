@@ -1,0 +1,8 @@
+Starting staging smoke against https://tendys-checkout-48npf1b5w-letstanleycook911-4248s-projects.vercel.app/
+Run ID: 20260326110249
+Vercel preview protection bypass is configured for this run.
+
+Automated staging smoke failed.
+fetch failed
+Smoke log written to artifacts/staging-smoke-20260326110249.log
+Smoke summary written to artifacts/staging-smoke-20260326110249.json

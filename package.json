@@ -10,11 +10,35 @@
     "lint": "eslint .",
     "test": "vitest run app lib",
     "test:e2e": "playwright test",
-    "staging:smoke": "node scripts/staging-smoke.mjs"
+    "staging:smoke": "node --env-file=.env.local scripts/staging-smoke.mjs",
+    "staging:artifacts": "node --env-file=.env.local scripts/staging-artifacts.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "overrides": {
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
+    "readdirp": {
+      "picomatch": "2.3.2"
+    },
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "vitest": {
+      "picomatch": "4.0.4"
+    },
+    "vite": {
+      "picomatch": "4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "fdir": {
+      "picomatch": "4.0.4"
+    }
+  },
   "dependencies": {
     "@fontsource/noto-sans-tc": "^5.2.9",
     "@fontsource/noto-serif-tc": "^5.2.9",

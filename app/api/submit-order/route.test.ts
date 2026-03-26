@@ -182,6 +182,28 @@ describe("POST /api/submit-order", () => {
     expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for invalid round_id", async () => {
+    const res = await POST(
+      makeRequest(validBody({ round_id: "not-a-uuid" })),
+    );
+
+    expect(res.status).toBe(400);
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid item product_id", async () => {
+    const res = await POST(
+      makeRequest(
+        validBody({
+          items: [{ product_id: "not-a-uuid", quantity: 1 }],
+        }),
+      ),
+    );
+
+    expect(res.status).toBe(400);
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
+  });
+
   it("returns 400 for duplicate product IDs", async () => {
     const res = await POST(
       makeRequest(

@@ -1,0 +1,24 @@
+Starting staging smoke against https://tendys-checkout.vercel.app/
+Run ID: 20260326100642
+Created supplier 65e9a0f1-9504-4669-99f4-e32809a45448
+Created round ce2b20ae-2e4f-4372-a5a4-40cd84e10a7a
+Created product 7452229e-4473-4a21-aa53-bef1431907a8
+Created delivery order ORD-20260326-002
+Created pickup order ORD-20260326-003
+Lookup returned 2 order(s)
+Reported payment for ORD-20260326-002
+Confirmed payment for ORD-20260326-002
+Queued arrival notification for 7452229e-4473-4a21-aa53-bef1431907a8
+Confirmed shipment for ORD-20260326-002
+Cancelled pickup order ORD-20260326-003
+
+Automated staging smoke complete.
+Follow docs/staging-smoke-runbook.md for provider/browser/manual checks.
+{
+  "runId": "20260326100642",
+  "supplierId": "65e9a0f1-9504-4669-99f4-e32809a45448",
+  "roundId": "ce2b20ae-2e4f-4372-a5a4-40cd84e10a7a",
+  "productId": "7452229e-4473-4a21-aa53-bef1431907a8",
+  "deliveryOrderNumber": "ORD-20260326-002",
+  "pickupOrderNumber": "ORD-20260326-003"
+}
