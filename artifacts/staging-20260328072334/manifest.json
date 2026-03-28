@@ -1,0 +1,16 @@
+{
+  "runId": "20260328072334",
+  "baseUrl": "https://tendys-checkout-git-staging-letstanleycook911-4248s-projects.vercel.app/",
+  "smokeSummaryPath": "artifacts/staging-smoke-20260328072334.json",
+  "roundId": "e4b9fef1-e790-47ee-a52b-4a24cfcefaf6",
+  "deliveryOrderNumber": "ORD-20260328-001",
+  "pickupOrderNumber": "ORD-20260328-002",
+  "artifacts": [
+    "lookup-results.png",
+    "order-detail.png",
+    "orders-export.csv",
+    "notification-logs.json",
+    "shipment-print-popup.png",
+    "shipment-print-popup.html"
+  ]
+}

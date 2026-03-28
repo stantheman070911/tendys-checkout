@@ -1,0 +1,13 @@
+{
+  "runId": "20260328072334",
+  "logPath": "artifacts/staging-smoke-20260328072334.log",
+  "summaryPath": "artifacts/staging-smoke-20260328072334.json",
+  "bypassConfigured": true,
+  "status": "passed",
+  "baseUrl": "https://tendys-checkout-git-staging-letstanleycook911-4248s-projects.vercel.app/",
+  "supplierId": "2bd63f86-62cc-4d38-b2e3-1550a3af158e",
+  "roundId": "e4b9fef1-e790-47ee-a52b-4a24cfcefaf6",
+  "productId": "5d3ddca4-9091-4e9c-9c3c-74e56f5753da",
+  "deliveryOrderNumber": "ORD-20260328-001",
+  "pickupOrderNumber": "ORD-20260328-002"
+}

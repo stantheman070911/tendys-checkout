@@ -6,6 +6,7 @@ import {
   getPublicOrderAccessCookieName,
   verifyPublicOrderAccessToken,
 } from "@/lib/public-order-access";
+import { isEnvironmentConfigurationError } from "@/lib/server-env";
 
 export default async function OrderPage({
   params,
@@ -21,7 +22,18 @@ export default async function OrderPage({
   const accessToken = cookieStore.get(
     getPublicOrderAccessCookieName(resolvedOrderNumber),
   )?.value;
-  const claims = verifyPublicOrderAccessToken(accessToken);
+  let resolvedError = error;
+  let claims = null;
+
+  try {
+    claims = verifyPublicOrderAccessToken(accessToken);
+  } catch (validationError) {
+    if (isEnvironmentConfigurationError(validationError)) {
+      resolvedError ||= "service_unavailable";
+    } else {
+      throw validationError;
+    }
+  }
 
   const identity =
     claims?.order_number === resolvedOrderNumber
@@ -48,7 +60,7 @@ export default async function OrderPage({
       order={order}
       anyUnderGoal={anyUnderGoal}
       identity={identity}
-      error={error}
+      error={resolvedError}
     />
   );
 }

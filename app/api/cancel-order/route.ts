@@ -8,34 +8,58 @@ import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendOrderCancelledNotifications } from "@/lib/notifications/send";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
+import { optionalTrimmedStringSchema, optionalUuidStringSchema, parseJsonBody, z } from "@/lib/validation";
+
+const cancelOrderSchema = z
+  .object({
+    orderId: optionalUuidStringSchema("orderId"),
+    order_number: optionalTrimmedStringSchema(),
+    purchaser_name: optionalTrimmedStringSchema(),
+    recipient_name: optionalTrimmedStringSchema(),
+    phone_last3: z.string().optional(),
+    cancel_reason: optionalTrimmedStringSchema(),
+  })
+  .transform((value) => ({
+    orderId: value.orderId,
+    orderNumber: value.order_number?.toUpperCase() ?? "",
+    purchaserName: value.purchaser_name || value.recipient_name || "",
+    phoneLast3: normalizePhoneDigits(value.phone_last3),
+    cancelReason: value.cancel_reason,
+  }));
 
 export async function POST(request: NextRequest) {
   try {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, cancelOrderSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
-
-    const { orderId, order_number, purchaser_name, recipient_name, phone_last3, cancel_reason } = body as {
-      orderId?: string;
-      order_number?: string;
-      purchaser_name?: string;
-      recipient_name?: string;
-      phone_last3?: string;
-      cancel_reason?: string;
-    };
+    const {
+      orderId,
+      orderNumber,
+      purchaserName,
+      phoneLast3,
+      cancelReason,
+    } = parsedBody.data;
 
     // Determine mode by auth — don't 401 if not admin, just use user mode
     const isAdmin = await verifyAdminSession(request);
 
-    let resolvedOrderId = orderId?.trim();
+    let resolvedOrderId = orderId;
 
     // Non-admin callers must provide order_number + public identity
     if (!isAdmin) {
       const clientIp = getClientIp(request);
-      const rateLimit = checkRateLimit(`cancel-order:${clientIp}`, 5, 60_000);
+      const rateLimit = await checkRateLimit(
+        `cancel-order:${clientIp}`,
+        5,
+        60_000,
+      );
+      if (rateLimit.error === "backend_unavailable") {
+        return NextResponse.json(
+          { error: "Order cancellation is temporarily unavailable" },
+          { status: 503 },
+        );
+      }
       if (!rateLimit.allowed) {
         return NextResponse.json(
           { error: "Too many requests" },
@@ -46,10 +70,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const orderNumber =
-        typeof order_number === "string"
-          ? order_number.trim().toUpperCase()
-          : "";
       if (!orderNumber) {
         return NextResponse.json(
           { error: "order_number is required" },
@@ -57,12 +77,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const purchaserName =
-        typeof purchaser_name === "string" && purchaser_name.trim()
-          ? purchaser_name.trim()
-          : typeof recipient_name === "string"
-            ? recipient_name.trim()
-            : "";
       if (!purchaserName) {
         return NextResponse.json(
           { error: "purchaser_name is required" },
@@ -70,7 +84,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const phoneLast3 = normalizePhoneDigits(phone_last3);
       if (phoneLast3.length !== 3) {
         return NextResponse.json(
           { error: "phone_last3 must be exactly 3 digits" },
@@ -97,10 +110,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reason =
-      isAdmin && typeof cancel_reason === "string"
-        ? cancel_reason.trim() || undefined
-        : undefined;
+    const reason = isAdmin ? cancelReason : undefined;
 
     const result = await cancelOrder(resolvedOrderId, isAdmin, reason);
 

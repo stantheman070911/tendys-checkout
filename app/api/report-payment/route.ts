@@ -5,15 +5,62 @@ import {
 } from "@/lib/db/orders";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
+import { parseJsonBody, z } from "@/lib/validation";
+
+const reportPaymentSchema = z
+  .object({
+    order_number: z.string().optional(),
+    purchaser_name: z.string().optional(),
+    recipient_name: z.string().optional(),
+    phone_last3: z.string().optional(),
+    payment_amount: z.any().optional(),
+    payment_last5: z.any().optional(),
+  })
+  .transform((value) => ({
+    orderNumber: value.order_number?.trim().toUpperCase() ?? "",
+    purchaserName:
+      value.purchaser_name?.trim() || value.recipient_name?.trim() || "",
+    phoneLast3: normalizePhoneDigits(value.phone_last3),
+    paymentAmount: value.payment_amount,
+    paymentLast5: value.payment_last5,
+  }))
+  .superRefine((value, context) => {
+    if (!value.orderNumber) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "order_number is required",
+      });
+    }
+
+    if (!value.purchaserName) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "purchaser_name is required",
+      });
+    }
+
+    if (value.phoneLast3.length !== 3) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "phone_last3 must be exactly 3 digits",
+      });
+    }
+  });
 
 export async function POST(request: NextRequest) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimit = checkRateLimit(
+    const rateLimit = await checkRateLimit(
       `report-payment:${clientIp}`,
       5,
       60_000,
     );
+    if (rateLimit.error === "backend_unavailable") {
+      return NextResponse.json(
+        { error: "Payment reporting is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Too many requests" },
@@ -24,59 +71,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, reportPaymentSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
-
     const {
-      order_number,
-      purchaser_name,
-      recipient_name,
-      phone_last3,
-      payment_amount,
-      payment_last5,
-    } =
-      body as {
-        order_number?: string;
-        purchaser_name?: string;
-        recipient_name?: string;
-        phone_last3?: string;
-        payment_amount?: number;
-        payment_last5?: string;
-      };
-
-    const orderNumber =
-      typeof order_number === "string" ? order_number.trim().toUpperCase() : "";
-    if (!orderNumber) {
-      return NextResponse.json(
-        { error: "order_number is required" },
-        { status: 400 },
-      );
-    }
-
-    const purchaserName =
-      typeof purchaser_name === "string" && purchaser_name.trim()
-        ? purchaser_name.trim()
-        : typeof recipient_name === "string"
-          ? recipient_name.trim()
-          : "";
-    if (!purchaserName) {
-      return NextResponse.json(
-        { error: "purchaser_name is required" },
-        { status: 400 },
-      );
-    }
-
-    const phoneLast3 = normalizePhoneDigits(phone_last3);
-    if (phoneLast3.length !== 3) {
-      return NextResponse.json(
-        { error: "phone_last3 must be exactly 3 digits" },
-        { status: 400 },
-      );
-    }
+      orderNumber,
+      purchaserName,
+      phoneLast3,
+      paymentAmount: payment_amount,
+      paymentLast5: payment_last5,
+    } = parsedBody.data;
 
     const existingOrder = await findPublicOrderByOrderNumberAndIdentity(
       orderNumber,

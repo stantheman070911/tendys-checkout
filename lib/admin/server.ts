@@ -5,6 +5,10 @@ import { ADMIN_BASE } from "@/constants";
 import { getPendingConfirmCount } from "@/lib/db/orders";
 import { findById, getOpenRound, listRecent } from "@/lib/db/rounds";
 import { ADMIN_SESSION_COOKIE_NAME, readAdminSessionValue } from "@/lib/auth/supabase-admin";
+import {
+  getPlaywrightAdminChromeFixture,
+  isPlaywrightAdminFixtureEnabled,
+} from "@/lib/testing/playwright-admin";
 
 export interface AdminChromeContext {
   round: DbRound | null;
@@ -28,6 +32,10 @@ export async function requireAdminPageSession() {
 export async function getAdminChromeContext(
   roundId?: string | null,
 ): Promise<AdminChromeContext> {
+  if (isPlaywrightAdminFixtureEnabled()) {
+    return getPlaywrightAdminChromeFixture();
+  }
+
   const rounds = await listRecent(20);
   const openRound = rounds.find((entry) => entry.is_open) ?? (await getOpenRound());
   const selectedRound =

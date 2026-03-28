@@ -1,4 +1,5 @@
 import { verifyToken, signToken } from "@/lib/auth/signed-token";
+import { getPublicOrderAccessSecret } from "@/lib/server-env";
 import { normalizePhoneDigits } from "@/lib/utils";
 
 export const PUBLIC_ORDER_ACCESS_TTL_SECONDS = 60 * 60 * 24;
@@ -35,15 +36,6 @@ export function normalizePublicOrderAccessIdentity(
   };
 }
 
-function getPublicOrderAccessSecret() {
-  return (
-    process.env.PUBLIC_ORDER_ACCESS_SECRET ||
-    process.env.ADMIN_SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    ""
-  );
-}
-
 export function getPublicOrderAccessCookieName(orderNumber: string) {
   return `tendy_order_access_${Buffer.from(
     orderNumber.trim().toUpperCase(),
@@ -55,18 +47,22 @@ export function buildPublicOrderPath(orderNumber: string) {
   return `/order/${encodeURIComponent(orderNumber.trim().toUpperCase())}`;
 }
 
+export function buildPublicOrderAccessPath(args: {
+  token: string;
+  orderNumber?: string;
+}) {
+  const params = new URLSearchParams({ token: args.token });
+  if (args.orderNumber) {
+    params.set("order", args.orderNumber.trim().toUpperCase());
+  }
+  return `/api/public-order/access?${params.toString()}`;
+}
+
 export function createPublicOrderAccessToken(args: {
   orderNumber: string;
   purchaserName: string;
   phoneLast3: string;
 }) {
-  const secret = getPublicOrderAccessSecret();
-  if (!secret) {
-    throw new Error(
-      "Missing PUBLIC_ORDER_ACCESS_SECRET, ADMIN_SESSION_SECRET, or SUPABASE_SERVICE_ROLE_KEY",
-    );
-  }
-
   const identity = normalizePublicOrderAccessIdentity({
     purchaser_name: args.purchaserName,
     phone_last3: args.phoneLast3,
@@ -82,17 +78,21 @@ export function createPublicOrderAccessToken(args: {
       phone_last3: identity.phone_last3,
       exp: Math.floor(Date.now() / 1000) + PUBLIC_ORDER_ACCESS_TTL_SECONDS,
     } satisfies PublicOrderAccessClaims,
-    secret,
+    getPublicOrderAccessSecret(),
   );
 }
 
 export function verifyPublicOrderAccessToken(
   token: string | null | undefined,
 ): PublicOrderAccessClaims | null {
-  const secret = getPublicOrderAccessSecret();
-  if (!secret) return null;
+  if (!token) {
+    return null;
+  }
 
-  const claims = verifyToken<PublicOrderAccessClaims>(token, secret);
+  const claims = verifyToken<PublicOrderAccessClaims>(
+    token,
+    getPublicOrderAccessSecret(),
+  );
   if (
     !claims?.order_number ||
     !claims.purchaser_name ||
@@ -131,4 +131,15 @@ export function createPublicOrderAccessCookie(args: {
     maxAge: PUBLIC_ORDER_ACCESS_TTL_SECONDS,
     path: buildPublicOrderPath(orderNumber),
   };
+}
+
+export function createPublicOrderAccessDetailUrl(args: {
+  orderNumber: string;
+  purchaserName: string;
+  phoneLast3: string;
+}) {
+  return buildPublicOrderAccessPath({
+    token: createPublicOrderAccessToken(args),
+    orderNumber: args.orderNumber,
+  });
 }

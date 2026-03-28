@@ -6,6 +6,7 @@ import {
   getAdminSessionFromRequest,
   verifyAdminAccessToken,
 } from "@/lib/auth/supabase-admin";
+import { isEnvironmentConfigurationError } from "@/lib/server-env";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -22,7 +23,14 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ authorized: true, email: session.email });
-  } catch {
+  } catch (error) {
+    if (isEnvironmentConfigurationError(error)) {
+      return NextResponse.json(
+        { error: "Admin session is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -58,7 +66,14 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch {
+  } catch (error) {
+    if (isEnvironmentConfigurationError(error)) {
+      return NextResponse.json(
+        { error: "Admin session is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

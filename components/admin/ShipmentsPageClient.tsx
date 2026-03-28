@@ -1,34 +1,16 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ShipmentCard } from "@/components/admin/ShipmentCard";
 import { groupOrdersByPickup } from "@/lib/admin/order-search";
-import { buildShipmentPrintDocument } from "@/lib/admin/shipment-print";
 import { removeBatchItemsById, removeItemsById } from "@/lib/admin/order-state";
-import { buildAdminPath } from "@/lib/admin/paths";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useAdminOrderDetails } from "@/hooks/use-admin-order-details";
+import { useAdminQueryControls } from "@/hooks/use-admin-query-controls";
+import { useShipmentBatchPrint } from "@/hooks/use-shipment-batch-print";
 import { useToast } from "@/hooks/use-toast";
-import type { AdminOrderDetail, AdminOrderListRow, Round } from "@/types";
-
-function updateQueryString(
-  searchParams: URLSearchParams,
-  updates: Record<string, string | null>,
-) {
-  const next = new URLSearchParams(searchParams.toString());
-
-  for (const [key, value] of Object.entries(updates)) {
-    if (!value) {
-      next.delete(key);
-    } else {
-      next.set(key, value);
-    }
-  }
-
-  const query = next.toString();
-  return query ? `?${query}` : "";
-}
+import type { AdminOrderListRow, Round } from "@/types";
 
 export function ShipmentsPageClient({
   round,
@@ -52,9 +34,16 @@ export function ShipmentsPageClient({
   productFilterName: string;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { adminFetch } = useAdminFetch();
   const { toast } = useToast();
+  const {
+    searchDraft,
+    setSearchDraft,
+    navigateWithUpdates: navigateWithUpdatesBase,
+  } = useAdminQueryControls({
+    path: "/shipments",
+    initialSearch,
+  });
   const {
     detailsById,
     loadingDetailIds,
@@ -63,51 +52,25 @@ export function ShipmentsPageClient({
   } = useAdminOrderDetails(adminFetch);
 
   const [orders, setOrders] = useState(initialOrders);
-  const [searchDraft, setSearchDraft] = useState(initialSearch);
   const [batchSel, setBatchSel] = useState<Set<string>>(new Set());
   const [batchActing, setBatchActing] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [printing, setPrinting] = useState(false);
+  const { printing, printOrders } = useShipmentBatchPrint({
+    adminFetch,
+    roundId: round.id,
+    onError: (message) =>
+      toast({
+        title: message,
+        variant: "destructive",
+      }),
+  });
 
   useEffect(() => {
     setOrders(initialOrders);
   }, [initialOrders]);
 
-  useEffect(() => {
-    setSearchDraft(initialSearch);
-  }, [initialSearch]);
-
-  useEffect(() => {
-    const trimmed = searchDraft.trim();
-    const current = searchParams.get("q") ?? "";
-    if (trimmed === current) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      const nextSearch = updateQueryString(
-        new URLSearchParams(searchParams.toString()),
-        {
-          q: trimmed || null,
-          page: "1",
-        },
-      );
-      router.replace(`${buildAdminPath("/shipments")}${nextSearch}`, {
-        scroll: false,
-      });
-    }, 250);
-
-    return () => window.clearTimeout(timer);
-  }, [router, searchDraft, searchParams]);
-
   function navigateWithUpdates(updates: Record<string, string | null>) {
-    const nextSearch = updateQueryString(
-      new URLSearchParams(searchParams.toString()),
-      updates,
-    );
-    router.push(`${buildAdminPath("/shipments")}${nextSearch}`, {
-      scroll: false,
-    });
+    navigateWithUpdatesBase(updates);
   }
 
   function handleShipmentConfirmed(orderId: string) {
@@ -207,38 +170,6 @@ export function ShipmentsPageClient({
     }
   }
 
-  async function printCurrentPage() {
-    if (orders.length === 0 || printing) return;
-
-    setPrinting(true);
-    try {
-      const { orders: detailOrders } = await adminFetch<{
-        orders: AdminOrderDetail[];
-      }>("/api/orders/print-batch", {
-        method: "POST",
-        body: JSON.stringify({
-          roundId: round.id,
-          orderIds: orders.map((order) => order.id),
-        }),
-      });
-
-      const printWindow = window.open("", "_blank", "noopener,noreferrer");
-      if (!printWindow) {
-        toast({ title: "無法開啟列印視窗", variant: "destructive" });
-        return;
-      }
-      printWindow.document.write(buildShipmentPrintDocument(detailOrders));
-      printWindow.document.close();
-    } catch (error) {
-      toast({
-        title: error instanceof Error ? error.message : "列印資料載入失敗",
-        variant: "destructive",
-      });
-    } finally {
-      setPrinting(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <section className="lux-panel-strong p-5 md:p-6">
@@ -256,7 +187,7 @@ export function ShipmentsPageClient({
             <span className="lux-pill">{total} 筆待處理</span>
             {orders.length > 0 && (
               <button
-                onClick={() => void printCurrentPage()}
+                onClick={() => void printOrders(orders.map((order) => order.id))}
                 disabled={printing}
                 className="print:hidden inline-flex min-h-[40px] items-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2 text-xs font-semibold text-[hsl(var(--ink))] disabled:opacity-50"
               >

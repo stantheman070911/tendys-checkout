@@ -4,6 +4,12 @@ import { findById as findProductById } from "@/lib/db/products";
 import { getCustomersForArrivalNotification } from "@/lib/db/orders";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendProductArrivalNotifications } from "@/lib/notifications/send";
+import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
+
+const notifyArrivalSchema = z.object({
+  productId: uuidStringSchema("productId"),
+  roundId: uuidStringSchema("roundId"),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,39 +18,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, notifyArrivalSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
+    const { productId: trimmedProductId, roundId: trimmedRoundId } =
+      parsedBody.data;
 
-    const { productId, roundId } = body as {
-      productId?: string;
-      roundId?: string;
-    };
-
-    if (!productId || typeof productId !== "string" || !productId.trim()) {
-      return NextResponse.json(
-        { error: "productId is required" },
-        { status: 400 },
-      );
-    }
-    if (!roundId || typeof roundId !== "string" || !roundId.trim()) {
-      return NextResponse.json(
-        { error: "roundId is required" },
-        { status: 400 },
-      );
-    }
-
-    const product = await findProductById(productId.trim());
+    const product = await findProductById(trimmedProductId);
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+    if (product.round_id !== trimmedRoundId) {
+      return NextResponse.json(
+        { error: "Product does not belong to this round" },
+        { status: 400 },
+      );
+    }
 
     const recipients = await getCustomersForArrivalNotification(
-      productId.trim(),
-      roundId.trim(),
+      trimmedProductId,
+      trimmedRoundId,
     );
 
     if (recipients.customerCount === 0) {
@@ -58,7 +52,7 @@ export async function POST(request: NextRequest) {
       sendProductArrivalNotifications(
         product.id,
         product.name,
-        roundId.trim(),
+        trimmedRoundId,
         recipients,
       ),
     );

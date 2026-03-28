@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { findAutofillProfileByNickname } from "@/lib/db/users";
+import {
+  parseSearchParams,
+  requiredTrimmedStringSchema,
+  z,
+} from "@/lib/validation";
+
+const userLookupQuerySchema = z.object({
+  nickname: requiredTrimmedStringSchema("nickname"),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,16 +18,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const nickname = request.nextUrl.searchParams.get("nickname")?.trim();
-
-    if (!nickname) {
-      return NextResponse.json(
-        { error: "nickname is required" },
-        { status: 400 },
-      );
+    const parsedQuery = parseSearchParams(
+      request.nextUrl.searchParams,
+      userLookupQuerySchema,
+    );
+    if (!parsedQuery.success) {
+      return parsedQuery.response;
     }
 
-    const user = await findAutofillProfileByNickname(nickname);
+    const user = await findAutofillProfileByNickname(parsedQuery.data.nickname);
 
     // Return only auto-fill fields — strip id, timestamps, nickname
     const safeUser = user

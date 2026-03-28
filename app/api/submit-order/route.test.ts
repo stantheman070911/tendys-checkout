@@ -10,6 +10,12 @@ const ordersMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
+const rateLimitMock = vi.hoisted(() => ({
+  checkRateLimit: vi.fn(),
+  getClientIp: vi.fn(() => "127.0.0.1"),
+}));
+vi.mock("@/lib/rate-limit", () => rateLimitMock);
+
 vi.mock("@/lib/public-order-access", () => ({
   buildPublicOrderPath: vi.fn((orderNumber: string) => `/order/${orderNumber}`),
   createPublicOrderAccessCookie: vi.fn((args: { orderNumber: string }) => ({
@@ -54,6 +60,11 @@ describe("POST /api/submit-order", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue(false);
+    process.env.PUBLIC_ORDER_ACCESS_SECRET = "test-public-order-secret";
+    rateLimitMock.checkRateLimit.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+    });
   });
 
   it("returns 201 on valid order", async () => {
@@ -165,6 +176,28 @@ describe("POST /api/submit-order", () => {
   it("returns 400 for invalid submission_key", async () => {
     const res = await POST(
       makeRequest(validBody({ submission_key: "not-a-uuid" })),
+    );
+
+    expect(res.status).toBe(400);
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid round_id", async () => {
+    const res = await POST(
+      makeRequest(validBody({ round_id: "not-a-uuid" })),
+    );
+
+    expect(res.status).toBe(400);
+    expect(ordersMock.createCheckoutOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid item product_id", async () => {
+    const res = await POST(
+      makeRequest(
+        validBody({
+          items: [{ product_id: "not-a-uuid", quantity: 1 }],
+        }),
+      ),
     );
 
     expect(res.status).toBe(400);

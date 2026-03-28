@@ -3,6 +3,7 @@ import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { listRoundOrdersBatch } from "@/lib/db/orders";
 import { STATUS_LABELS } from "@/constants";
 import type { OrderStatus } from "@/types";
+import { uuidStringSchema } from "@/lib/validation";
 
 const CSV_BATCH_SIZE = 500;
 const NO_STORE_HEADERS = {
@@ -20,17 +21,18 @@ async function validateCsvExportRequest(request: NextRequest) {
     };
   }
 
-  const roundId = request.nextUrl.searchParams.get("roundId");
-  if (!roundId || !roundId.trim()) {
+  const roundIdRaw = request.nextUrl.searchParams.get("roundId");
+  const roundIdParsed = uuidStringSchema("roundId").safeParse(roundIdRaw ?? "");
+  if (!roundIdParsed.success) {
     return {
       response: NextResponse.json(
-        { error: "roundId is required" },
+        { error: roundIdParsed.error.issues[0]?.message ?? "roundId must be a valid UUID" },
         { status: 400, headers: NO_STORE_HEADERS },
       ),
     };
   }
 
-  return { roundId: roundId.trim() };
+  return { roundId: roundIdParsed.data };
 }
 
 export async function HEAD(request: NextRequest) {

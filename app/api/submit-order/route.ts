@@ -5,12 +5,16 @@ import {
   buildPublicOrderPath,
   createPublicOrderAccessCookie,
 } from "@/lib/public-order-access";
+import {
+  getPublicOrderAccessSecret,
+  isEnvironmentConfigurationError,
+} from "@/lib/server-env";
 import { getPhoneLast3 } from "@/lib/utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PHONE_RE = /^[\d\-+().\s]{7,20}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const MAX_LEN = {
   nickname: 50,
@@ -28,12 +32,229 @@ const PUBLIC_ORDER_COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
 };
 
+const requiredBoundedStringSchema = (field: keyof typeof MAX_LEN) =>
+  z
+    .unknown()
+    .superRefine((value, context) => {
+      if (typeof value !== "string" || !value.trim()) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${field} is required`,
+        });
+        return;
+      }
+
+      const trimmed = value.trim();
+      if (trimmed.length > MAX_LEN[field]) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${field} must be ≤ ${MAX_LEN[field]} chars`,
+        });
+      }
+    })
+    .transform((value) => (typeof value === "string" ? value.trim() : ""));
+
+const optionalBoundedStringSchema = (field: keyof typeof MAX_LEN) =>
+  z
+    .unknown()
+    .superRefine((value, context) => {
+      if (value === undefined || value === null || typeof value !== "string") {
+        return;
+      }
+
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      if (trimmed.length > MAX_LEN[field]) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${field} must be ≤ ${MAX_LEN[field]} chars`,
+        });
+      }
+    })
+    .transform((value) => {
+      if (typeof value !== "string") {
+        return undefined;
+      }
+
+      const trimmed = value.trim();
+      return trimmed ? trimmed : undefined;
+    });
+
+const submissionKeySchema = uuidStringSchema("submission_key");
+
+const roundIdSchema = uuidStringSchema("round_id");
+
+const phoneSchema = z
+  .unknown()
+  .superRefine((value, context) => {
+    if (typeof value !== "string" || !value.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "phone is required",
+      });
+      return;
+    }
+
+    const trimmed = value.trim();
+    if (!PHONE_RE.test(trimmed)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "phone format is invalid",
+      });
+    }
+  })
+  .transform((value) => (typeof value === "string" ? value.trim() : ""));
+
+const emailSchema = z
+  .unknown()
+  .superRefine((value, context) => {
+    if (value === undefined || value === null || typeof value !== "string") {
+      return;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    if (trimmed.length > MAX_LEN.email) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `email must be ≤ ${MAX_LEN.email} chars`,
+      });
+      return;
+    }
+
+    if (!EMAIL_RE.test(trimmed)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "email format is invalid",
+      });
+    }
+  })
+  .transform((value) => {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  });
+
+const pickupLocationSchema = z
+  .unknown()
+  .superRefine((value, context) => {
+    if (value === undefined || typeof value === "string") {
+      return;
+    }
+
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "pickup_location must be a string",
+    });
+  })
+  .transform((value) => (typeof value === "string" ? value.trim() : ""));
+
+const orderItemSchema = z.object({
+  product_id: uuidStringSchema("product_id"),
+  quantity: z
+    .unknown()
+    .superRefine((value, context) => {
+      if (
+        typeof value !== "number" ||
+        !Number.isInteger(value) ||
+        value <= 0
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Each item must have a positive integer quantity",
+        });
+      }
+    })
+    .transform((value) => (typeof value === "number" ? value : 0)),
+});
+
+const itemsSchema = z
+  .unknown()
+  .superRefine((value, context) => {
+    if (!Array.isArray(value) || value.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "items must be a non-empty array",
+      });
+    }
+  })
+  .transform((value) => (Array.isArray(value) ? value : []))
+  .pipe(z.array(orderItemSchema))
+  .superRefine((items, context) => {
+    const seenProducts = new Set<string>();
+    for (const item of items) {
+      if (seenProducts.has(item.product_id)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Duplicate products in order items",
+        });
+        return;
+      }
+
+      seenProducts.add(item.product_id);
+    }
+  });
+
+const submitOrderSchema = z
+  .object({
+    round_id: roundIdSchema,
+    nickname: requiredBoundedStringSchema("nickname"),
+    purchaser_name: optionalBoundedStringSchema("purchaser_name"),
+    recipient_name: requiredBoundedStringSchema("recipient_name"),
+    phone: phoneSchema,
+    address: optionalBoundedStringSchema("address"),
+    email: emailSchema,
+    pickup_location: pickupLocationSchema,
+    items: itemsSchema,
+    submission_key: submissionKeySchema,
+    note: optionalBoundedStringSchema("note"),
+    save_profile: z.unknown().transform((value) => value === true),
+  })
+  .superRefine((value, context) => {
+    if (!value.purchaser_name && !value.recipient_name) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "purchaser_name is required",
+      });
+    }
+
+    if (value.pickup_location === "" && !value.address) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "address is required for delivery",
+      });
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    purchaser_name: value.purchaser_name ?? value.recipient_name,
+  }));
+
 export async function POST(request: NextRequest) {
   try {
     const isAdmin = await verifyAdminSession(request);
     if (!isAdmin) {
       const clientIp = getClientIp(request);
-      const rateLimit = checkRateLimit(`submit-order:${clientIp}`, 5, 60_000);
+      const rateLimit = await checkRateLimit(
+        `submit-order:${clientIp}`,
+        5,
+        60_000,
+      );
+      if (rateLimit.error === "backend_unavailable") {
+        return NextResponse.json(
+          { error: "Ordering is temporarily unavailable" },
+          { status: 503 },
+        );
+      }
       if (!rateLimit.allowed) {
         return NextResponse.json(
           { error: "Too many requests" },
@@ -45,11 +266,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, submitOrderSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
     const {
@@ -65,236 +284,33 @@ export async function POST(request: NextRequest) {
       submission_key,
       note,
       save_profile,
-    } = body as {
-      round_id?: string;
-      nickname?: string;
-      purchaser_name?: string;
-      recipient_name?: string;
-      phone?: string;
-      address?: string;
-      email?: string;
-      pickup_location?: string;
-      items?: Array<{
-        product_id?: string;
-        product_name?: string;
-        unit_price?: number;
-        quantity?: number;
-        subtotal?: number;
-      }>;
-      submission_key?: string;
-      note?: string;
-      save_profile?: boolean;
-    };
+    } = parsedBody.data;
 
-    // ─── Validation ──────────────────────────────────────────
-
-    if (
-      !submission_key ||
-      typeof submission_key !== "string" ||
-      !UUID_RE.test(submission_key)
-    ) {
-      return NextResponse.json(
-        { error: "submission_key must be a valid UUID" },
-        { status: 400 },
-      );
-    }
-
-    const trimmedRoundId = typeof round_id === "string" ? round_id.trim() : "";
-    if (!trimmedRoundId) {
-      return NextResponse.json(
-        { error: "round_id is required" },
-        { status: 400 },
-      );
-    }
-    if (!UUID_RE.test(trimmedRoundId)) {
-      return NextResponse.json(
-        { error: "round_id must be a valid UUID" },
-        { status: 400 },
-      );
-    }
-
-    const trimmedNickname = typeof nickname === "string" ? nickname.trim() : "";
-    if (!trimmedNickname) {
-      return NextResponse.json(
-        { error: "nickname is required" },
-        { status: 400 },
-      );
-    }
-    if (trimmedNickname.length > MAX_LEN.nickname) {
-      return NextResponse.json(
-        { error: `nickname must be ≤ ${MAX_LEN.nickname} chars` },
-        { status: 400 },
-      );
-    }
-
-    const trimmedPurchaserName =
-      typeof purchaser_name === "string"
-        ? purchaser_name.trim()
-        : typeof recipient_name === "string"
-          ? recipient_name.trim()
-          : "";
-    if (!trimmedPurchaserName) {
-      return NextResponse.json(
-        { error: "purchaser_name is required" },
-        { status: 400 },
-      );
-    }
-    if (trimmedPurchaserName.length > MAX_LEN.purchaser_name) {
-      return NextResponse.json(
-        { error: `purchaser_name must be ≤ ${MAX_LEN.purchaser_name} chars` },
-        { status: 400 },
-      );
-    }
-
-    const trimmedRecipientName =
-      typeof recipient_name === "string" ? recipient_name.trim() : "";
-    if (!trimmedRecipientName) {
-      return NextResponse.json(
-        { error: "recipient_name is required" },
-        { status: 400 },
-      );
-    }
-    if (trimmedRecipientName.length > MAX_LEN.recipient_name) {
-      return NextResponse.json(
-        { error: `recipient_name must be ≤ ${MAX_LEN.recipient_name} chars` },
-        { status: 400 },
-      );
-    }
-
-    const trimmedPhone = typeof phone === "string" ? phone.trim() : "";
-    if (!trimmedPhone) {
-      return NextResponse.json({ error: "phone is required" }, { status: 400 });
-    }
-    if (!PHONE_RE.test(trimmedPhone)) {
-      return NextResponse.json(
-        { error: "phone format is invalid" },
-        { status: 400 },
-      );
-    }
-
-    // pickup_location: empty string = 宅配, or a named option
-    if (
-      pickup_location !== undefined &&
-      typeof pickup_location !== "string"
-    ) {
-      return NextResponse.json(
-        { error: "pickup_location must be a string" },
-        { status: 400 },
-      );
-    }
-    const pickupValue =
-      typeof pickup_location === "string" ? pickup_location.trim() : "";
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "items must be a non-empty array" },
-        { status: 400 },
-      );
-    }
-
-    // Validate each item and check for duplicates
-    const seenProducts = new Set<string>();
-    for (const item of items) {
-      const productId =
-        typeof item.product_id === "string" ? item.product_id.trim() : "";
-      if (!productId) {
-        return NextResponse.json(
-          { error: "Each item must have a product_id" },
-          { status: 400 },
-        );
-      }
-      if (!UUID_RE.test(productId)) {
-        return NextResponse.json(
-          { error: "Each item must have a valid product_id" },
-          { status: 400 },
-        );
-      }
-      if (seenProducts.has(productId)) {
-        return NextResponse.json(
-          { error: "Duplicate products in order items" },
-          { status: 400 },
-        );
-      }
-      seenProducts.add(productId);
-
-      if (
-        typeof item.quantity !== "number" ||
-        !Number.isInteger(item.quantity) ||
-        item.quantity <= 0
-      ) {
-        return NextResponse.json(
-          { error: "Each item must have a positive integer quantity" },
-          { status: 400 },
-        );
-      }
-    }
-
-    // ─── Optional/conditional field checks ────────────────────
-
-    const isDelivery = pickupValue === "";
-    const trimmedAddress =
-      typeof address === "string" ? address.trim() : undefined;
-
-    if (isDelivery && !trimmedAddress) {
-      return NextResponse.json(
-        { error: "address is required for delivery" },
-        { status: 400 },
-      );
-    }
-
-    if (trimmedAddress && trimmedAddress.length > MAX_LEN.address) {
-      return NextResponse.json(
-        { error: `address must be ≤ ${MAX_LEN.address} chars` },
-        { status: 400 },
-      );
-    }
-
-    const trimmedEmail = typeof email === "string" ? email.trim() : undefined;
-    if (trimmedEmail && trimmedEmail.length > MAX_LEN.email) {
-      return NextResponse.json(
-        { error: `email must be ≤ ${MAX_LEN.email} chars` },
-        { status: 400 },
-      );
-    }
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      return NextResponse.json(
-        { error: "email format is invalid" },
-        { status: 400 },
-      );
-    }
-
-    const trimmedNote =
-      typeof note === "string" ? note.trim() || undefined : undefined;
-    if (trimmedNote && trimmedNote.length > MAX_LEN.note) {
-      return NextResponse.json(
-        { error: `note must be ≤ ${MAX_LEN.note} chars` },
-        { status: 400 },
-      );
-    }
+    getPublicOrderAccessSecret();
 
     // ─── Create order ───────────────────────────────────────
 
     const orderItems = items.map((item) => ({
-      product_id: item.product_id!.trim(),
-      quantity: item.quantity!,
+      product_id: item.product_id,
+      quantity: item.quantity,
     }));
-    const shouldSaveProfile = save_profile === true;
+    const shouldSaveProfile = save_profile;
 
     const result = await createCheckoutOrder({
-      round_id: trimmedRoundId,
-      pickup_location: pickupValue,
-      note: trimmedNote,
+      round_id,
+      pickup_location,
+      note,
       submission_key,
       items: orderItems,
       is_admin: isAdmin,
       save_profile: shouldSaveProfile,
       user: {
-        nickname: trimmedNickname,
-        purchaser_name: trimmedPurchaserName,
-        recipient_name: trimmedRecipientName,
-        phone: trimmedPhone,
-        address: trimmedAddress,
-        email: trimmedEmail,
+        nickname,
+        purchaser_name,
+        recipient_name,
+        phone,
+        address,
+        email,
       },
     });
 
@@ -312,8 +328,8 @@ export async function POST(request: NextRequest) {
           ...PUBLIC_ORDER_COOKIE_OPTIONS,
           ...createPublicOrderAccessCookie({
             orderNumber: result.order.order_number,
-            purchaserName: trimmedPurchaserName,
-            phoneLast3: getPhoneLast3(trimmedPhone),
+            purchaserName: purchaser_name,
+            phoneLast3: getPhoneLast3(phone),
           }),
         });
 
@@ -342,6 +358,13 @@ export async function POST(request: NextRequest) {
         );
     }
   } catch (error) {
+    if (isEnvironmentConfigurationError(error)) {
+      return NextResponse.json(
+        { error: "Ordering is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
     console.error("POST /api/submit-order failed", error);
     return NextResponse.json(
       { error: "Internal server error" },

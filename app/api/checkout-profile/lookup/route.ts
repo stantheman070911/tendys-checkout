@@ -8,48 +8,59 @@ import {
   normalizePhoneDigits,
   PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS,
 } from "@/lib/utils";
+import { errorResponse, parseJsonBody, z } from "@/lib/validation";
 
 const PHONE_RE = /^[\d\-+().\s]{7,20}$/;
 const INCOMPLETE_PHONE_ERROR =
   "phone is required and must include a full phone number for autofill";
+const checkoutProfileLookupSchema = z
+  .object({
+    nickname: z.string().optional(),
+    phone: z.string().optional(),
+  })
+  .transform((value) => ({
+    nickname: value.nickname?.trim() ?? "",
+    phone: value.phone?.trim() ?? "",
+  }))
+  .superRefine((value, context) => {
+    if (!value.nickname) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "nickname is required",
+      });
+    }
+
+    const phoneDigits = normalizePhoneDigits(value.phone);
+    if (
+      !value.phone ||
+      !PHONE_RE.test(value.phone) ||
+      phoneDigits.length < PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: INCOMPLETE_PHONE_ERROR,
+      });
+    }
+  });
 
 export async function POST(request: NextRequest) {
   try {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, checkoutProfileLookupSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
-    const { nickname, phone } = body as {
-      nickname?: string;
-      phone?: string;
-    };
-
-    const trimmedNickname = typeof nickname === "string" ? nickname.trim() : "";
-    if (!trimmedNickname) {
-      return NextResponse.json(
-        { error: "nickname is required" },
-        { status: 400 },
-      );
-    }
-
-    const trimmedPhone = typeof phone === "string" ? phone.trim() : "";
-    const phoneDigits = normalizePhoneDigits(trimmedPhone);
-    if (
-      !trimmedPhone ||
-      !PHONE_RE.test(trimmedPhone) ||
-      phoneDigits.length < PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS
-    ) {
-      return NextResponse.json(
-        { error: INCOMPLETE_PHONE_ERROR },
-        { status: 400 },
-      );
-    }
+    const { nickname: trimmedNickname, phone: trimmedPhone } = parsedBody.data;
 
     const clientIp = getClientIp(request);
-    const rateLimit = checkRateLimit(`checkout-profile:${clientIp}`, 5, 60_000);
+    const rateLimit = await checkRateLimit(
+      `checkout-profile:${clientIp}`,
+      5,
+      60_000,
+    );
+    if (rateLimit.error === "backend_unavailable") {
+      return errorResponse("Checkout profile lookup is temporarily unavailable", 503);
+    }
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Too many requests" },

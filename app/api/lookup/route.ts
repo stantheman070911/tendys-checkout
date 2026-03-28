@@ -1,12 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findOrdersByPurchaserNameAndPhoneLast3 } from "@/lib/db/orders";
+import { createPublicOrderAccessDetailUrl } from "@/lib/public-order-access";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import {
+  getPublicOrderAccessSecret,
+  isEnvironmentConfigurationError,
+} from "@/lib/server-env";
 import { normalizePhoneDigits } from "@/lib/utils";
+import { parseJsonBody, z } from "@/lib/validation";
+
+const lookupSchema = z
+  .object({
+    purchaser_name: z.string().optional(),
+    recipient_name: z.string().optional(),
+    phone_last3: z.string().optional(),
+  })
+  .transform((value) => ({
+    purchaserName: value.purchaser_name?.trim() || value.recipient_name?.trim() || "",
+    phoneLast3: normalizePhoneDigits(value.phone_last3),
+  }))
+  .superRefine((value, context) => {
+    if (!value.purchaserName) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "purchaser_name is required",
+      });
+    }
+
+    if (value.phoneLast3.length !== 3) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "phone_last3 must be exactly 3 digits",
+      });
+    }
+  });
 
 export async function POST(request: NextRequest) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimit = checkRateLimit(`lookup:${clientIp}`, 5, 60_000);
+    const rateLimit = await checkRateLimit(`lookup:${clientIp}`, 5, 60_000);
+    if (rateLimit.error === "backend_unavailable") {
+      return NextResponse.json(
+        { error: "Lookup is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Too many requests" },
@@ -17,34 +55,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-    }
+    getPublicOrderAccessSecret();
 
-    const { purchaser_name, recipient_name, phone_last3 } = body as {
-      purchaser_name?: string;
-      recipient_name?: string;
-      phone_last3?: string;
-    };
-
-    const purchaserName = purchaser_name?.trim() || recipient_name?.trim();
-    const phoneLast3 = normalizePhoneDigits(phone_last3?.trim());
-
-    if (!purchaserName) {
-      return NextResponse.json(
-        { error: "purchaser_name is required" },
-        { status: 400 },
-      );
+    const parsedBody = await parseJsonBody(request, lookupSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
-    if (phoneLast3.length !== 3) {
-      return NextResponse.json(
-        { error: "phone_last3 must be exactly 3 digits" },
-        { status: 400 },
-      );
-    }
+    const { purchaserName, phoneLast3 } = parsedBody.data;
 
     const orders = await findOrdersByPurchaserNameAndPhoneLast3(
       purchaserName,
@@ -61,6 +78,11 @@ export async function POST(request: NextRequest) {
       total_amount: order.total_amount,
       shipping_fee: order.shipping_fee,
       created_at: order.created_at,
+      detail_url: createPublicOrderAccessDetailUrl({
+        orderNumber: order.order_number,
+        purchaserName,
+        phoneLast3,
+      }),
       order_items: order.order_items.map((item) => ({
         id: item.id,
         product_name: item.product_name,
@@ -70,7 +92,14 @@ export async function POST(request: NextRequest) {
     }));
 
     return NextResponse.json({ orders: safeOrders });
-  } catch {
+  } catch (error) {
+    if (isEnvironmentConfigurationError(error)) {
+      return NextResponse.json(
+        { error: "Lookup is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

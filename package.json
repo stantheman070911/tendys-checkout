@@ -8,11 +8,44 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run app lib",
+    "test:e2e": "playwright test",
+    "staging:smoke": "node --env-file=.env.local scripts/staging-smoke.mjs",
+    "staging:artifacts": "node --env-file=.env.local scripts/staging-artifacts.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "overrides": {
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
+    "readdirp": {
+      "picomatch": "2.3.2"
+    },
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "vitest": {
+      "picomatch": "4.0.4"
+    },
+    "vite": {
+      "picomatch": "4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "fdir": {
+      "picomatch": "4.0.4"
+    },
+    "brace-expansion": "1.1.13",
+    "eslint": {
+      "brace-expansion": "1.1.13"
+    },
+    "eslint-config-next": {
+      "brace-expansion": "5.0.5"
+    }
+  },
   "dependencies": {
     "@fontsource/noto-sans-tc": "^5.2.9",
     "@fontsource/noto-serif-tc": "^5.2.9",
@@ -25,6 +58,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-toast": "^1.2.15",
     "@supabase/supabase-js": "^2.99.2",
+    "@upstash/redis": "^1.37.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "class-variance-authority": "^0.7.1",
@@ -36,9 +70,11 @@
     "react-dom": "^19.2.4",
     "resend": "^6.9.4",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

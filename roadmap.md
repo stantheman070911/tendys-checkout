@@ -40,7 +40,7 @@
 
 ### Tasks
 
-- [ ] **7.1** Full flow smoke test (manual, against real Supabase):
+- [~] **7.1** Full flow smoke test (manual, against real Supabase):
   - Create supplier → round (with shipping fee + pickup point A/B labels) → products (linked to supplier, with goals)
   - Place test orders: 宅配 (verify shipping added), 面交 (verify no shipping)
   - Verify progress bars update
@@ -52,6 +52,13 @@
   - Lookup by `purchaser_name + phone_last3` → verify access works, no cross-order leaks, and unlocked detail shows expected address/phone
   - Export CSV → verify shipping fee column + Chinese encoding
   - Close round → verify 已截單
+  - 2026-03-26 tooling correction: staging smoke now targets `STAGING_BASE_URL` only, writes run-scoped log/summary artifacts, and fails closed on Vercel Deployment Protection instead of treating the auth page as app output
+  - 2026-03-26 preview bypass fix is real: with the provided bypass secret, the protected preview smoke now reaches supplier/round/product creation before entering the app-level blocker
+  - 2026-03-26 latest preview smoke run (`artifacts/staging-smoke-20260326110505.log` / `.json`) fails at `POST /api/submit-order` with `503 Ordering is temporarily unavailable`
+  - Inference from the follow-up admin probe: the preview deployment is very likely missing `PUBLIC_ORDER_ACCESS_SECRET`, because admin `submit-order` bypasses public rate limiting but still returns the same generic `503`
+  - 2026-03-26 artifact guardrail check correctly refused to run against the failed smoke summary, preventing invalid staging evidence from being generated
+  - Previous March 26 artifacts against `https://tendys-checkout.vercel.app/` do not count as staging proof and must not be used for sign-off
+  - Remaining sign-off work: ensure preview `PUBLIC_ORDER_ACCESS_SECRET` is configured, rerun preview smoke, rerun artifact capture, verify public-rate-limit/Upstash behavior on preview, then complete real LINE binding/push proof, spreadsheet-app CSV verification, and the browser/provider checks listed below
 - [x] **7.2** Edge case tests (99 tests / 21 files)
 - [x] **7.3** Mobile polish (ShippingFeeNote contrast, SharePanel clipboard handling)
 - [x] **7.4** Error + loading states (lookup errors, CSV loading, product toggle, POS validation, clipboard fallback)
@@ -134,6 +141,7 @@ npm run build        # must pass
 npx tsc --noEmit     # must pass (requires prior build)
 npm run lint         # must pass
 npx vitest run       # must pass
+npm run test:e2e     # browser coverage for CSV preflight/download + shipment batch print
 ```
 
 **Verify:**
@@ -156,7 +164,7 @@ npx vitest run       # must pass
 - [ ] **LINE ambiguity handling** — Reject or disambiguate messages with multiple order numbers (currently first-match-wins)
 - [ ] **Integration coverage** — Route-to-notification integration test
 - [ ] **Admin client-flow integration coverage** — Add browser/component coverage for CSV preflight/download and shipment batch print flows
-- [ ] **Dependency remediation** — `npm audit` issues in dedicated pass
+- [ ] **Dependency cleanup follow-up** — remove temporary `picomatch` overrides once upstream Tailwind/Vitest dependency chains no longer require them
 - [ ] **Visual QA pass** — Device-by-device screenshot / browser review for the new luxury theme on low-end mobile and Safari
 - [ ] **True DB-side thin rows** — Replace per-order `order_items` list hydration with SQL/precomputed preview data for the admin list hot path
 

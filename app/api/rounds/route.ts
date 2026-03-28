@@ -12,8 +12,37 @@ import {
   DEFAULT_PICKUP_OPTION_B,
   validatePickupOptionLabels,
 } from "@/lib/pickup-options";
+import {
+  nonNegativeIntegerOrNullSchema,
+  parseJsonBody,
+  requiredTrimmedStringSchema,
+  uuidStringSchema,
+  z,
+} from "@/lib/validation";
 
 const PUBLIC_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=60";
+
+const roundCreateSchema = z.object({
+  name: requiredTrimmedStringSchema("name"),
+  deadline: z.union([z.string(), z.null(), z.undefined()]),
+  shipping_fee: nonNegativeIntegerOrNullSchema("shipping_fee"),
+  pickup_option_a: z.string().optional(),
+  pickup_option_b: z.string().optional(),
+});
+
+const roundUpdateSchema = z.object({
+  id: uuidStringSchema("id"),
+  name: z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, { message: "name cannot be blank" }))
+    .optional(),
+  is_open: z.boolean().optional(),
+  deadline: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  shipping_fee: nonNegativeIntegerOrNullSchema("shipping_fee"),
+  pickup_option_a: z.string().optional(),
+  pickup_option_b: z.string().optional(),
+});
 
 // Public — storefront needs open round
 export async function GET(request: NextRequest) {
@@ -55,53 +84,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, roundCreateSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
-    const { name, deadline, shipping_fee, pickup_option_a, pickup_option_b } =
-      body as {
-      name?: string;
-      deadline?: string | null;
-      shipping_fee?: number | null;
-      pickup_option_a?: string;
-      pickup_option_b?: string;
-    };
-
-    const trimmedName = typeof name === "string" ? name.trim() : "";
-    if (!trimmedName) {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
-    }
-
-    if (
-      shipping_fee !== undefined &&
-      shipping_fee !== null &&
-      (typeof shipping_fee !== "number" ||
-        !Number.isInteger(shipping_fee) ||
-        shipping_fee < 0)
-    ) {
-      return NextResponse.json(
-        { error: "shipping_fee must be a non-negative integer or null" },
-        { status: 400 },
-      );
-    }
-
-    if (pickup_option_a !== undefined && typeof pickup_option_a !== "string") {
-      return NextResponse.json(
-        { error: "pickup_option_a must be a string" },
-        { status: 400 },
-      );
-    }
-
-    if (pickup_option_b !== undefined && typeof pickup_option_b !== "string") {
-      return NextResponse.json(
-        { error: "pickup_option_b must be a string" },
-        { status: 400 },
-      );
-    }
+    const {
+      name,
+      deadline,
+      shipping_fee,
+      pickup_option_a,
+      pickup_option_b,
+    } = parsedBody.data;
 
     const pickupOptions = validatePickupOptionLabels(
       typeof pickup_option_a === "string"
@@ -119,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await create({
-      name: trimmedName,
+      name,
       deadline: deadline ?? undefined,
       shipping_fee: shipping_fee ?? undefined,
       pickup_option_a: pickupOptions.pickup_option_a,
@@ -146,43 +140,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const parsedBody = await parseJsonBody(request, roundUpdateSchema);
+    if (!parsedBody.success) {
+      return parsedBody.response;
     }
 
-    const { id, ...fields } = body as {
-      id?: string;
-      name?: string;
-      is_open?: boolean;
-      deadline?: string | null;
-      shipping_fee?: number | null;
-      pickup_option_a?: string;
-      pickup_option_b?: string;
-    };
-
-    if (!id || typeof id !== "string" || !id.trim()) {
-      return NextResponse.json({ error: "id is required" }, { status: 400 });
-    }
+    const { id, ...fields } = parsedBody.data;
 
     const data: Record<string, unknown> = {};
-    if (typeof fields.name === "string") data.name = fields.name.trim();
+    if (typeof fields.name === "string") data.name = fields.name;
     if (typeof fields.is_open === "boolean") data.is_open = fields.is_open;
     if (fields.deadline !== undefined) data.deadline = fields.deadline;
     if (fields.shipping_fee !== undefined) {
-      if (
-        fields.shipping_fee !== null &&
-        (typeof fields.shipping_fee !== "number" ||
-          !Number.isInteger(fields.shipping_fee) ||
-          fields.shipping_fee < 0)
-      ) {
-        return NextResponse.json(
-          { error: "shipping_fee must be a non-negative integer or null" },
-          { status: 400 },
-        );
-      }
       data.shipping_fee = fields.shipping_fee;
     }
 
@@ -208,7 +177,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      const existingRound = await findById(id.trim());
+      const existingRound = await findById(id);
       if (!existingRound) {
         return NextResponse.json({ error: "Round not found" }, { status: 404 });
       }
@@ -240,7 +209,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const result = await update(
-      id.trim(),
+      id,
       data as Parameters<typeof update>[1],
     );
     if (result && typeof result === "object" && "error" in result) {

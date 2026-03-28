@@ -10,7 +10,7 @@ import {
 
 describe("public order access tokens", () => {
   beforeEach(() => {
-    process.env.ADMIN_SESSION_SECRET = "test-secret";
+    process.env.PUBLIC_ORDER_ACCESS_SECRET = "test-public-order-secret";
   });
 
   it("normalizes purchaser identity", () => {

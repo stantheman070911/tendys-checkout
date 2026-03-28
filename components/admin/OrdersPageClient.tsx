@@ -1,12 +1,11 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { startTransition, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { OrderCard } from "@/components/admin/OrderCard";
 import { POSForm } from "@/components/admin/POSForm";
 import { useAdminChrome } from "@/components/admin/AdminChromeState";
 import { STATUS_LABELS } from "@/constants";
-import { getCsvExportErrorMessage } from "@/lib/admin/csv-export";
 import { detailToAdminOrderListRow } from "@/lib/admin/order-view";
 import {
   applyBatchStatusTransition,
@@ -14,9 +13,10 @@ import {
   getPendingConfirmCountDelta,
   replaceItemById,
 } from "@/lib/admin/order-state";
-import { buildAdminPath } from "@/lib/admin/paths";
+import { useAdminCsvExport } from "@/hooks/use-admin-csv-export";
 import { useAdminFetch } from "@/hooks/use-admin-fetch";
 import { useAdminOrderDetails } from "@/hooks/use-admin-order-details";
+import { useAdminQueryControls } from "@/hooks/use-admin-query-controls";
 import { useToast } from "@/hooks/use-toast";
 import type {
   AdminOrderDetail,
@@ -33,24 +33,6 @@ const FILTER_OPTIONS = [
   "shipped",
   "cancelled",
 ] as const;
-
-function updateQueryString(
-  searchParams: URLSearchParams,
-  updates: Record<string, string | null>,
-) {
-  const next = new URLSearchParams(searchParams.toString());
-
-  for (const [key, value] of Object.entries(updates)) {
-    if (!value) {
-      next.delete(key);
-    } else {
-      next.set(key, value);
-    }
-  }
-
-  const nextQuery = next.toString();
-  return nextQuery ? `?${nextQuery}` : "";
-}
 
 export function OrdersPageClient({
   round,
@@ -76,10 +58,17 @@ export function OrdersPageClient({
   products: ProductWithProgress[];
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { adminFetch } = useAdminFetch();
   const { setPendingCount } = useAdminChrome();
   const { toast } = useToast();
+  const {
+    searchDraft,
+    setSearchDraft,
+    navigateWithUpdates: navigateWithUpdatesBase,
+  } = useAdminQueryControls({
+    path: "/orders",
+    initialSearch,
+  });
   const {
     detailsById,
     loadingDetailIds,
@@ -89,62 +78,25 @@ export function OrdersPageClient({
   } = useAdminOrderDetails(adminFetch);
 
   const [orders, setOrders] = useState(initialOrders);
-  const [searchDraft, setSearchDraft] = useState(initialSearch);
   const [batchSel, setBatchSel] = useState<Set<string>>(new Set());
   const [batchActing, setBatchActing] = useState(false);
   const [showPOS, setShowPOS] = useState(initialShowPos);
-  const [csvCooldown, setCsvCooldown] = useState(false);
-  const [csvExporting, setCsvExporting] = useState(false);
-  const csvCooldownTimerRef = useRef<number | null>(null);
-  const csvFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const { csvCooldown, csvExporting, startCsvExport } = useAdminCsvExport({
+    roundId: round.id,
+    onError: (message) =>
+      toast({
+        title: message,
+        variant: "destructive",
+      }),
+  });
 
   useEffect(() => {
     setOrders(initialOrders);
   }, [initialOrders]);
 
   useEffect(() => {
-    setSearchDraft(initialSearch);
-  }, [initialSearch]);
-
-  useEffect(() => {
     setShowPOS(initialShowPos);
   }, [initialShowPos]);
-
-  useEffect(
-    () => () => {
-      if (csvCooldownTimerRef.current != null) {
-        window.clearTimeout(csvCooldownTimerRef.current);
-      }
-      if (csvFrameRef.current) {
-        csvFrameRef.current.remove();
-        csvFrameRef.current = null;
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const trimmed = searchDraft.trim();
-    const current = searchParams.get("q") ?? "";
-    if (trimmed === current) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      const nextSearch = updateQueryString(
-        new URLSearchParams(searchParams.toString()),
-        {
-          q: trimmed || null,
-          page: "1",
-        },
-      );
-      router.replace(`${buildAdminPath("/orders")}${nextSearch}`, {
-        scroll: false,
-      });
-    }, 250);
-
-    return () => window.clearTimeout(timer);
-  }, [router, searchDraft, searchParams]);
 
   const filter = initialStatus;
   const pendingConfirm = useMemo(
@@ -153,11 +105,7 @@ export function OrdersPageClient({
   );
 
   function navigateWithUpdates(updates: Record<string, string | null>) {
-    const nextSearch = updateQueryString(
-      new URLSearchParams(searchParams.toString()),
-      updates,
-    );
-    router.push(`${buildAdminPath("/orders")}${nextSearch}`, { scroll: false });
+    navigateWithUpdatesBase(updates);
   }
 
   function handleOrderMutated(
@@ -291,52 +239,6 @@ export function OrdersPageClient({
     }
   }
 
-  async function handleCSVExport() {
-    if (csvCooldown || csvExporting) {
-      return;
-    }
-
-    setCsvExporting(true);
-    const exportUrl = `/api/export-csv?roundId=${encodeURIComponent(round.id)}`;
-
-    try {
-      const preflight = await fetch(exportUrl, {
-        method: "HEAD",
-        credentials: "include",
-      });
-
-      if (!preflight.ok) {
-        throw new Error(getCsvExportErrorMessage(preflight.status));
-      }
-
-      let iframe = csvFrameRef.current;
-      if (!iframe || !document.body.contains(iframe)) {
-        iframe = document.createElement("iframe");
-        iframe.name = "admin-csv-download";
-        iframe.setAttribute("aria-hidden", "true");
-        iframe.style.display = "none";
-        document.body.appendChild(iframe);
-        csvFrameRef.current = iframe;
-      }
-
-      iframe.src = "about:blank";
-      iframe.src = exportUrl;
-
-      setCsvCooldown(true);
-      csvCooldownTimerRef.current = window.setTimeout(() => {
-        setCsvCooldown(false);
-        csvCooldownTimerRef.current = null;
-      }, 1500);
-    } catch (error) {
-      toast({
-        title: error instanceof Error ? error.message : "匯出失敗",
-        variant: "destructive",
-      });
-    } finally {
-      setCsvExporting(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <section className="lux-panel-strong p-5 md:p-6">
@@ -370,7 +272,7 @@ export function OrdersPageClient({
           </button>
         )}
         <button
-          onClick={handleCSVExport}
+          onClick={() => void startCsvExport()}
           disabled={csvCooldown || csvExporting}
           className={`inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(177,140,92,0.24)] bg-[rgba(255,251,246,0.88)] px-4 py-2.5 text-xs font-semibold tracking-[0.08em] whitespace-nowrap ${
             csvCooldown || csvExporting

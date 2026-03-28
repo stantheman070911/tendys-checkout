@@ -1,0 +1,38 @@
+
+    <html>
+      <head>
+        <title>待出貨裝箱單</title>
+        <style>
+          body { font-family: sans-serif; padding: 0; margin: 0; color: #111827; }
+          .slip { padding: 24px; page-break-after: always; }
+          .slip:last-child { page-break-after: auto; }
+          h2 { margin: 0 0 8px; font-size: 18px; }
+          .info { margin-bottom: 12px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; font-size: 14px; }
+          th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; }
+          th { background: #f3f4f6; }
+          tfoot td { border-top: 2px solid #111827; }
+        </style>
+      </head>
+      <body>
+        <div class="slip">
+          <h2>ORD-20260326-004</h2>
+          <div class="info">
+            <div><b>暱稱：</b>print-20260326100642</div>
+            <div><b>訂購人：</b>煙霧測試</div>
+            <div><b>收貨人：</b>煙霧測試 · 0912-000-678</div>
+            <div>📍 測試面交 A</div>
+          </div>
+          <table>
+            <thead><tr><th>品名</th><th>數量</th><th>小計</th></tr></thead>
+            <tbody>
+              <tr><td>Print Product 20260326100642</td><td>1</td><td>$120</td></tr>
+              
+            </tbody>
+            <tfoot><tr><td colspan="2"><b>合計</b></td><td><b>$120</b></td></tr></tfoot>
+          </table>
+        </div>
+      </body>
+      <script>window.onload = function () { window.print(); };</script>
+    </html>
+  

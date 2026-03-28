@@ -22,6 +22,7 @@ function makeRequest(body: unknown) {
 describe("POST /api/lookup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.PUBLIC_ORDER_ACCESS_SECRET = "test-public-order-secret";
   });
 
   it("returns 200 with a matching order", async () => {
@@ -45,6 +46,7 @@ describe("POST /api/lookup", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.orders[0].order_number).toBe("ORD-001");
+    expect(data.orders[0].detail_url).toContain("/api/public-order/access?token=");
     expect(data.orders[0].order_items[0].product_name).toBe("地瓜");
     expect(res.headers.get("set-cookie")).toBeNull();
   });

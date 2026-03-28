@@ -1,0 +1,32 @@
+Starting staging smoke against https://tendys-checkout-git-staging-letstanleycook911-4248s-projects.vercel.app/
+Run ID: 20260328072334
+Vercel preview protection bypass is configured for this run.
+Created supplier 2bd63f86-62cc-4d38-b2e3-1550a3af158e
+Created round e4b9fef1-e790-47ee-a52b-4a24cfcefaf6
+Created product 5d3ddca4-9091-4e9c-9c3c-74e56f5753da
+Created delivery order ORD-20260328-001
+Created pickup order ORD-20260328-002
+Lookup returned 2 order(s)
+Reported payment for ORD-20260328-001
+Confirmed payment for ORD-20260328-001
+Queued arrival notification for 5d3ddca4-9091-4e9c-9c3c-74e56f5753da
+Confirmed shipment for ORD-20260328-001
+Cancelled pickup order ORD-20260328-002
+
+Automated staging smoke complete.
+Follow docs/staging-smoke-runbook.md for provider/browser/manual checks.
+Smoke log written to artifacts/staging-smoke-20260328072334.log
+Smoke summary written to artifacts/staging-smoke-20260328072334.json
+{
+  "runId": "20260328072334",
+  "logPath": "artifacts/staging-smoke-20260328072334.log",
+  "summaryPath": "artifacts/staging-smoke-20260328072334.json",
+  "bypassConfigured": true,
+  "status": "passed",
+  "baseUrl": "https://tendys-checkout-git-staging-letstanleycook911-4248s-projects.vercel.app/",
+  "supplierId": "2bd63f86-62cc-4d38-b2e3-1550a3af158e",
+  "roundId": "e4b9fef1-e790-47ee-a52b-4a24cfcefaf6",
+  "productId": "5d3ddca4-9091-4e9c-9c3c-74e56f5753da",
+  "deliveryOrderNumber": "ORD-20260328-001",
+  "pickupOrderNumber": "ORD-20260328-002"
+}
