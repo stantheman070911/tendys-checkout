@@ -408,6 +408,9 @@ async function main() {
         waitUntil: "domcontentloaded",
       });
       await assertNotProtectionPage(page, "Public lookup capture", baseUrl);
+      // Wait for React hydration — domcontentloaded fires before the JS bundle
+      // executes, so controlled input onChange handlers aren't wired yet.
+      await page.waitForLoadState("networkidle");
       await page.getByPlaceholder("訂購人姓名").fill(purchaserName);
       await page.getByPlaceholder("手機末三碼").fill(phoneLast3);
       await page.getByRole("button", { name: "查詢訂單" }).click();

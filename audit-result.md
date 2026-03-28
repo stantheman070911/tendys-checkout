@@ -87,12 +87,34 @@ The `catch` branch in `fire-and-forget.ts` previously called `runTask()` immedia
 
 ## CTO Conditional Sign-off — 2026-03-28
 
-All code-side claims from the 2026-03-28 verification were independently verified TRUE with zero discrepancies. The sign-off is **conditional** on the following operational steps:
+All code-side claims from the 2026-03-28 verification were independently verified TRUE with zero discrepancies.
 
-1. **Refresh `STAGING_ADMIN_BEARER_TOKEN`** — the token in `.env.local` expired 2026-03-26 ~11:27 UTC (43h before sign-off). Obtain a fresh 1-hour Supabase JWT by logging into the admin panel and copying the `Authorization` header from any admin API call.
-2. **Configure staging/preview Vercel env vars** — `PUBLIC_ORDER_ACCESS_SECRET`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` must be set on the Vercel preview deployment (Settings → Environment Variables → Preview scope).
-3. **Rerun `npm run staging:smoke`** against the preview URL — must produce `"status": "passed"` in the summary JSON.
-4. **Rerun `npm run staging:artifacts -- --run-id=<new-run-id>`** — manifest `siteUrl` must match the staging/preview URL.
-5. **Attach artifact bundle** to this document.
+### Staging Smoke — PASSED 2026-03-28
 
-Manual/provider proofs (LINE binding screenshot, CSV encoding verification) remain outstanding per `docs/staging-smoke-runbook.md`.
+| Item | Result |
+|------|--------|
+| Run ID | `20260328072334` |
+| Base URL | `https://tendys-checkout-git-staging-letstanleycook911-4248s-projects.vercel.app/` |
+| Status | **passed** |
+| Smoke summary | `artifacts/staging-smoke-20260328072334.json` |
+| Artifact bundle | `artifacts/staging-20260328072334/` |
+
+Smoke coverage: supplier create → round create → product create → delivery order → pickup order → lookup (2 results) → payment report → payment confirm → arrival notification → shipment confirm → cancel.
+
+Artifact bundle contents:
+- `lookup-results.png` — public lookup results page
+- `order-detail.png` — signed order detail page
+- `orders-export.csv` — admin CSV export
+- `notification-logs.json` — notification log entries
+- `shipment-print-popup.png` — shipment print popup screenshot
+- `shipment-print-popup.html` — shipment print popup HTML
+
+**All CTO conditions satisfied on code + automated staging side.**
+
+### Remaining Manual/Provider Proofs
+
+Still required per `docs/staging-smoke-runbook.md` before final production launch:
+
+- Real LINE binding with a human account + screenshot of delivered LINE push notification.
+- Spreadsheet-app (Excel/Numbers) visual verification of the exported CSV — check encoding, column alignment, and Chinese characters.
+- Remaining browser/provider screenshots listed in the runbook.
