@@ -16,6 +16,7 @@ import {
   nonNegativeIntegerOrNullSchema,
   parseJsonBody,
   requiredTrimmedStringSchema,
+  uuidStringSchema,
   z,
 } from "@/lib/validation";
 
@@ -30,7 +31,7 @@ const roundCreateSchema = z.object({
 });
 
 const roundUpdateSchema = z.object({
-  id: requiredTrimmedStringSchema("id"),
+  id: uuidStringSchema("id"),
   name: z
     .string()
     .transform((value) => value.trim())
@@ -176,7 +177,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      const existingRound = await findById(id.trim());
+      const existingRound = await findById(id);
       if (!existingRound) {
         return NextResponse.json({ error: "Round not found" }, { status: 404 });
       }
@@ -208,7 +209,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const result = await update(
-      id.trim(),
+      id,
       data as Parameters<typeof update>[1],
     );
     if (result && typeof result === "object" && "error" in result) {

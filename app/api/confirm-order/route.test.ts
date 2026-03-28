@@ -24,6 +24,8 @@ vi.mock("@/lib/notifications/fire-and-forget", () => ({
 
 import { POST } from "./route";
 
+const VALID_ORDER_ID = "11111111-1111-4111-8111-000000000001";
+
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/confirm-order", {
     method: "POST",
@@ -33,7 +35,7 @@ function makeRequest(body: unknown) {
 }
 
 const fakeOrder = {
-  id: "o1",
+  id: VALID_ORDER_ID,
   order_number: "ORD-20260324-001",
   status: "confirmed",
   order_items: [{ id: "oi1", product_name: "地瓜", quantity: 1 }],
@@ -51,7 +53,7 @@ describe("POST /api/confirm-order", () => {
     ordersMock.confirmOrder.mockResolvedValue(fakeOrder);
     notifyMock.sendPaymentConfirmedNotifications.mockResolvedValue({});
 
-    const res = await POST(makeRequest({ orderId: "o1" }));
+    const res = await POST(makeRequest({ orderId: VALID_ORDER_ID }));
     expect(res.status).toBe(200);
     expect(notifyMock.sendPaymentConfirmedNotifications).toHaveBeenCalledWith(
       fakeOrder,
@@ -62,19 +64,25 @@ describe("POST /api/confirm-order", () => {
   it("returns 404 when order not found or wrong status", async () => {
     ordersMock.confirmOrder.mockResolvedValue(null);
 
-    const res = await POST(makeRequest({ orderId: "nonexistent" }));
+    const res = await POST(makeRequest({ orderId: VALID_ORDER_ID }));
     expect(res.status).toBe(404);
   });
 
   it("returns 401 when not admin", async () => {
     authMock.mockResolvedValue(false);
 
-    const res = await POST(makeRequest({ orderId: "o1" }));
+    const res = await POST(makeRequest({ orderId: VALID_ORDER_ID }));
     expect(res.status).toBe(401);
   });
 
   it("returns 400 for missing orderId", async () => {
     const res = await POST(makeRequest({}));
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for malformed orderId", async () => {
+    const res = await POST(makeRequest({ orderId: "not-a-uuid" }));
+    expect(res.status).toBe(400);
+    expect(ordersMock.confirmOrder).not.toHaveBeenCalled();
   });
 });

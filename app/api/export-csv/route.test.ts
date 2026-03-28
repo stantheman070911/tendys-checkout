@@ -15,6 +15,8 @@ vi.mock("@/lib/db/orders", () => ordersMock);
 
 import { GET, HEAD } from "./route";
 
+const VALID_ROUND_ID = "11111111-1111-4111-8111-000000000020";
+
 function makeRequest(roundId?: string) {
   const params = roundId ? `?roundId=${roundId}` : "";
   const url = new URL(`http://localhost/api/export-csv${params}`);
@@ -73,7 +75,7 @@ describe("GET /api/export-csv", () => {
       .mockResolvedValueOnce(fakeOrders)
       .mockResolvedValueOnce([]);
 
-    const res = assertResponse(await GET(makeRequest("r1")));
+    const res = assertResponse(await GET(makeRequest(VALID_ROUND_ID)));
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
     // UTF-8 BOM: EF BB BF
@@ -87,7 +89,7 @@ describe("GET /api/export-csv", () => {
       .mockResolvedValueOnce(fakeOrders)
       .mockResolvedValueOnce([]);
 
-    const res = assertResponse(await GET(makeRequest("r1")));
+    const res = assertResponse(await GET(makeRequest(VALID_ROUND_ID)));
     const text = await res.text();
     const headerLine = text.split("\r\n")[0];
     expect(headerLine).toContain("運費");
@@ -99,7 +101,7 @@ describe("GET /api/export-csv", () => {
       .mockResolvedValueOnce(fakeOrders)
       .mockResolvedValueOnce([]);
 
-    const res = assertResponse(await GET(makeRequest("r1")));
+    const res = assertResponse(await GET(makeRequest(VALID_ROUND_ID)));
     const text = await res.text();
     expect(text).toContain("王小明");
     expect(text).toContain("王大明");
@@ -110,13 +112,13 @@ describe("GET /api/export-csv", () => {
   it("returns 401 when not admin", async () => {
     authMock.mockResolvedValue(false);
 
-    const res = assertResponse(await GET(makeRequest("r1")));
+    const res = assertResponse(await GET(makeRequest(VALID_ROUND_ID)));
     expect(res.status).toBe(401);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("HEAD preflight returns 204 when the request is valid", async () => {
-    const res = assertResponse(await HEAD(makeRequest("r1")));
+    const res = assertResponse(await HEAD(makeRequest(VALID_ROUND_ID)));
     expect(res.status).toBe(204);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
@@ -124,8 +126,21 @@ describe("GET /api/export-csv", () => {
   it("HEAD preflight returns 401 when the session is expired", async () => {
     authMock.mockResolvedValue(false);
 
-    const res = assertResponse(await HEAD(makeRequest("r1")));
+    const res = assertResponse(await HEAD(makeRequest(VALID_ROUND_ID)));
     expect(res.status).toBe(401);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("returns 400 for malformed roundId", async () => {
+    const res = assertResponse(await GET(makeRequest("not-a-uuid")));
+    expect(res.status).toBe(400);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(ordersMock.listRoundOrdersBatch).not.toHaveBeenCalled();
+  });
+
+  it("HEAD returns 400 for malformed roundId", async () => {
+    const res = assertResponse(await HEAD(makeRequest("not-a-uuid")));
+    expect(res.status).toBe(400);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 });

@@ -37,6 +37,13 @@
     },
     "fdir": {
       "picomatch": "4.0.4"
+    },
+    "brace-expansion": "1.1.13",
+    "eslint": {
+      "brace-expansion": "1.1.13"
+    },
+    "eslint-config-next": {
+      "brace-expansion": "5.0.5"
     }
   },
   "dependencies": {

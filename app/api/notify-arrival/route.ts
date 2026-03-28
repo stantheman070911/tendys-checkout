@@ -4,11 +4,11 @@ import { findById as findProductById } from "@/lib/db/products";
 import { getCustomersForArrivalNotification } from "@/lib/db/orders";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendProductArrivalNotifications } from "@/lib/notifications/send";
-import { parseJsonBody, requiredTrimmedStringSchema, z } from "@/lib/validation";
+import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
 const notifyArrivalSchema = z.object({
-  productId: requiredTrimmedStringSchema("productId"),
-  roundId: requiredTrimmedStringSchema("roundId"),
+  productId: uuidStringSchema("productId"),
+  roundId: uuidStringSchema("roundId"),
 });
 
 export async function POST(request: NextRequest) {

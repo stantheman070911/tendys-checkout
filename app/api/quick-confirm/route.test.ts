@@ -24,6 +24,8 @@ vi.mock("@/lib/notifications/fire-and-forget", () => ({
 
 import { POST } from "./route";
 
+const VALID_ORDER_ID = "11111111-1111-4111-8111-000000000001";
+
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/quick-confirm", {
     method: "POST",
@@ -50,7 +52,7 @@ describe("POST /api/quick-confirm", () => {
     ordersMock.quickConfirm.mockResolvedValue(fakeOrder);
     notifyMock.sendPaymentConfirmedNotifications.mockResolvedValue({});
 
-    const res = await POST(makeRequest({ orderId: "o1", paymentAmount: 500 }));
+    const res = await POST(makeRequest({ orderId: VALID_ORDER_ID, paymentAmount: 500 }));
     expect(res.status).toBe(200);
     expect(notifyMock.sendPaymentConfirmedNotifications).toHaveBeenCalledWith(
       fakeOrder,
@@ -61,22 +63,28 @@ describe("POST /api/quick-confirm", () => {
   it("returns 404 when order not found or wrong status", async () => {
     ordersMock.quickConfirm.mockResolvedValue(null);
 
-    const res = await POST(makeRequest({ orderId: "o1", paymentAmount: 500 }));
+    const res = await POST(makeRequest({ orderId: VALID_ORDER_ID, paymentAmount: 500 }));
     expect(res.status).toBe(404);
   });
 
   it("returns 401 when not admin", async () => {
     authMock.mockResolvedValue(false);
 
-    const res = await POST(makeRequest({ orderId: "o1", paymentAmount: 500 }));
+    const res = await POST(makeRequest({ orderId: VALID_ORDER_ID, paymentAmount: 500 }));
     expect(res.status).toBe(401);
   });
 
   it("returns 400 for invalid paymentAmount", async () => {
     const cases = [0, -1, 1.5, undefined];
     for (const paymentAmount of cases) {
-      const res = await POST(makeRequest({ orderId: "o1", paymentAmount }));
+      const res = await POST(makeRequest({ orderId: VALID_ORDER_ID, paymentAmount }));
       expect(res.status).toBe(400);
     }
+  });
+
+  it("returns 400 for malformed orderId", async () => {
+    const res = await POST(makeRequest({ orderId: "not-a-uuid", paymentAmount: 500 }));
+    expect(res.status).toBe(400);
+    expect(ordersMock.quickConfirm).not.toHaveBeenCalled();
   });
 });

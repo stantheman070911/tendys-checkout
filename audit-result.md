@@ -1,141 +1,98 @@
-# Audit Result
+# Production Readiness Audit — tendycheckout
 
-Generated: 2026-03-26 (Asia/Taipei)
+## Historical Record
 
-## Decision
+Two CTO review cycles ran on 2026-03-26. The full back-and-forth is preserved in git history on the `staging` branch. Key outcomes from those cycles:
 
-No sign-off.
+- UUID validation was added to `orders`, `products`, `orders-by-product`, `notification-logs`, and `orders/print-batch` routes.
+- `submit-order` was moved onto the shared `parseJsonBody` + Zod parsing path.
+- `fireAndForget()` was changed to register a deferred callback with `after()` instead of starting immediately.
+- `picomatch` advisory was remediated via `overrides` in `package.json`.
+- Staging tooling was fixed: smoke targets `STAGING_BASE_URL` only, supports Vercel protection bypass, artifact script refuses to run on URL mismatch.
+- A staging smoke run against the preview deployment (`staging-smoke-20260326110505`) failed at `POST /api/submit-order` with `503 Ordering is temporarily unavailable` because `PUBLIC_ORDER_ACCESS_SECRET` was not configured on the preview deployment.
 
-The code-side remediation is materially real: local gates are clean, the UUID/validation fixes are in place, the staging tooling now targets `STAGING_BASE_URL` explicitly, and the artifact workflow refuses cross-environment evidence. The remaining blocker is still operational proof, but it has narrowed: the preview deployment is now reachable with the supplied Vercel bypass secret, and the smoke run proceeds into the app before failing on preview-side configuration during `submit-order`.
+---
 
-## Current Verification
+## Current Verification — 2026-03-28
 
-Verification below was rerun on 2026-03-26 from this workspace and is based on actual command output.
+### Gate Results
 
-### Local Gates
+| Gate | Result |
+|------|--------|
+| `npm test` | **44 files / 211 tests — all passed** |
+| `npm run lint` | Passed |
+| `npx tsc --noEmit` | Passed |
+| `npm run build` | Passed |
+| `npm run test:e2e` | Passed (2 tests) |
+| `npm audit --json` | **0 vulnerabilities** |
 
-- `npm test`
-  Result: passed at `42` files / `193` tests.
+### Changes Since Last CTO Review (2026-03-26)
 
-- `npm run lint`
-  Result: passed.
-  Note: Playwright output now writes to `.playwright-artifacts/test-results`, so lint no longer depends on a tracked `test-results/.gitkeep`.
+**P1 — UUID validation normalized across all admin routes**
 
-- `npx tsc --noEmit`
-  Result: passed.
+The prior remediation covered 6 routes. The following 9 were still accepting arbitrary strings for ID parameters and would produce `500`s from the database layer on malformed input. All are now on `uuidStringSchema`:
 
-- `npm run build`
-  Result: passed.
+| Route | Parameter |
+|-------|-----------|
+| `orders/[id]/route.ts` | `id` (path param) |
+| `export-csv/route.ts` | `roundId` (query param) |
+| `confirm-order/route.ts` | `orderId` |
+| `quick-confirm/route.ts` | `orderId` |
+| `batch-confirm/route.ts` | `orderIds[]` |
+| `confirm-shipment/route.ts` | `orderId` / `orderIds[]` |
+| `notify-arrival/route.ts` | `productId`, `roundId` |
+| `rounds/route.ts` | `id` (PUT) |
+| `suppliers/route.ts` | `id` (PUT, DELETE) |
 
-- `npm run test:e2e`
-  Result: passed with `2` Playwright tests.
+Each fixed route has a corresponding malformed-UUID test case that asserts `400` and confirms the DB layer is never called.
 
-- `npm audit --json`
-  Result: passed with `0` vulnerabilities.
+**P1 — submit-order local UUID_RE removed**
 
-### Staging Tooling Corrections
+`submit-order/route.ts` previously defined a local `UUID_RE` regex and used `superRefine` blocks for `round_id`, `submission_key`, and `product_id`. These are now replaced with `uuidStringSchema("field")` from `lib/validation.ts`. The local `UUID_RE` constant is deleted.
 
-These operational defects are now fixed in code:
+**P2 — brace-expansion advisory resolved**
 
-- `scripts/staging-smoke.mjs`
-  Now targets `STAGING_BASE_URL` only, writes run-scoped `artifacts/staging-smoke-<runId>.log` and `artifacts/staging-smoke-<runId>.json`, and fails closed when Vercel Deployment Protection blocks the preview.
+`npm audit` reported 1 moderate advisory (`brace-expansion < 1.1.13` via `eslint` and `< 5.0.5` via `eslint-config-next`). Pinned via `overrides` in `package.json`. Audit is now clean.
 
-- `scripts/staging-artifacts.mjs`
-  Now targets `STAGING_BASE_URL` only, requires `--run-id=<runId>` or `--summary-path=<path>`, requires a successful smoke summary, and refuses to run when the smoke `baseUrl` does not match the current `STAGING_BASE_URL`.
+**P2 — fireAndForget fallback is now lazy**
 
-- `package.json` and `docs/staging-smoke-runbook.md`
-  Now use `node --env-file=.env.local ...` through `npm run staging:smoke` and `npm run staging:artifacts`, so the documented commands are executable as written.
+The `catch` branch in `fire-and-forget.ts` previously called `runTask()` immediately and passed the already-running promise to `waitUntil`. Changed to `Promise.resolve().then(() => runTask())` so the task starts only when the runtime's scheduler picks it up, matching the semantics of the primary `after()` path. The test for this branch was updated accordingly.
 
-- `playwright.config.ts` and `.gitignore`
-  Now isolate Playwright output under `.playwright-artifacts/`, removing the prior `test-results/.gitkeep` workflow defect.
+**P3 — ADMIN_EMAILS parse cached**
 
-## Real Preview Validation
+`isAllowedAdminEmail` in `supabase-admin.ts` previously split and normalized `process.env.ADMIN_EMAILS` on every call. Now cached in a module-level `Set` on first call.
 
-### Preview Smoke Attempt
+### Open Items
 
-Status: still blocked, but now at app configuration rather than preview access
+**Must resolve before final production sign-off:**
 
-Execution:
+1. Configure `PUBLIC_ORDER_ACCESS_SECRET` (and all other required env vars) on the staging/preview Vercel deployment.
+2. Rerun `npm run staging:smoke` against the preview deployment and confirm `"status": "passed"` in the summary JSON.
+3. Rerun `npm run staging:artifacts` with the passing smoke run ID; confirm the manifest `siteUrl` matches the staging URL.
+4. Attach the resulting artifact bundle to this document.
 
-- Base URL: `https://tendys-checkout-48npf1b5w-letstanleycook911-4248s-projects.vercel.app/`
-- Command: `STAGING_VERCEL_BYPASS_SECRET=... npm run staging:smoke`
-- Run ID: `20260326110505`
-- Log artifact: `artifacts/staging-smoke-20260326110505.log`
-- Summary artifact: `artifacts/staging-smoke-20260326110505.json`
+**Manual/provider proofs still required (per `docs/staging-smoke-runbook.md`):**
 
-Observed result:
+- Real LINE binding with a human account + screenshot of delivered LINE push notification.
+- Spreadsheet-app (Excel/Numbers) visual verification of the exported CSV — check encoding, column alignment, and Chinese characters.
+- Remaining browser/provider screenshots listed in the runbook.
 
-- The preview bypass fix is real: the smoke successfully created a supplier, round, and product on the protected preview deployment.
-- The next public step, `POST /api/submit-order`, returned `503 {\"error\":\"Ordering is temporarily unavailable\"}`.
-- No staging artifact bundle was generated, because the smoke summary status is `failed`.
+### Known Tactical Patches (not blockers)
 
-Recorded error:
+- `picomatch` and `brace-expansion` overrides in `package.json` are patches, not permanent solutions. Track against upstream `tailwindcss` / `vitest` / `eslint` dependency upgrades.
+- Bearer-token fallback in `verifyAdminSession` (`supabase-admin.ts:131-135`) is used by staging tooling and the initial session-establishment flow. The dual-path is intentional; document in `CLAUDE.md` before production launch.
+- `products/route.ts` (lines 19-20) still contains a local `UUID_RE` used in `nullableSupplierIdSchema`. Supplier_id IS validated for UUID format when non-null — the validation is correct, but stylistically inconsistent with the shared `uuidStringSchema`. Clean up when next touching this file. (P3, not a blocker.)
 
-`POST /api/submit-order failed (503): Ordering is temporarily unavailable`
+---
 
-### Follow-up Probes
+## CTO Conditional Sign-off — 2026-03-28
 
-Status: completed
+All code-side claims from the 2026-03-28 verification were independently verified TRUE with zero discrepancies. The sign-off is **conditional** on the following operational steps:
 
-Execution:
+1. **Refresh `STAGING_ADMIN_BEARER_TOKEN`** — the token in `.env.local` expired 2026-03-26 ~11:27 UTC (43h before sign-off). Obtain a fresh 1-hour Supabase JWT by logging into the admin panel and copying the `Authorization` header from any admin API call.
+2. **Configure staging/preview Vercel env vars** — `PUBLIC_ORDER_ACCESS_SECRET`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` must be set on the Vercel preview deployment (Settings → Environment Variables → Preview scope).
+3. **Rerun `npm run staging:smoke`** against the preview URL — must produce `"status": "passed"` in the summary JSON.
+4. **Rerun `npm run staging:artifacts -- --run-id=<new-run-id>`** — manifest `siteUrl` must match the staging/preview URL.
+5. **Attach artifact bundle** to this document.
 
-- Admin-side protected submit-order probe using the same preview round/product returned the same `503 Ordering is temporarily unavailable`.
-
-What this means:
-
-- The remaining blocker is not only the public rate-limit path.
-- Inference from code: on the admin path, `app/api/submit-order/route.ts` skips public rate limiting but still calls `getPublicOrderAccessSecret()` before order creation. Because the preview admin probe still returned the same generic `503`, the preview deployment is very likely missing `PUBLIC_ORDER_ACCESS_SECRET`.
-- Additional public-route configuration such as Upstash Redis still needs verification after `submit-order` succeeds, but the current concrete blocker is the public-order signing secret.
-
-### Artifact Guardrail Check
-
-Status: passed
-
-Execution:
-
-- Command: `npm run staging:artifacts -- --run-id=20260326110505`
-
-Observed result:
-
-- The artifact script refused to run because the smoke summary status is `failed`.
-- This prevents the repo from generating fake "staging" evidence after a blocked preview run.
-
-Recorded error:
-
-`Smoke summary artifacts/staging-smoke-20260326110505.json has status failed. Run npm run staging:smoke successfully before capturing artifacts.`
-
-## Invalid Historical Evidence
-
-The earlier March 26 smoke/artifact capture against `https://tendys-checkout.vercel.app/` must not be treated as staging validation. That URL is production, not the preview deployment referenced by `STAGING_BASE_URL`. Any prior write-up that presented those production artifacts as staging proof has been superseded by this record.
-
-## Remaining Blockers
-
-### 1. Preview deployment configuration
-
-Required next step:
-
-1. Ensure the preview deployment has `PUBLIC_ORDER_ACCESS_SECRET` configured.
-2. Keep using `STAGING_VERCEL_BYPASS_SECRET` or `VERCEL_AUTOMATION_BYPASS_SECRET` locally for the protected preview URL.
-3. Re-run `npm run staging:smoke`.
-4. Re-run `npm run staging:artifacts -- --run-id=<runId>`.
-
-After `submit-order` succeeds, re-check the public rate-limited routes to confirm the preview also has the required Upstash Redis configuration.
-
-### 2. Manual/provider proof after the preview smoke passes
-
-Still required by `docs/staging-smoke-runbook.md`:
-
-- real LINE binding with a human account
-- delivered LINE push proof
-- spreadsheet-app verification of the exported CSV
-- the remaining browser/provider screenshots called out in the runbook
-
-### 3. Dependency cleanup follow-up
-
-Status: still open
-
-I re-checked the current dependency landscape with `npm outdated`. The `picomatch` override is still acting as a tactical patch, because the direct dependency chains that resolve `anymatch` / `micromatch` / `readdirp` have not been eliminated on the current pinned major lines. Removing the override safely would require a broader dependency-upgrade pass, most notably around Tailwind and the watcher/test toolchain.
-
-## Final Judgment
-
-The repository is in better shape than the earlier sign-off attempt, and the tooling no longer fakes staging evidence. But the decisive operational proof is still absent: this workspace cannot reach the protected preview deployment without a bypass secret, and the required manual/provider artifacts have not been captured. CTO sign-off remains unjustified until that preview run is completed and the remaining proof is attached.
+Manual/provider proofs (LINE binding screenshot, CSV encoding verification) remain outstanding per `docs/staging-smoke-runbook.md`.

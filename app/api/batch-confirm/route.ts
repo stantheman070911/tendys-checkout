@@ -4,25 +4,13 @@ import { batchConfirm } from "@/lib/db/orders";
 import { mapWithConcurrency } from "@/lib/async";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendPaymentConfirmedNotifications } from "@/lib/notifications/send";
-import { parseJsonBody, z } from "@/lib/validation";
+import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
-const batchConfirmSchema = z
-  .object({
-    orderIds: z.array(z.string()).min(1, {
-      message: "orderIds must be a non-empty array of strings",
-    }),
-  })
-  .transform((value) => ({
-    orderIds: value.orderIds.map((id) => id.trim()),
-  }))
-  .superRefine((value, context) => {
-    if (value.orderIds.some((id) => !id)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "orderIds must be a non-empty array of strings",
-      });
-    }
-  });
+const batchConfirmSchema = z.object({
+  orderIds: z
+    .array(uuidStringSchema("orderId"))
+    .min(1, { message: "orderIds must be a non-empty array of UUIDs" }),
+});
 
 export async function POST(request: NextRequest) {
   try {

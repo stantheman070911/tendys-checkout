@@ -35,14 +35,19 @@ export function getSupabaseAnon(): SupabaseClient {
   return anonClient;
 }
 
-function isAllowedAdminEmail(email: string) {
-  const allowedEmailsStr = process.env.ADMIN_EMAILS || "";
-  const allowedEmails = allowedEmailsStr
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
+let cachedAllowedEmails: Set<string> | null = null;
 
-  return allowedEmails.includes(email.toLowerCase());
+function isAllowedAdminEmail(email: string) {
+  if (!cachedAllowedEmails) {
+    const allowedEmailsStr = process.env.ADMIN_EMAILS || "";
+    cachedAllowedEmails = new Set(
+      allowedEmailsStr
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean),
+    );
+  }
+  return cachedAllowedEmails.has(email.toLowerCase());
 }
 
 function parseCookieHeader(header: string | null, name: string) {

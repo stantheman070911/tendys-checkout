@@ -7,6 +7,7 @@ import {
   parseJsonBody,
   parseSearchParams,
   requiredTrimmedStringSchema,
+  uuidStringSchema,
   z,
 } from "@/lib/validation";
 
@@ -19,7 +20,7 @@ const supplierCreateSchema = z.object({
 });
 
 const supplierUpdateSchema = z.object({
-  id: requiredTrimmedStringSchema("id"),
+  id: uuidStringSchema("id"),
   name: z
     .string()
     .transform((value) => value.trim())
@@ -32,7 +33,7 @@ const supplierUpdateSchema = z.object({
 });
 
 const supplierDeleteQuerySchema = z.object({
-  id: requiredTrimmedStringSchema("id"),
+  id: uuidStringSchema("id"),
 });
 
 export async function GET(request: NextRequest) {
@@ -111,7 +112,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const supplier = await update(id.trim(), data);
+    const supplier = await update(id, data);
     return NextResponse.json({ supplier });
   } catch {
     return NextResponse.json(

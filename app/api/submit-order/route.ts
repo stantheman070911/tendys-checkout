@@ -11,10 +11,8 @@ import {
 } from "@/lib/server-env";
 import { getPhoneLast3 } from "@/lib/utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { parseJsonBody, z } from "@/lib/validation";
+import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PHONE_RE = /^[\d\-+().\s]{7,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -85,39 +83,9 @@ const optionalBoundedStringSchema = (field: keyof typeof MAX_LEN) =>
       return trimmed ? trimmed : undefined;
     });
 
-const submissionKeySchema = z
-  .unknown()
-  .superRefine((value, context) => {
-    const trimmed = typeof value === "string" ? value.trim() : "";
-    if (!UUID_RE.test(trimmed)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "submission_key must be a valid UUID",
-      });
-    }
-  })
-  .transform((value) => (typeof value === "string" ? value.trim() : ""));
+const submissionKeySchema = uuidStringSchema("submission_key");
 
-const roundIdSchema = z
-  .unknown()
-  .superRefine((value, context) => {
-    const trimmed = typeof value === "string" ? value.trim() : "";
-    if (!trimmed) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "round_id is required",
-      });
-      return;
-    }
-
-    if (!UUID_RE.test(trimmed)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "round_id must be a valid UUID",
-      });
-    }
-  })
-  .transform((value) => (typeof value === "string" ? value.trim() : ""));
+const roundIdSchema = uuidStringSchema("round_id");
 
 const phoneSchema = z
   .unknown()
@@ -191,26 +159,7 @@ const pickupLocationSchema = z
   .transform((value) => (typeof value === "string" ? value.trim() : ""));
 
 const orderItemSchema = z.object({
-  product_id: z
-    .unknown()
-    .superRefine((value, context) => {
-      const trimmed = typeof value === "string" ? value.trim() : "";
-      if (!trimmed) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Each item must have a product_id",
-        });
-        return;
-      }
-
-      if (!UUID_RE.test(trimmed)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Each item must have a valid product_id",
-        });
-      }
-    })
-    .transform((value) => (typeof value === "string" ? value.trim() : "")),
+  product_id: uuidStringSchema("product_id"),
   quantity: z
     .unknown()
     .superRefine((value, context) => {

@@ -32,7 +32,10 @@ describe("fireAndForget", () => {
   });
 
   it("falls back to waitUntil when after is unavailable", async () => {
-    const waitUntil = vi.fn();
+    let capturedPromise: Promise<void> | undefined;
+    const waitUntil = vi.fn((p: Promise<void>) => {
+      capturedPromise = p;
+    });
     const task = vi.fn(async () => undefined);
     afterMock.mockImplementation(() => {
       throw new Error("outside request");
@@ -45,7 +48,12 @@ describe("fireAndForget", () => {
 
     fireAndForget(task);
 
+    // waitUntil is called synchronously, but task is deferred (lazy)
     expect(waitUntil).toHaveBeenCalledTimes(1);
+    expect(task).not.toHaveBeenCalled();
+
+    // After the promise resolves, task runs
+    await capturedPromise;
     expect(task).toHaveBeenCalledTimes(1);
   });
 });

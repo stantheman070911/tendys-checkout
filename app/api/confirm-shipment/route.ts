@@ -4,11 +4,11 @@ import { confirmShipment, batchConfirmShipment } from "@/lib/db/orders";
 import { mapWithConcurrency } from "@/lib/async";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendShipmentNotifications } from "@/lib/notifications/send";
-import { parseJsonBody, requiredTrimmedStringSchema, z } from "@/lib/validation";
+import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
 const confirmShipmentSingleSchema = z
   .object({
-    orderId: requiredTrimmedStringSchema("orderId"),
+    orderId: uuidStringSchema("orderId"),
     orderIds: z.any().optional(),
   })
   .transform((value) => ({
@@ -19,22 +19,14 @@ const confirmShipmentSingleSchema = z
 const confirmShipmentBatchSchema = z
   .object({
     orderId: z.any().optional(),
-    orderIds: z.array(z.string()).min(1, {
-      message: "Provide orderId (string) or orderIds (string[])",
-    }),
+    orderIds: z
+      .array(uuidStringSchema("orderId"))
+      .min(1, { message: "Provide orderId (string) or orderIds (string[])" }),
   })
   .transform((value) => ({
     mode: "batch" as const,
-    orderIds: value.orderIds.map((id) => id.trim()),
-  }))
-  .superRefine((value, context) => {
-    if (value.orderIds.some((id) => !id)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Provide orderId (string) or orderIds (string[])",
-      });
-    }
-  });
+    orderIds: value.orderIds,
+  }));
 
 const confirmShipmentSchema = z.union([
   confirmShipmentSingleSchema,

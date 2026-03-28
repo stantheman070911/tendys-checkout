@@ -24,6 +24,9 @@ vi.mock("@/lib/notifications/fire-and-forget", () => ({
 
 import { POST } from "./route";
 
+const UUID1 = "11111111-1111-4111-8111-000000000001";
+const UUID2 = "11111111-1111-4111-8111-000000000002";
+
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/batch-confirm", {
     method: "POST",
@@ -43,36 +46,42 @@ describe("POST /api/batch-confirm", () => {
 
   it("partial success: some confirmed, some skipped", async () => {
     ordersMock.batchConfirm.mockResolvedValue([
-      { id: "o1", order_number: "ORD-001", order_items: [] },
+      { id: UUID1, order_number: "ORD-001", order_items: [] },
     ]);
 
-    const res = await POST(makeRequest({ orderIds: ["o1", "o2"] }));
+    const res = await POST(makeRequest({ orderIds: [UUID1, UUID2] }));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.confirmed).toBe(1);
-    expect(data.skipped).toEqual(["o2"]);
+    expect(data.skipped).toEqual([UUID2]);
   });
 
   it("all skipped → 200 with confirmed: 0", async () => {
     ordersMock.batchConfirm.mockResolvedValue([]);
 
-    const res = await POST(makeRequest({ orderIds: ["o1", "o2"] }));
+    const res = await POST(makeRequest({ orderIds: [UUID1, UUID2] }));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.confirmed).toBe(0);
-    expect(data.skipped).toEqual(["o1", "o2"]);
+    expect(data.skipped).toEqual([UUID1, UUID2]);
     expect(notifyMock.sendPaymentConfirmedNotifications).not.toHaveBeenCalled();
   });
 
   it("returns 401 when not admin", async () => {
     authMock.mockResolvedValue(false);
 
-    const res = await POST(makeRequest({ orderIds: ["o1"] }));
+    const res = await POST(makeRequest({ orderIds: [UUID1] }));
     expect(res.status).toBe(401);
   });
 
   it("returns 400 for empty orderIds", async () => {
     const res = await POST(makeRequest({ orderIds: [] }));
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when orderIds contains a malformed UUID", async () => {
+    const res = await POST(makeRequest({ orderIds: [UUID1, "not-a-uuid"] }));
+    expect(res.status).toBe(400);
+    expect(ordersMock.batchConfirm).not.toHaveBeenCalled();
   });
 });

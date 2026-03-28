@@ -17,7 +17,6 @@ export function fireAndForget(task: () => Promise<unknown>) {
     return;
   } catch {
     const runtime = globalThis as WaitUntilCapableGlobal;
-    const promise = runTask();
-    runtime.waitUntil?.(promise);
+    runtime.waitUntil?.(Promise.resolve().then(() => runTask()));
   }
 }

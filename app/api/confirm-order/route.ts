@@ -3,10 +3,10 @@ import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { confirmOrder } from "@/lib/db/orders";
 import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendPaymentConfirmedNotifications } from "@/lib/notifications/send";
-import { parseJsonBody, requiredTrimmedStringSchema, z } from "@/lib/validation";
+import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
 const confirmOrderSchema = z.object({
-  orderId: requiredTrimmedStringSchema("orderId"),
+  orderId: uuidStringSchema("orderId"),
 });
 
 export async function POST(request: NextRequest) {

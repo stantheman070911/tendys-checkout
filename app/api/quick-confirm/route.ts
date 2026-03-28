@@ -6,12 +6,12 @@ import { sendPaymentConfirmedNotifications } from "@/lib/notifications/send";
 import {
   parseJsonBody,
   positiveIntegerSchema,
-  requiredTrimmedStringSchema,
+  uuidStringSchema,
   z,
 } from "@/lib/validation";
 
 const quickConfirmSchema = z.object({
-  orderId: requiredTrimmedStringSchema("orderId"),
+  orderId: uuidStringSchema("orderId"),
   paymentAmount: positiveIntegerSchema("paymentAmount"),
 });
 
