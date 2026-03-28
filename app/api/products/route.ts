@@ -16,8 +16,6 @@ import {
 } from "@/lib/validation";
 
 const PUBLIC_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=60";
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const nullableSupplierIdSchema = (preserveUndefined: boolean) =>
   z
@@ -32,7 +30,7 @@ const nullableSupplierIdSchema = (preserveUndefined: boolean) =>
         return;
       }
 
-      if (!UUID_RE.test(trimmed)) {
+      if (!z.string().uuid().safeParse(trimmed).success) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "supplier_id must be a valid UUID or null",

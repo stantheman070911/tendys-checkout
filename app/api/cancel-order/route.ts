@@ -8,11 +8,11 @@ import { fireAndForget } from "@/lib/notifications/fire-and-forget";
 import { sendOrderCancelledNotifications } from "@/lib/notifications/send";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
-import { optionalTrimmedStringSchema, parseJsonBody, z } from "@/lib/validation";
+import { optionalTrimmedStringSchema, optionalUuidStringSchema, parseJsonBody, z } from "@/lib/validation";
 
 const cancelOrderSchema = z
   .object({
-    orderId: optionalTrimmedStringSchema(),
+    orderId: optionalUuidStringSchema("orderId"),
     order_number: optionalTrimmedStringSchema(),
     purchaser_name: optionalTrimmedStringSchema(),
     recipient_name: optionalTrimmedStringSchema(),
