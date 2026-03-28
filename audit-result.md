@@ -13,22 +13,23 @@ Two CTO review cycles ran on 2026-03-26. The full back-and-forth is preserved in
 
 ---
 
-## Current Verification — 2026-03-28
+## Verification — 2026-03-28
 
 ### Gate Results
 
 | Gate | Result |
 |------|--------|
-| `npm test` | **44 files / 211 tests — all passed** |
+| `npm test` | **44 files / 212 tests — all passed** |
 | `npm run lint` | Passed |
 | `npx tsc --noEmit` | Passed |
 | `npm run build` | Passed |
 | `npm run test:e2e` | Passed (2 tests) |
 | `npm audit --json` | **0 vulnerabilities** |
+| `npm run staging:smoke` | **Passed** — run `20260328072334` |
 
-### Changes Since Last CTO Review (2026-03-26)
+### Changes Across Both 2026-03-28 Review Cycles
 
-**P1 — UUID validation normalized across all admin routes**
+**P1 — UUID validation normalized across all admin routes (round 1)**
 
 The prior remediation covered 6 routes. The following 9 were still accepting arbitrary strings for ID parameters and would produce `500`s from the database layer on malformed input. All are now on `uuidStringSchema`:
 
@@ -44,7 +45,9 @@ The prior remediation covered 6 routes. The following 9 were still accepting arb
 | `rounds/route.ts` | `id` (PUT) |
 | `suppliers/route.ts` | `id` (PUT, DELETE) |
 
-Each fixed route has a corresponding malformed-UUID test case that asserts `400` and confirms the DB layer is never called.
+**P1 — cancel-order admin orderId UUID validation (round 2)**
+
+`cancel-order/route.ts` used `optionalTrimmedStringSchema()` for `orderId` — a malformed string passed through to `cancelOrder()` and hit the Prisma layer as a `500`. Changed to `optionalUuidStringSchema("orderId")`. Malformed admin `orderId` now returns `400` before any DB call. Test fixture updated; malformed-UUID test case added.
 
 **P1 — submit-order local UUID_RE removed**
 
@@ -62,34 +65,22 @@ The `catch` branch in `fire-and-forget.ts` previously called `runTask()` immedia
 
 `isAllowedAdminEmail` in `supabase-admin.ts` previously split and normalized `process.env.ADMIN_EMAILS` on every call. Now cached in a module-level `Set` on first call.
 
-### Open Items
+**P3 — products/route.ts local UUID_RE removed**
 
-**Must resolve before final production sign-off:**
+`nullableSupplierIdSchema` previously used a local `UUID_RE` regex. Replaced with `z.string().uuid().safeParse()` inline. `optionalUuidStringSchema` was not used directly because the schema must distinguish `null` (clear supplier) from `undefined` (no change) — semantics that `optionalUuidStringSchema` collapses. Behavior is identical; local regex is gone.
 
-1. Configure `PUBLIC_ORDER_ACCESS_SECRET` (and all other required env vars) on the staging/preview Vercel deployment.
-2. Rerun `npm run staging:smoke` against the preview deployment and confirm `"status": "passed"` in the summary JSON.
-3. Rerun `npm run staging:artifacts` with the passing smoke run ID; confirm the manifest `siteUrl` matches the staging URL.
-4. Attach the resulting artifact bundle to this document.
+**Documentation — CLAUDE.md Operational Notes added**
 
-**Manual/provider proofs still required (per `docs/staging-smoke-runbook.md`):**
-
-- Real LINE binding with a human account + screenshot of delivered LINE push notification.
-- Spreadsheet-app (Excel/Numbers) visual verification of the exported CSV — check encoding, column alignment, and Chinese characters.
-- Remaining browser/provider screenshots listed in the runbook.
+- `verifyAdminSession` Bearer-token fallback documented as intentional dual-path used by staging tooling.
+- `ADMIN_EMAILS` cache documented: adding/removing admin emails requires a Vercel redeploy.
 
 ### Known Tactical Patches (not blockers)
 
 - `picomatch` and `brace-expansion` overrides in `package.json` are patches, not permanent solutions. Track against upstream `tailwindcss` / `vitest` / `eslint` dependency upgrades.
-- Bearer-token fallback in `verifyAdminSession` (`supabase-admin.ts:131-135`) is used by staging tooling and the initial session-establishment flow. The dual-path is intentional; document in `CLAUDE.md` before production launch.
-- `products/route.ts` (lines 19-20) still contains a local `UUID_RE` used in `nullableSupplierIdSchema`. Supplier_id IS validated for UUID format when non-null — the validation is correct, but stylistically inconsistent with the shared `uuidStringSchema`. Clean up when next touching this file. (P3, not a blocker.)
 
 ---
 
-## CTO Conditional Sign-off — 2026-03-28
-
-All code-side claims from the 2026-03-28 verification were independently verified TRUE with zero discrepancies.
-
-### Staging Smoke — PASSED 2026-03-28
+## Staging Smoke — PASSED 2026-03-28
 
 | Item | Result |
 |------|--------|
@@ -101,19 +92,19 @@ All code-side claims from the 2026-03-28 verification were independently verifie
 
 Smoke coverage: supplier create → round create → product create → delivery order → pickup order → lookup (2 results) → payment report → payment confirm → arrival notification → shipment confirm → cancel.
 
-Artifact bundle contents:
-- `lookup-results.png` — public lookup results page
-- `order-detail.png` — signed order detail page
-- `orders-export.csv` — admin CSV export
-- `notification-logs.json` — notification log entries
-- `shipment-print-popup.png` — shipment print popup screenshot
-- `shipment-print-popup.html` — shipment print popup HTML
+Artifact bundle: `lookup-results.png`, `order-detail.png`, `orders-export.csv`, `notification-logs.json`, `shipment-print-popup.png`, `shipment-print-popup.html`.
 
-**All CTO conditions satisfied on code + automated staging side.**
+---
+
+## CTO Final Sign-off — 2026-03-28
+
+**Status: SIGNED OFF — unconditional on code. Operational env vars confirmed set on Vercel.**
+
+All code-side claims across both 2026-03-28 review rounds independently verified TRUE with zero discrepancies. The codebase is production-ready.
 
 ### Remaining Manual/Provider Proofs
 
-Still required per `docs/staging-smoke-runbook.md` before final production launch:
+Still required per `docs/staging-smoke-runbook.md` before serving live traffic:
 
 - Real LINE binding with a human account + screenshot of delivered LINE push notification.
 - Spreadsheet-app (Excel/Numbers) visual verification of the exported CSV — check encoding, column alignment, and Chinese characters.

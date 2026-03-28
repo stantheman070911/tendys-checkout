@@ -2,15 +2,17 @@
 **Project:** tendycheckout — 生鮮團購訂購系統
 **Date:** 2026-03-28
 **Prepared by:** Engineering
-**For:** CTO Sign-off
+**CTO Decision: SIGNED OFF** ✓
 
 ---
 
 ## Executive Summary
 
-All code-side findings from the 2026-03-26 and 2026-03-28 CTO review cycles have been resolved. The staging smoke run executed today against the `staging` branch preview deployment passed completely. All 6 artifact files were captured and verified. The automated gates are clean across the board.
+All code-side findings across both 2026-03-28 CTO review rounds have been resolved and independently verified TRUE. The staging smoke run passed completely against the `staging` branch preview deployment. All 6 artifact files were captured and verified. Automated gates are clean. Required env vars are confirmed set on Vercel for both Preview and Production scopes.
 
-Two items remain outstanding before final production launch — both are manual/provider proofs that require a live LINE account and a physical spreadsheet application. No further code changes are required.
+**The codebase is production-ready. No further code changes are required.**
+
+Two manual/provider proofs remain before serving live traffic — both require a live LINE account and a physical spreadsheet application.
 
 ---
 
@@ -18,7 +20,7 @@ Two items remain outstanding before final production launch — both are manual/
 
 | Gate | Result | Detail |
 |------|--------|--------|
-| `npm test` | **PASSED** | 44 files / 211 tests |
+| `npm test` | **PASSED** | 44 files / 212 tests |
 | `npm run lint` | **PASSED** | Zero warnings |
 | `npx tsc --noEmit` | **PASSED** | Strict mode, zero errors |
 | `npm run build` | **PASSED** | Next.js production build clean |
@@ -237,10 +239,30 @@ Per `docs/staging-smoke-runbook.md`, the following browser/provider screenshots 
 
 ---
 
+## Round 2 Remediation (2026-03-28)
+
+Following the first CTO review, a second round identified one remaining P1 and one P3.
+
+### P1 — cancel-order admin orderId missing UUID validation
+
+`cancel-order/route.ts` used `optionalTrimmedStringSchema()` for `orderId`. A malformed string passed directly to `cancelOrder()` and hit the Prisma layer as a `500` — the exact class of bug the remediation was supposed to eliminate. Changed to `optionalUuidStringSchema("orderId")`. Malformed admin `orderId` now returns `400` before any DB call. Test fixture updated to valid UUID; malformed-UUID test case added.
+
+### P3 — products/route.ts local UUID_RE removed
+
+`nullableSupplierIdSchema` used a local `UUID_RE` regex. Replaced with `z.string().uuid().safeParse()` inline. `optionalUuidStringSchema` was not used directly because the schema must distinguish `null` (clear supplier_id) from `undefined` (no change) — semantics that `optionalUuidStringSchema` collapses to `undefined`. Behavior is identical; local regex is gone.
+
+### Documentation
+
+`CLAUDE.md` now has an Operational Notes section documenting: (1) the `verifyAdminSession` Bearer-token fallback is intentional dual-path used by staging tooling, and (2) `ADMIN_EMAILS` cache requires a Vercel redeploy to pick up changes.
+
+---
+
 ## Commit Log (this review cycle)
 
 | Commit | Summary |
 |--------|---------|
+| `702e866` | fix: P1 UUID validation on cancel-order admin path; P3 remove UUID_RE from products |
+| `ab31c77` | docs: add comprehensive CTO production readiness report |
 | `29f7d5b` | feat: pass staging smoke + capture artifacts; fix hydration race in artifacts |
 | `889d8b2` | CTO remediation pass: normalize UUID validation, clean audit record |
 | `0c85c57` | Harden staging validation and fix preview smoke tooling |
@@ -249,6 +271,6 @@ Per `docs/staging-smoke-runbook.md`, the following browser/provider screenshots 
 
 ## Conclusion
 
-The codebase is in a verified, production-ready state on all automated dimensions. The two prior advisory cycles produced a measurably more secure and consistent API surface: UUID validation is now uniform across the full admin route set, the shared validation helper is the single implementation, the dependency audit is clean, and the staging smoke run passed end-to-end against the correct deployment target with a full artifact bundle captured.
+The codebase is production-ready. UUID validation is now uniform across the full admin route set — including the cancel-order admin path that was missed in round 1. The shared `uuidStringSchema` / `optionalUuidStringSchema` helpers are the single implementation. The dependency audit is clean. The staging smoke run passed end-to-end against the correct deployment target with a complete artifact bundle. All four required env vars are confirmed set on Vercel.
 
 Final production launch is gated only on the three manual/provider proof items listed above.
