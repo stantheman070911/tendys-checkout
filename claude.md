@@ -356,6 +356,16 @@ Public operations go through server-side API routes + Prisma, not direct anon ac
 
 ---
 
+## Operational Notes
+
+### Admin auth dual-path (verifyAdminSession)
+`lib/auth/supabase-admin.ts:130–141` has a deliberate Bearer-token fallback alongside the primary signed-cookie path. The Bearer path is used by staging tooling (`scripts/staging-smoke.mjs`, `scripts/staging-artifacts.mjs`) and by the initial admin session-establishment flow where the cookie has not yet been set. Do not remove it without updating those scripts.
+
+### ADMIN_EMAILS cache
+`isAllowedAdminEmail()` in `lib/auth/supabase-admin.ts` parses `process.env.ADMIN_EMAILS` once on first call and caches the result in a module-level `Set`. On Vercel's serverless model, the cache is per-process (cleared on each cold start). **Adding or removing admin email addresses requires a Vercel redeploy** to guarantee all warm instances pick up the change.
+
+---
+
 ## Verification (run before presenting work)
 
 ```bash
