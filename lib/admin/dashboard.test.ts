@@ -17,6 +17,11 @@ const notificationLogsMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/notification-logs", () => notificationLogsMock);
 
+const notificationJobsMock = vi.hoisted(() => ({
+  listFailedNotificationJobsByRound: vi.fn(),
+}));
+vi.mock("@/lib/db/notification-jobs", () => notificationJobsMock);
+
 import { getAdminDashboardSummary } from "./dashboard";
 
 describe("getAdminDashboardSummary", () => {
@@ -71,6 +76,7 @@ describe("getAdminDashboardSummary", () => {
         _count: { _all: 1 },
       },
     ]);
+    notificationJobsMock.listFailedNotificationJobsByRound.mockResolvedValue([]);
 
     const summary = await getAdminDashboardSummary("r1");
 
@@ -111,5 +117,6 @@ describe("getAdminDashboardSummary", () => {
         email: { success: 0, failed: 1, skipped: 0 },
       },
     ]);
+    expect(summary.failedNotificationJobs).toEqual([]);
   });
 });

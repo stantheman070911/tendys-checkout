@@ -4,6 +4,7 @@ import {
   phoneMatchesStoredProfile,
 } from "@/lib/db/users";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getRequestId, getRouteFromRequest, logError } from "@/lib/logger";
 import {
   normalizePhoneDigits,
   PUBLIC_CHECKOUT_AUTOFILL_MIN_PHONE_DIGITS,
@@ -57,6 +58,10 @@ export async function POST(request: NextRequest) {
       `checkout-profile:${clientIp}`,
       5,
       60_000,
+      {
+        route: getRouteFromRequest(request),
+        requestId: getRequestId(request),
+      },
     );
     if (rateLimit.error === "backend_unavailable") {
       return errorResponse("Checkout profile lookup is temporarily unavailable", 503);
@@ -91,7 +96,13 @@ export async function POST(request: NextRequest) {
         email: profile.email,
       },
     });
-  } catch {
+  } catch (error) {
+    logError({
+      event: "checkout_profile_lookup_failed",
+      requestId: getRequestId(request),
+      route: getRouteFromRequest(request),
+      error,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

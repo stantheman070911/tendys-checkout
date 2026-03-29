@@ -178,7 +178,22 @@ export function sameBaseUrl(left, right) {
 }
 
 export function createProtectedFetchSession() {
-  let bypassCookie = "";
+  const cookieJar = new Map();
+
+  function readSetCookieHeaders(headers) {
+    if (typeof headers.getSetCookie === "function") {
+      return headers.getSetCookie();
+    }
+
+    const value = headers.get("set-cookie");
+    return value ? value.split(/,(?=[^;]+?=)/g) : [];
+  }
+
+  function buildCookieHeader() {
+    return Array.from(cookieJar.entries())
+      .map(([name, value]) => `${name}=${value}`)
+      .join("; ");
+  }
 
   return {
     async fetch(url, init = {}) {
@@ -190,14 +205,21 @@ export function createProtectedFetchSession() {
           redirect: "manual",
           headers: {
             ...buildProtectionHeaders(),
-            ...(bypassCookie ? { Cookie: bypassCookie } : {}),
+            ...(cookieJar.size > 0 ? { Cookie: buildCookieHeader() } : {}),
             ...(init.headers ?? {}),
           },
         });
 
-        const setCookie = response.headers.get("set-cookie");
-        if (setCookie?.includes("_vercel_jwt=")) {
-          bypassCookie = setCookie.split(/;\s*/)[0];
+        for (const setCookie of readSetCookieHeaders(response.headers)) {
+          const [cookiePair] = setCookie.split(/;\s*/);
+          const separator = cookiePair.indexOf("=");
+          if (separator === -1) {
+            continue;
+          }
+
+          const name = cookiePair.slice(0, separator);
+          const value = cookiePair.slice(separator + 1);
+          cookieJar.set(name, value);
         }
 
         const location = response.headers.get("location");
@@ -216,7 +238,12 @@ export function createProtectedFetchSession() {
       throw new Error(`Exceeded protected redirect attempts for ${url}`);
     },
     getBypassCookie() {
-      return bypassCookie;
+      const value = cookieJar.get("_vercel_jwt");
+      return value ? `_vercel_jwt=${value}` : "";
+    },
+    getCookie(name) {
+      const value = cookieJar.get(name);
+      return value ? `${name}=${value}` : "";
     },
   };
 }

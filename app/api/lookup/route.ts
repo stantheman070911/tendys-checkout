@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleEnvironmentConfigurationError } from "@/lib/api/errors";
 import { findOrdersByPurchaserNameAndPhoneLast3 } from "@/lib/db/orders";
+import { getRequestId, getRouteFromRequest } from "@/lib/logger";
 import { createPublicOrderAccessDetailUrl } from "@/lib/public-order-access";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
   getPublicOrderAccessSecret,
-  isEnvironmentConfigurationError,
 } from "@/lib/server-env";
 import { normalizePhoneDigits } from "@/lib/utils";
 import { parseJsonBody, z } from "@/lib/validation";
@@ -38,7 +39,10 @@ const lookupSchema = z
 export async function POST(request: NextRequest) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimit = await checkRateLimit(`lookup:${clientIp}`, 5, 60_000);
+    const rateLimit = await checkRateLimit(`lookup:${clientIp}`, 5, 60_000, {
+      route: getRouteFromRequest(request),
+      requestId: getRequestId(request),
+    });
     if (rateLimit.error === "backend_unavailable") {
       return NextResponse.json(
         { error: "Lookup is temporarily unavailable" },
@@ -93,11 +97,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ orders: safeOrders });
   } catch (error) {
-    if (isEnvironmentConfigurationError(error)) {
-      return NextResponse.json(
-        { error: "Lookup is temporarily unavailable" },
-        { status: 503 },
-      );
+    const response = handleEnvironmentConfigurationError(
+      request,
+      error,
+      "Lookup is temporarily unavailable",
+    );
+    if (response) {
+      return response;
     }
 
     return NextResponse.json(

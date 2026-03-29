@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { randomUUID } from "node:crypto";
 import {
@@ -53,14 +54,28 @@ async function requestJson(baseUrl, path, options = {}) {
   return payload;
 }
 
-function buildAdminHeaders(token) {
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
-
 function getPhoneLast3(phone) {
   return phone.replace(/\D/g, "").slice(-3);
+}
+
+function runDbValidation(logger) {
+  logger.log("Running DB schema validation before smoke...");
+  const result = spawnSync("npm", ["run", "db:validate"], {
+    cwd: process.cwd(),
+    env: process.env,
+    encoding: "utf8",
+  });
+
+  if (result.stdout) {
+    logger.log(result.stdout.trim());
+  }
+  if (result.stderr) {
+    logger.log(result.stderr.trim());
+  }
+
+  if (result.status !== 0) {
+    throw new Error("DB schema validation failed before staging smoke.");
+  }
 }
 
 async function main() {
@@ -91,11 +106,20 @@ async function main() {
 
     logger.log(`Starting staging smoke against ${baseUrl}`);
     logger.log(`Run ID: ${runId}`);
+    runDbValidation(logger);
     logger.log(
       hasProtectionBypassSecret()
         ? "Vercel preview protection bypass is configured for this run."
         : "No Vercel preview protection bypass secret is configured for this run.",
     );
+
+    await requestJson(baseUrl, "/api/admin/session", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminBearerToken}`,
+      },
+    });
+    logger.log("Established admin session cookie from /api/admin/session");
 
     const supplierPayload = {
       name: `Smoke Supplier ${runId}`,
@@ -106,7 +130,6 @@ async function main() {
     };
     const supplierResponse = await requestJson(baseUrl, "/api/suppliers", {
       method: "POST",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify(supplierPayload),
     });
     created.supplier = supplierResponse.supplier;
@@ -122,7 +145,6 @@ async function main() {
     };
     const roundResponse = await requestJson(baseUrl, "/api/rounds", {
       method: "POST",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify(roundPayload),
     });
     created.round = roundResponse.round;
@@ -141,7 +163,6 @@ async function main() {
     };
     const productResponse = await requestJson(baseUrl, "/api/products", {
       method: "POST",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify(productPayload),
     });
     created.product = productResponse.product;
@@ -227,7 +248,6 @@ async function main() {
 
     await requestJson(baseUrl, "/api/confirm-order", {
       method: "POST",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify({
         orderId: created.deliveryOrder.id,
       }),
@@ -236,7 +256,6 @@ async function main() {
 
     await requestJson(baseUrl, "/api/notify-arrival", {
       method: "POST",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify({
         productId: created.product.id,
         roundId: created.round.id,
@@ -246,7 +265,6 @@ async function main() {
 
     await requestJson(baseUrl, "/api/confirm-shipment", {
       method: "POST",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify({
         orderId: created.deliveryOrder.id,
       }),
@@ -265,7 +283,6 @@ async function main() {
 
     await requestJson(baseUrl, "/api/products", {
       method: "PUT",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify({
         id: created.product.id,
         is_active: false,
@@ -273,7 +290,6 @@ async function main() {
     });
     await requestJson(baseUrl, "/api/rounds", {
       method: "PUT",
-      headers: buildAdminHeaders(adminBearerToken),
       body: JSON.stringify({
         id: created.round.id,
         is_open: false,

@@ -4,6 +4,9 @@
 **Prepared by:** Engineering
 **CTO Decision: SIGNED OFF** ✓
 
+> Archived historical snapshot only.
+> This document is not the current approval source. Use `roadmap.md` for live release status.
+
 ---
 
 ## Executive Summary

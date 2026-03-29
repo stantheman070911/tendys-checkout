@@ -6,7 +6,7 @@ import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
 
 export default async function AdminLoginPage() {
   const cookieStore = await cookies();
-  const session = readAdminSessionValue(
+  const session = await readAdminSessionValue(
     cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value,
   );
 

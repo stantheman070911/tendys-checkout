@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_SESSION_COOKIE_NAME,
   ADMIN_SESSION_MAX_AGE_SECONDS,
-  createAdminSessionValue,
+  createAdminSession,
   getAdminSessionFromRequest,
+  revokeAdminSession,
   verifyAdminAccessToken,
 } from "@/lib/auth/supabase-admin";
-import { isEnvironmentConfigurationError } from "@/lib/server-env";
+import { handleEnvironmentConfigurationError } from "@/lib/api/errors";
+import { getRequestId, getRouteFromRequest, logError } from "@/lib/logger";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -17,18 +19,20 @@ const COOKIE_OPTIONS = {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = getAdminSessionFromRequest(request);
+    const session = await getAdminSessionFromRequest(request);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     return NextResponse.json({ authorized: true, email: session.email });
   } catch (error) {
-    if (isEnvironmentConfigurationError(error)) {
-      return NextResponse.json(
-        { error: "Admin session is temporarily unavailable" },
-        { status: 503 },
-      );
+    const response = handleEnvironmentConfigurationError(
+      request,
+      error,
+      "Admin session is temporarily unavailable",
+    );
+    if (response) {
+      return response;
     }
 
     return NextResponse.json(
@@ -53,25 +57,28 @@ export async function POST(request: NextRequest) {
     if (!claims) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const session = await createAdminSession(claims.email);
 
     const response = NextResponse.json({
       authorized: true,
-      email: claims.email,
+      email: session.claims.email,
     });
     response.cookies.set({
       ...COOKIE_OPTIONS,
       name: ADMIN_SESSION_COOKIE_NAME,
-      value: createAdminSessionValue(claims.email),
+      value: session.value,
       maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
     });
 
     return response;
   } catch (error) {
-    if (isEnvironmentConfigurationError(error)) {
-      return NextResponse.json(
-        { error: "Admin session is temporarily unavailable" },
-        { status: 503 },
-      );
+    const response = handleEnvironmentConfigurationError(
+      request,
+      error,
+      "Admin session is temporarily unavailable",
+    );
+    if (response) {
+      return response;
     }
 
     return NextResponse.json(
@@ -81,8 +88,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromRequest(request);
+    if (session) {
+      await revokeAdminSession(session.sid);
+    }
+
     const response = NextResponse.json({ success: true });
     response.cookies.set({
       ...COOKIE_OPTIONS,
@@ -91,7 +103,13 @@ export async function DELETE() {
       maxAge: 0,
     });
     return response;
-  } catch {
+  } catch (error) {
+    logError({
+      event: "admin_session_delete_failed",
+      requestId: getRequestId(request),
+      route: getRouteFromRequest(request),
+      error,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

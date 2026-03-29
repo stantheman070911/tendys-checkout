@@ -34,6 +34,42 @@
 
 ---
 
+## Release Candidate Status
+
+This file is the canonical release-readiness source of truth. Do not use `whatwearebuilding.md` or archived CTO reports as approval state.
+
+- Candidate date: `2026-03-29`
+- Release owner: `TBD`
+- Commit SHA: `PENDING_BEFORE_RELEASE`
+- Artifact bundle IDs: `PENDING_BEFORE_RELEASE`
+- Staging URL: `PENDING_BEFORE_RELEASE`
+- Admin route: `/backoffice`
+- Current status: `BLOCKED`
+- Blocking evidence still required before release:
+  - Record green `npm run db:validate` output on the exact release candidate (configured DB validated successfully on `2026-03-30`)
+  - Rerun staging smoke on the exact release candidate
+  - Record the exact release owner, commit SHA, artifact bundle IDs, and staging URL here
+  - Complete or explicitly reopen every 7.1 verification item with owner + date
+
+### 7.1 Release Candidate Verification
+
+- [ ] Record exact release commit SHA and staging URL in this section
+- [ ] Record artifact bundle IDs for the release candidate
+- [ ] `npm run verify:release` passes on the release candidate
+- [ ] Staging smoke rerun passes on the exact release candidate
+- [ ] LINE binding verified end-to-end against a test OA
+- [ ] Payment-confirmed notification verified via LINE + email
+- [ ] Arrival notification verified via LINE + email
+- [ ] Shipment notification verified via LINE + email
+- [ ] Exported CSV opened in Excel or Numbers and validated
+- [ ] Safari mobile visual QA recorded
+- [ ] Chrome mobile visual QA recorded
+- [ ] Upstash rate limit verified active on the staging deployment
+- [ ] Forced notification failure produced Sentry event and Slack alert
+- [ ] Any remaining open item is explicitly reopened with owner + date
+
+---
+
 ## Phase 7: Integration Testing + Polish
 
 > **Goal:** End-to-end flow works. Edge cases handled. Ready for first real group-buy round.

@@ -2,6 +2,11 @@ import { Prisma } from "@prisma/client";
 import { toAdminOrderListRow } from "@/lib/admin/order-view";
 import { prisma } from "@/lib/db/prisma";
 import { decrementStock, restoreStock } from "@/lib/db/products";
+import {
+  enqueueOrderCancelledNotificationsTx,
+  enqueuePaymentConfirmedNotificationsTx,
+  enqueueShipmentNotificationsTx,
+} from "@/lib/notifications/outbox";
 import { isValidRoundPickupLocation } from "@/lib/pickup-options";
 import { normalizePhoneDigits } from "@/lib/utils";
 import type { AdminOrderListRow } from "@/types";
@@ -610,23 +615,6 @@ export async function findPublicOrderByOrderNumberAndIdentity(
   });
 }
 
-export async function listByRound(roundId: string, statusFilter?: string) {
-  const items = await prisma.order.findMany({
-    where: {
-      round_id: roundId,
-      ...(statusFilter ? { status: statusFilter } : {}),
-    },
-    select: orderWithAdminListSelect,
-    orderBy: { created_at: "desc" },
-  });
-
-  return items.map((item) => toAdminOrderListRow(item));
-}
-
-export async function listConfirmedByRound(roundId: string) {
-  return listByRound(roundId, "confirmed");
-}
-
 function buildAdminOrderWhere(input: {
   roundId: string;
   status?: string;
@@ -986,10 +974,15 @@ export async function reportPayment(
 
 export async function confirmOrder(orderId: string) {
   try {
-    return await prisma.order.update({
-      where: { id: orderId, status: "pending_confirm" },
-      data: { status: "confirmed", confirmed_at: new Date() },
-      include: { order_items: true, user: true },
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id: orderId, status: "pending_confirm" },
+        data: { status: "confirmed", confirmed_at: new Date() },
+        include: { order_items: true, user: true },
+      });
+
+      await enqueuePaymentConfirmedNotificationsTx(tx, order);
+      return order;
     });
   } catch (err) {
     if (
@@ -1019,19 +1012,30 @@ export async function batchConfirm(orderIds: string[]) {
       data: { status: "confirmed", confirmed_at: new Date() },
     });
 
-    return tx.order.findMany({
+    const confirmedOrders = await tx.order.findMany({
       where: { id: { in: pendingIds }, status: "confirmed" },
       include: { order_items: true, user: true },
     });
+
+    for (const order of confirmedOrders) {
+      await enqueuePaymentConfirmedNotificationsTx(tx, order);
+    }
+
+    return confirmedOrders;
   });
 }
 
 export async function confirmShipment(orderId: string) {
   try {
-    return await prisma.order.update({
-      where: { id: orderId, status: "confirmed" },
-      data: { status: "shipped", shipped_at: new Date() },
-      include: { order_items: true, user: true },
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id: orderId, status: "confirmed" },
+        data: { status: "shipped", shipped_at: new Date() },
+        include: { order_items: true, user: true },
+      });
+
+      await enqueueShipmentNotificationsTx(tx, order);
+      return order;
     });
   } catch (err) {
     if (
@@ -1061,10 +1065,16 @@ export async function batchConfirmShipment(orderIds: string[]) {
       data: { status: "shipped", shipped_at: new Date() },
     });
 
-    return tx.order.findMany({
+    const shippedOrders = await tx.order.findMany({
       where: { id: { in: confirmedIds }, status: "shipped" },
       include: { order_items: true, user: true },
     });
+
+    for (const order of shippedOrders) {
+      await enqueueShipmentNotificationsTx(tx, order);
+    }
+
+    return shippedOrders;
   });
 }
 
@@ -1110,6 +1120,11 @@ export async function cancelOrder(
       status: "cancelled" as const,
       cancel_reason: cancelReason || null,
     };
+
+    if (isAdmin) {
+      await enqueueOrderCancelledNotificationsTx(tx, cancelled);
+    }
+
     return { order: cancelled, changed: true as const };
   });
 }
@@ -1118,16 +1133,21 @@ export async function cancelOrder(
 
 export async function quickConfirm(orderId: string, paymentAmount: number) {
   try {
-    return await prisma.order.update({
-      where: { id: orderId, status: "pending_payment" },
-      data: {
-        status: "confirmed",
-        payment_amount: paymentAmount,
-        payment_last5: "CASH",
-        payment_reported_at: new Date(),
-        confirmed_at: new Date(),
-      },
-      include: { order_items: true, user: true },
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id: orderId, status: "pending_payment" },
+        data: {
+          status: "confirmed",
+          payment_amount: paymentAmount,
+          payment_last5: "CASH",
+          payment_reported_at: new Date(),
+          confirmed_at: new Date(),
+        },
+        include: { order_items: true, user: true },
+      });
+
+      await enqueuePaymentConfirmedNotificationsTx(tx, order);
+      return order;
     });
   } catch (err) {
     if (

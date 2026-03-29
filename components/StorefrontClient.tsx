@@ -67,6 +67,8 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     setSaveProfile,
   } = useStorefrontCheckoutForm();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [roundClosedOverride, setRoundClosedOverride] = useState(false);
+  const [refreshingRound, setRefreshingRound] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submissionKey, setSubmissionKey] = useState<string | null>(null);
 
@@ -89,6 +91,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
     (p) => p.goal_qty !== null && p.current_qty < p.goal_qty,
   );
   const roundClosed =
+    roundClosedOverride ||
     !round.is_open ||
     (round.deadline !== null && new Date(round.deadline) < new Date());
   const { autofillStatus, visibleAutofillStatus, resetAutofillStatus } =
@@ -103,8 +106,42 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
       },
     });
 
+  async function refreshRoundStatus() {
+    setRefreshingRound(true);
+    try {
+      const response = await fetch(`/api/rounds?roundId=${round.id}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        return !roundClosed;
+      }
+
+      const data = (await response.json()) as {
+        round?: Pick<Round, "is_open" | "deadline"> | null;
+      };
+      const closed =
+        !data.round ||
+        !data.round.is_open ||
+        (data.round.deadline !== null &&
+          new Date(data.round.deadline) < new Date());
+
+      setRoundClosedOverride(closed);
+      return !closed;
+    } catch {
+      return !roundClosed;
+    } finally {
+      setRefreshingRound(false);
+    }
+  }
+
   // Checkout open
-  function handleCheckout() {
+  async function handleCheckout() {
+    const roundStillOpen = await refreshRoundStatus();
+    if (!roundStillOpen) {
+      toast({ title: "本輪已截單，請改用查訂單功能", variant: "destructive" });
+      return;
+    }
+
     setCheckoutOpen(true);
     if (!submissionKey) setSubmissionKey(generateSubmissionKey());
     setTimeout(() => {
@@ -115,7 +152,13 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
   // Submit order
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (submitting || cartItems.length === 0) return;
+    if (submitting || refreshingRound || cartItems.length === 0) return;
+
+    const roundStillOpen = await refreshRoundStatus();
+    if (!roundStillOpen) {
+      toast({ title: "本輪已截單，無法再送出訂單", variant: "destructive" });
+      return;
+    }
 
     const trimmedNickname = nickname.trim();
     const trimmedPurchaserName = purchaserName.trim();
@@ -509,6 +552,7 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                     type="submit"
                     disabled={
                       submitting ||
+                      refreshingRound ||
                       cartItems.length === 0 ||
                       roundClosed ||
                       (isDelivery && !address.trim())
@@ -517,6 +561,8 @@ export function StorefrontClient({ round, products }: StorefrontClientProps) {
                   >
                     {submitting
                       ? "送出中..."
+                      : refreshingRound
+                        ? "確認開團狀態中..."
                       : `送出訂單 · ${formatCurrency(orderTotal)}`}
                   </button>
                   {isDelivery && !address.trim() && (

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth/supabase-admin", () => ({
-  verifyAdminSession: authMock,
+  authorizeAdminRequest: authMock,
 }));
 
 const ordersMock = vi.hoisted(() => ({
@@ -40,7 +40,11 @@ function makeRequest(body: unknown) {
 describe("POST /api/batch-confirm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authMock.mockResolvedValue(true);
+    authMock.mockResolvedValue({
+      authorized: true,
+      mode: "cookie",
+      claims: null,
+    });
     notifyMock.sendPaymentConfirmedNotifications.mockResolvedValue({});
   });
 
@@ -68,7 +72,11 @@ describe("POST /api/batch-confirm", () => {
   });
 
   it("returns 401 when not admin", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
 
     const res = await POST(makeRequest({ orderIds: [UUID1] }));
     expect(res.status).toBe(401);

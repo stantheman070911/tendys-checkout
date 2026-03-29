@@ -24,6 +24,13 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: prismaMock,
 }));
 
+const outboxMock = vi.hoisted(() => ({
+  enqueuePaymentConfirmedNotificationsTx: vi.fn(),
+  enqueueShipmentNotificationsTx: vi.fn(),
+  enqueueOrderCancelledNotificationsTx: vi.fn(),
+}));
+vi.mock("@/lib/notifications/outbox", () => outboxMock);
+
 import { batchConfirm, batchConfirmShipment } from "./orders";
 import { cancelOrder } from "./orders";
 
@@ -53,6 +60,7 @@ describe("batch order mutations", () => {
     });
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe("pending-1");
+    expect(outboxMock.enqueuePaymentConfirmedNotificationsTx).toHaveBeenCalledTimes(1);
   });
 
   it("batchConfirmShipment only returns orders transitioned in this call", async () => {
@@ -79,6 +87,7 @@ describe("batch order mutations", () => {
     });
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe("confirmed-1");
+    expect(outboxMock.enqueueShipmentNotificationsTx).toHaveBeenCalledTimes(1);
   });
 
   it("cancelOrder restores stock in product-id order to avoid deadlocks", async () => {
@@ -109,5 +118,6 @@ describe("batch order mutations", () => {
     expect(txMock.$executeRaw).toHaveBeenCalledTimes(2);
     expect(txMock.$executeRaw.mock.calls[0]?.[2]).toBe("product-a");
     expect(txMock.$executeRaw.mock.calls[1]?.[2]).toBe("product-b");
+    expect(outboxMock.enqueueOrderCancelledNotificationsTx).toHaveBeenCalledTimes(1);
   });
 });

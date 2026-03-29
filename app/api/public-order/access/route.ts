@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleEnvironmentConfigurationError } from "@/lib/api/errors";
 import { findPublicOrderByOrderNumberAndIdentity } from "@/lib/db/orders";
+import { getRequestId, getRouteFromRequest } from "@/lib/logger";
 import {
   buildPublicOrderPath,
   createPublicOrderAccessCookie,
@@ -8,7 +10,6 @@ import {
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
   getPublicOrderAccessSecret,
-  isEnvironmentConfigurationError,
 } from "@/lib/server-env";
 import { normalizePhoneDigits } from "@/lib/utils";
 import { parseFormData, parseSearchParams, z } from "@/lib/validation";
@@ -103,7 +104,13 @@ export async function GET(request: NextRequest) {
     });
     return response;
   } catch (error) {
-    if (isEnvironmentConfigurationError(error)) {
+    if (
+      handleEnvironmentConfigurationError(
+        request,
+        error,
+        "Public order access is temporarily unavailable",
+      )
+    ) {
       return seeOther(redirectToOrder(request, "", "service_unavailable"));
     }
 
@@ -126,6 +133,10 @@ export async function POST(request: NextRequest) {
       `public-order-access:${clientIp}`,
       5,
       60_000,
+      {
+        route: getRouteFromRequest(request),
+        requestId: getRequestId(request),
+      },
     );
     if (rateLimit.error === "backend_unavailable") {
       return seeOther(
@@ -162,7 +173,13 @@ export async function POST(request: NextRequest) {
     });
     return response;
   } catch (error) {
-    if (isEnvironmentConfigurationError(error)) {
+    if (
+      handleEnvironmentConfigurationError(
+        request,
+        error,
+        "Public order access is temporarily unavailable",
+      )
+    ) {
       return seeOther(redirectToOrder(request, "", "service_unavailable"));
     }
 

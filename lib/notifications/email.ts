@@ -1,4 +1,8 @@
 import { Resend } from "resend";
+import {
+  getResendApiKey,
+  getResendFromEmail,
+} from "@/lib/server-env";
 import type { NotifyResult } from "@/lib/line/push";
 
 export type { NotifyResult };
@@ -7,14 +11,14 @@ let resendClient: Resend | null = null;
 
 function getResend(): Resend | null {
   if (resendClient) return resendClient;
-  const key = process.env.RESEND_API_KEY;
+  const key = getResendApiKey();
   if (!key) return null;
   resendClient = new Resend(key);
   return resendClient;
 }
 
 function getFrom(): string {
-  return process.env.RESEND_FROM_EMAIL ?? "noreply@example.com";
+  return getResendFromEmail() ?? "noreply@example.com";
 }
 
 function escapeHtml(str: string): string {

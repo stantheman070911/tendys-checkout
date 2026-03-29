@@ -1,13 +1,25 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { AuthMode } from "@/lib/logger";
 import { verifyToken, signToken } from "@/lib/auth/signed-token";
-import { getAdminSessionSecret } from "@/lib/server-env";
+import { getKeyValueStore } from "@/lib/upstash";
+import {
+  allowBearerAdminSessionFallback,
+  getAdminSessionSecret,
+} from "@/lib/server-env";
 
 export const ADMIN_SESSION_COOKIE_NAME = "tendy_admin_session";
-export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 4;
 
-export interface AdminSessionClaims {
+export interface AdminSessionClaims extends Record<string, unknown> {
   email: string;
+  sid: string;
   exp: number;
+}
+
+export interface AdminAuthorizationResult {
+  authorized: boolean;
+  mode: AuthMode;
+  claims: AdminSessionClaims | null;
 }
 
 let adminClient: SupabaseClient | null = null;
@@ -63,16 +75,29 @@ function parseCookieHeader(header: string | null, name: string) {
 }
 
 export function createAdminSessionValue(email: string) {
+  return createAdminSessionValueWithSid(email, crypto.randomUUID());
+}
+
+function buildAdminSessionClaims(email: string, sid: string): AdminSessionClaims {
+  return {
+    email,
+    sid,
+    exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_MAX_AGE_SECONDS,
+  };
+}
+
+function buildAdminSessionStoreKey(sessionId: string) {
+  return `admin-session:${sessionId}`;
+}
+
+export function createAdminSessionValueWithSid(email: string, sid: string) {
   return signToken(
-    {
-      email,
-      exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_MAX_AGE_SECONDS,
-    } satisfies AdminSessionClaims,
+    buildAdminSessionClaims(email, sid),
     getAdminSessionSecret(),
   );
 }
 
-export function readAdminSessionValue(
+function parseSignedAdminSessionValue(
   value: string | null | undefined,
 ): AdminSessionClaims | null {
   if (!value) {
@@ -80,7 +105,7 @@ export function readAdminSessionValue(
   }
 
   const claims = verifyToken<AdminSessionClaims>(value, getAdminSessionSecret());
-  if (!claims?.email || typeof claims.exp !== "number") {
+  if (!claims?.email || !claims.sid || typeof claims.exp !== "number") {
     return null;
   }
 
@@ -95,9 +120,52 @@ export function readAdminSessionValue(
   return claims;
 }
 
-export function getAdminSessionFromRequest(
+export async function createAdminSession(email: string) {
+  const sid = crypto.randomUUID();
+  const claims = buildAdminSessionClaims(email, sid);
+
+  await getKeyValueStore().set(
+    buildAdminSessionStoreKey(sid),
+    { email },
+    { ex: ADMIN_SESSION_MAX_AGE_SECONDS },
+  );
+
+  return {
+    claims,
+    value: createAdminSessionValueWithSid(email, sid),
+  };
+}
+
+export async function revokeAdminSession(sessionId: string) {
+  await getKeyValueStore().del(buildAdminSessionStoreKey(sessionId));
+}
+
+export async function readAdminSessionValue(
+  value: string | null | undefined,
+): Promise<AdminSessionClaims | null> {
+  const claims = parseSignedAdminSessionValue(value);
+  if (!claims) {
+    return null;
+  }
+
+  const stored = await getKeyValueStore().get<{ email?: string }>(
+    buildAdminSessionStoreKey(claims.sid),
+  );
+
+  if (!stored?.email && process.env.PLAYWRIGHT_ADMIN_FIXTURE === "1") {
+    return claims;
+  }
+
+  if (!stored?.email || stored.email.toLowerCase() !== claims.email.toLowerCase()) {
+    return null;
+  }
+
+  return claims;
+}
+
+export async function getAdminSessionFromRequest(
   request: Request,
-): AdminSessionClaims | null {
+): Promise<AdminSessionClaims | null> {
   return readAdminSessionValue(
     parseCookieHeader(
       request.headers.get("cookie"),
@@ -108,7 +176,7 @@ export function getAdminSessionFromRequest(
 
 export async function verifyAdminAccessToken(
   token: string,
-): Promise<AdminSessionClaims | null> {
+): Promise<{ email: string } | null> {
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.auth.getUser(token);
@@ -120,22 +188,58 @@ export async function verifyAdminAccessToken(
 
     return {
       email: data.user.email,
-      exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_MAX_AGE_SECONDS,
     };
   } catch {
     return null;
   }
 }
 
-export async function verifyAdminSession(request: Request): Promise<boolean> {
+export async function authorizeAdminRequest(
+  request: Request,
+): Promise<AdminAuthorizationResult> {
   const cookieSession = getAdminSessionFromRequest(request);
-  if (cookieSession) {
-    return true;
+  if (await cookieSession) {
+    return {
+      authorized: true,
+      mode: "cookie",
+      claims: await cookieSession,
+    };
+  }
+
+  if (!allowBearerAdminSessionFallback()) {
+    return {
+      authorized: false,
+      mode: "none",
+      claims: null,
+    };
   }
 
   const authHeader = request.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return false;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return {
+      authorized: false,
+      mode: "none",
+      claims: null,
+    };
+  }
 
   const token = authHeader.slice(7);
-  return !!(await verifyAdminAccessToken(token));
+  const claims = await verifyAdminAccessToken(token);
+  if (!claims) {
+    return {
+      authorized: false,
+      mode: "none",
+      claims: null,
+    };
+  }
+
+  return {
+    authorized: true,
+    mode: "bearer",
+    claims: buildAdminSessionClaims(claims.email, "bearer"),
+  };
+}
+
+export async function verifyAdminSession(request: Request): Promise<boolean> {
+  return (await authorizeAdminRequest(request)).authorized;
 }

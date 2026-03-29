@@ -31,7 +31,7 @@ export const NOTIFICATION_TYPES = {
   ORDER_CANCELLED: "order_cancelled",
 } as const;
 
-export const ADMIN_BASE = "/bitchassnigga";
+export const ADMIN_BASE = "/backoffice";
 
 export const BANK_INFO = {
   name: process.env.NEXT_PUBLIC_BANK_NAME ?? "",

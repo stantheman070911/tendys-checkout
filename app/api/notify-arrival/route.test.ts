@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth/supabase-admin", () => ({
-  verifyAdminSession: authMock,
+  authorizeAdminRequest: authMock,
 }));
 
 const productsMock = vi.hoisted(() => ({
@@ -17,15 +17,10 @@ const ordersMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
 
-const notifyMock = vi.hoisted(() => ({
-  sendProductArrivalNotifications: vi.fn(),
+const outboxMock = vi.hoisted(() => ({
+  enqueueProductArrivalNotifications: vi.fn(),
 }));
-vi.mock("@/lib/notifications/send", () => notifyMock);
-vi.mock("@/lib/notifications/fire-and-forget", () => ({
-  fireAndForget: (task: () => Promise<unknown>) => {
-    void task();
-  },
-}));
+vi.mock("@/lib/notifications/outbox", () => outboxMock);
 
 import { POST } from "./route";
 
@@ -46,7 +41,11 @@ function makeRequest(body: unknown) {
 describe("POST /api/notify-arrival", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authMock.mockResolvedValue(true);
+    authMock.mockResolvedValue({
+      authorized: true,
+      mode: "cookie",
+      claims: null,
+    });
   });
 
   it("returns 200 with 0 customers and no notification call", async () => {
@@ -66,7 +65,7 @@ describe("POST /api/notify-arrival", () => {
     const data = await res.json();
     expect(data.customersNotified).toBe(0);
     expect(data.queued).toBe(false);
-    expect(notifyMock.sendProductArrivalNotifications).not.toHaveBeenCalled();
+    expect(outboxMock.enqueueProductArrivalNotifications).not.toHaveBeenCalled();
   });
 
   it("returns 404 when product not found", async () => {
@@ -88,19 +87,20 @@ describe("POST /api/notify-arrival", () => {
       round_id: ROUND_ID,
     });
     ordersMock.getCustomersForArrivalNotification.mockResolvedValue(recipients);
-    notifyMock.sendProductArrivalNotifications.mockResolvedValue(undefined);
+    outboxMock.enqueueProductArrivalNotifications.mockResolvedValue(undefined);
 
     const res = await POST(makeRequest({ productId: PRODUCT_ID, roundId: ROUND_ID }));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.customersNotified).toBe(2);
     expect(data.queued).toBe(true);
-    expect(notifyMock.sendProductArrivalNotifications).toHaveBeenCalledWith(
-      PRODUCT_ID,
-      "地瓜",
-      ROUND_ID,
-      recipients,
-    );
+    expect(outboxMock.enqueueProductArrivalNotifications).toHaveBeenCalledWith({
+      productId: PRODUCT_ID,
+      productName: "地瓜",
+      roundId: ROUND_ID,
+      lineUserIds: recipients.lineUserIds,
+      emails: recipients.emails,
+    });
   });
 
   it("returns 400 when product and round do not match", async () => {
@@ -113,11 +113,15 @@ describe("POST /api/notify-arrival", () => {
     const res = await POST(makeRequest({ productId: PRODUCT_ID, roundId: ROUND_ID }));
     expect(res.status).toBe(400);
     expect(ordersMock.getCustomersForArrivalNotification).not.toHaveBeenCalled();
-    expect(notifyMock.sendProductArrivalNotifications).not.toHaveBeenCalled();
+    expect(outboxMock.enqueueProductArrivalNotifications).not.toHaveBeenCalled();
   });
 
   it("returns 401 when not admin", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
 
     const res = await POST(makeRequest({ productId: PRODUCT_ID, roundId: ROUND_ID }));
     expect(res.status).toBe(401);

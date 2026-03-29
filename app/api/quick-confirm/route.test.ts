@@ -4,23 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth/supabase-admin", () => ({
-  verifyAdminSession: authMock,
+  authorizeAdminRequest: authMock,
 }));
 
 const ordersMock = vi.hoisted(() => ({
   quickConfirm: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
-
-const notifyMock = vi.hoisted(() => ({
-  sendPaymentConfirmedNotifications: vi.fn(),
-}));
-vi.mock("@/lib/notifications/send", () => notifyMock);
-vi.mock("@/lib/notifications/fire-and-forget", () => ({
-  fireAndForget: (task: () => Promise<unknown>) => {
-    void task();
-  },
-}));
 
 import { POST } from "./route";
 
@@ -45,19 +35,18 @@ const fakeOrder = {
 describe("POST /api/quick-confirm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authMock.mockResolvedValue(true);
+    authMock.mockResolvedValue({
+      authorized: true,
+      mode: "cookie",
+      claims: null,
+    });
   });
 
-  it("confirms pending_payment → 200 + notification", async () => {
+  it("confirms pending_payment → 200", async () => {
     ordersMock.quickConfirm.mockResolvedValue(fakeOrder);
-    notifyMock.sendPaymentConfirmedNotifications.mockResolvedValue({});
 
     const res = await POST(makeRequest({ orderId: VALID_ORDER_ID, paymentAmount: 500 }));
     expect(res.status).toBe(200);
-    expect(notifyMock.sendPaymentConfirmedNotifications).toHaveBeenCalledWith(
-      fakeOrder,
-      fakeOrder.order_items,
-    );
   });
 
   it("returns 404 when order not found or wrong status", async () => {
@@ -68,7 +57,11 @@ describe("POST /api/quick-confirm", () => {
   });
 
   it("returns 401 when not admin", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
 
     const res = await POST(makeRequest({ orderId: VALID_ORDER_ID, paymentAmount: 500 }));
     expect(res.status).toBe(401);

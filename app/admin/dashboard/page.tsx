@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ADMIN_BASE } from "@/constants";
 import { ProductAggregationTable } from "@/components/admin/ProductAggregationTable";
+import { NotificationFailuresPanel } from "@/components/admin/NotificationFailuresPanel";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { getAdminDashboardSummary } from "@/lib/admin/dashboard";
 import { getAdminChromeContext, requireAdminPageSession } from "@/lib/admin/server";
 import { serializeForClient } from "@/lib/server-serialize";
 import { formatCurrency } from "@/lib/utils";
-import type { Round } from "@/types";
+import type { AdminNotificationFailureRow, Round } from "@/types";
 
 function buildRoundHref(path: string, roundId: string) {
   const params = new URLSearchParams({ roundId });
@@ -73,6 +74,10 @@ export default async function DashboardPage({
   ];
 
   const clientRound = serializeForClient<Round>(round);
+  const failedNotificationJobs =
+    serializeForClient<AdminNotificationFailureRow[]>(
+      summary.failedNotificationJobs,
+    );
 
   return (
     <AdminShell
@@ -201,6 +206,11 @@ export default async function DashboardPage({
             </div>
           </div>
         )}
+
+        <NotificationFailuresPanel
+          roundId={clientRound.id}
+          jobs={failedNotificationJobs}
+        />
       </div>
     </AdminShell>
   );

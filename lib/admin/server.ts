@@ -18,7 +18,7 @@ export interface AdminChromeContext {
 
 export async function requireAdminPageSession() {
   const cookieStore = await cookies();
-  const session = readAdminSessionValue(
+  const session = await readAdminSessionValue(
     cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value,
   );
 

@@ -3,6 +3,7 @@ import {
   findPublicOrderByOrderNumberAndIdentity,
   reportPayment,
 } from "@/lib/db/orders";
+import { getRequestId, getRouteFromRequest, logError } from "@/lib/logger";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
 import { parseJsonBody, z } from "@/lib/validation";
@@ -54,6 +55,10 @@ export async function POST(request: NextRequest) {
       `report-payment:${clientIp}`,
       5,
       60_000,
+      {
+        route: getRouteFromRequest(request),
+        requestId: getRequestId(request),
+      },
     );
     if (rateLimit.error === "backend_unavailable") {
       return NextResponse.json(
@@ -135,7 +140,13 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ order });
-  } catch {
+  } catch (error) {
+    logError({
+      event: "report_payment_failed",
+      requestId: getRequestId(request),
+      route: getRouteFromRequest(request),
+      error,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

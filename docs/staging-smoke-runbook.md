@@ -20,9 +20,19 @@ For the deployed app:
 
 - `ADMIN_SESSION_SECRET`
 - `PUBLIC_ORDER_ACCESS_SECRET`
+- `NOTIFICATION_WORKER_SECRET`
+- `CRON_SECRET`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `RATE_LIMIT_PREFIX`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `LINE_CHANNEL_ACCESS_TOKEN`
+- `LINE_CHANNEL_SECRET`
+- `SENTRY_DSN`
+- `OPS_ALERT_WEBHOOK_URL`
+
+`CRON_SECRET` must be set on the Vercel project. Vercel Cron attaches `Authorization: Bearer <CRON_SECRET>` automatically when invoking `/api/internal/notification-worker`.
 
 ## Automated Pass
 
@@ -34,17 +44,19 @@ npm run staging:smoke
 
 The script performs:
 
-1. Create supplier.
-2. Create round with shipping fee and pickup labels.
-3. Create product linked to that round/supplier.
-4. Submit one delivery order and one pickup order.
-5. Lookup orders via `purchaser_name + phone_last3`.
-6. Report payment for the delivery order.
-7. Admin confirm the delivery order.
-8. Queue an arrival notification.
-9. Admin confirm shipment.
-10. Cancel the pickup order.
-11. Deactivate the test product and close the test round.
+1. Run `npm run db:validate` against the target database configuration.
+2. Exchange `STAGING_ADMIN_BEARER_TOKEN` for a real admin session cookie via `/api/admin/session`.
+3. Create supplier.
+4. Create round with shipping fee and pickup labels.
+5. Create product linked to that round/supplier.
+6. Submit one delivery order and one pickup order.
+7. Lookup orders via `purchaser_name + phone_last3`.
+8. Report payment for the delivery order.
+9. Admin confirm the delivery order.
+10. Queue an arrival notification.
+11. Admin confirm shipment.
+12. Cancel the pickup order.
+13. Deactivate the test product and close the test round.
 
 The script writes these run-scoped artifacts automatically:
 
@@ -90,6 +102,7 @@ This helper does not replace the remaining manual proof steps below. In particul
 Record timestamp, staging URL, commit SHA, and operator name.
 
 - Verify admin login via Supabase and session-cookie creation.
+- Verify the hidden admin path is `/backoffice` and `/admin` redirects to `/gtfo`.
 - Open `/lookup`, search with the smoke purchaser identity, and confirm each result exposes a working signed detail link.
 - Open the signed detail URL directly and confirm the browser lands on clean `/order/[orderNumber]`.
 - Verify public order detail shows phone, address, and LINE binding UI correctly.

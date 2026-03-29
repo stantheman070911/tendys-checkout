@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/auth/supabase-admin";
+import { authorizeAdminRequest } from "@/lib/auth/supabase-admin";
 import {
   cancelOrder,
   findPublicOrderByOrderNumberAndIdentity,
 } from "@/lib/db/orders";
-import { fireAndForget } from "@/lib/notifications/fire-and-forget";
-import { sendOrderCancelledNotifications } from "@/lib/notifications/send";
+import { getRequestId, getRouteFromRequest, logError } from "@/lib/logger";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizePhoneDigits } from "@/lib/utils";
 import { optionalTrimmedStringSchema, optionalUuidStringSchema, parseJsonBody, z } from "@/lib/validation";
@@ -28,6 +27,8 @@ const cancelOrderSchema = z
   }));
 
 export async function POST(request: NextRequest) {
+  let authMode: "cookie" | "bearer" | "none" = "none";
+
   try {
     const parsedBody = await parseJsonBody(request, cancelOrderSchema);
     if (!parsedBody.success) {
@@ -42,7 +43,9 @@ export async function POST(request: NextRequest) {
     } = parsedBody.data;
 
     // Determine mode by auth — don't 401 if not admin, just use user mode
-    const isAdmin = await verifyAdminSession(request);
+    const authorization = await authorizeAdminRequest(request);
+    authMode = authorization.mode;
+    const isAdmin = authorization.authorized;
 
     let resolvedOrderId = orderId;
 
@@ -53,6 +56,10 @@ export async function POST(request: NextRequest) {
         `cancel-order:${clientIp}`,
         5,
         60_000,
+        {
+          route: getRouteFromRequest(request),
+          requestId: getRequestId(request),
+        },
       );
       if (rateLimit.error === "backend_unavailable") {
         return NextResponse.json(
@@ -122,19 +129,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // Admin cancel: send cancellation notifications only if status actually changed
-    if (isAdmin && result.changed && result.order.order_items) {
-      fireAndForget(() =>
-        sendOrderCancelledNotifications(
-          result.order,
-          result.order.order_items,
-          reason,
-        ),
-      );
-    }
-
     return NextResponse.json({ order: result.order });
-  } catch {
+  } catch (error) {
+    logError({
+      event: "cancel_order_failed",
+      requestId: getRequestId(request),
+      route: getRouteFromRequest(request),
+      authMode,
+      error,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

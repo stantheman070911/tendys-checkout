@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth/supabase-admin", () => ({
-  verifyAdminSession: authMock,
+  authorizeAdminRequest: authMock,
 }));
 
 const ordersMock = vi.hoisted(() => ({
@@ -13,16 +13,6 @@ const ordersMock = vi.hoisted(() => ({
   findPublicOrderByOrderNumberAndIdentity: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
-
-const notifyMock = vi.hoisted(() => ({
-  sendOrderCancelledNotifications: vi.fn(),
-}));
-vi.mock("@/lib/notifications/send", () => notifyMock);
-vi.mock("@/lib/notifications/fire-and-forget", () => ({
-  fireAndForget: (task: () => Promise<unknown>) => {
-    void task();
-  },
-}));
 
 import { POST } from "./route";
 
@@ -51,7 +41,11 @@ describe("POST /api/cancel-order", () => {
   });
 
   it("user cancel pending_payment → 200, no notification", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
     ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue({
       ...fakeOrder,
     });
@@ -69,11 +63,14 @@ describe("POST /api/cancel-order", () => {
       }),
     );
     expect(res.status).toBe(200);
-    expect(notifyMock.sendOrderCancelledNotifications).not.toHaveBeenCalled();
   });
 
   it("user cancel non-pending_payment → 400", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
     ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue({
       ...fakeOrder,
     });
@@ -91,28 +88,30 @@ describe("POST /api/cancel-order", () => {
     expect(res.status).toBe(400);
   });
 
-  it("admin cancel → 200 + sends notification", async () => {
-    authMock.mockResolvedValue(true);
+  it("admin cancel → 200", async () => {
+    authMock.mockResolvedValue({
+      authorized: true,
+      mode: "cookie",
+      claims: null,
+    });
     ordersMock.cancelOrder.mockResolvedValue({
       changed: true,
       order: fakeOrder,
       order_items: fakeOrder.order_items,
     });
-    notifyMock.sendOrderCancelledNotifications.mockResolvedValue({});
 
     const res = await POST(
       makeRequest({ orderId: VALID_ORDER_ID, cancel_reason: "客戶要求" }),
     );
     expect(res.status).toBe(200);
-    expect(notifyMock.sendOrderCancelledNotifications).toHaveBeenCalledWith(
-      fakeOrder,
-      fakeOrder.order_items,
-      "客戶要求",
-    );
   });
 
   it("admin cancel already-cancelled → no notification", async () => {
-    authMock.mockResolvedValue(true);
+    authMock.mockResolvedValue({
+      authorized: true,
+      mode: "cookie",
+      claims: null,
+    });
     ordersMock.cancelOrder.mockResolvedValue({
       changed: false,
       order: fakeOrder,
@@ -121,11 +120,14 @@ describe("POST /api/cancel-order", () => {
 
     const res = await POST(makeRequest({ orderId: VALID_ORDER_ID }));
     expect(res.status).toBe(200);
-    expect(notifyMock.sendOrderCancelledNotifications).not.toHaveBeenCalled();
   });
 
   it("order not found → 404", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
     ordersMock.findPublicOrderByOrderNumberAndIdentity.mockResolvedValue(null);
 
     const res = await POST(
@@ -139,7 +141,11 @@ describe("POST /api/cancel-order", () => {
   });
 
   it("missing public order_number → 400", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
     const res = await POST(
       makeRequest({ purchaser_name: "王小美", phone_last3: "678" }),
     );
@@ -147,7 +153,11 @@ describe("POST /api/cancel-order", () => {
   });
 
   it("invalid phone_last3 → 400", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
     const res = await POST(
       makeRequest({
         order_number: "ORD-20260324-001",
@@ -159,7 +169,11 @@ describe("POST /api/cancel-order", () => {
   });
 
   it("admin cancel with malformed orderId → 400, DB never called", async () => {
-    authMock.mockResolvedValue(true);
+    authMock.mockResolvedValue({
+      authorized: true,
+      mode: "cookie",
+      claims: null,
+    });
     const res = await POST(makeRequest({ orderId: "not-a-uuid", cancel_reason: "test" }));
     expect(res.status).toBe(400);
     expect(ordersMock.cancelOrder).not.toHaveBeenCalled();

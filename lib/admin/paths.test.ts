@@ -3,16 +3,16 @@ import { buildAdminPath } from "./paths";
 
 describe("buildAdminPath", () => {
   it("returns the admin base for empty input", () => {
-    expect(buildAdminPath()).toBe("/bitchassnigga");
+    expect(buildAdminPath()).toBe("/backoffice");
   });
 
   it("normalizes relative paths", () => {
     expect(buildAdminPath("orders/123/print")).toBe(
-      "/bitchassnigga/orders/123/print",
+      "/backoffice/orders/123/print",
     );
   });
 
   it("preserves rooted paths", () => {
-    expect(buildAdminPath("/dashboard")).toBe("/bitchassnigga/dashboard");
+    expect(buildAdminPath("/dashboard")).toBe("/backoffice/dashboard");
   });
 });

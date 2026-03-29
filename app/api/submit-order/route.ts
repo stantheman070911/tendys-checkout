@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleEnvironmentConfigurationError } from "@/lib/api/errors";
 import { verifyAdminSession } from "@/lib/auth/supabase-admin";
 import { createCheckoutOrder } from "@/lib/db/orders";
+import { getRequestId, getRouteFromRequest } from "@/lib/logger";
 import {
   buildPublicOrderPath,
   createPublicOrderAccessCookie,
@@ -248,6 +250,10 @@ export async function POST(request: NextRequest) {
         `submit-order:${clientIp}`,
         5,
         60_000,
+        {
+          route: getRouteFromRequest(request),
+          requestId: getRequestId(request),
+        },
       );
       if (rateLimit.error === "backend_unavailable") {
         return NextResponse.json(
@@ -358,11 +364,13 @@ export async function POST(request: NextRequest) {
         );
     }
   } catch (error) {
-    if (isEnvironmentConfigurationError(error)) {
-      return NextResponse.json(
-        { error: "Ordering is temporarily unavailable" },
-        { status: 503 },
-      );
+    const response = handleEnvironmentConfigurationError(
+      request,
+      error,
+      "Ordering is temporarily unavailable",
+    );
+    if (response) {
+      return response;
     }
 
     console.error("POST /api/submit-order failed", error);

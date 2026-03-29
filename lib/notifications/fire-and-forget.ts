@@ -1,4 +1,6 @@
 import { after } from "next/server";
+import { logError } from "@/lib/logger";
+import { captureException } from "@/lib/observability/sentry";
 
 type WaitUntilCapableGlobal = typeof globalThis & {
   waitUntil?: (promise: Promise<void>) => void;
@@ -7,8 +9,12 @@ type WaitUntilCapableGlobal = typeof globalThis & {
 export function fireAndForget(task: () => Promise<unknown>) {
   const runTask = () =>
     task()
-      .catch((error) => {
-        console.error("Background notification task failed", error);
+      .catch(async (error) => {
+        logError({
+          event: "background_task_failed",
+          error,
+        });
+        await captureException(error);
       })
       .then(() => undefined);
 

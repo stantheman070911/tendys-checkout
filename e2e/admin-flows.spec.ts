@@ -9,6 +9,7 @@ function createAdminSessionCookie() {
   return signToken(
     {
       email: ADMIN_EMAIL,
+      sid: "playwright-admin-session",
       exp: Math.floor(Date.now() / 1000) + 60 * 60,
     },
     ADMIN_SESSION_SECRET,

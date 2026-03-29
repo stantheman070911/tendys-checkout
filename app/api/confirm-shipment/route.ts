@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/auth/supabase-admin";
+import { authorizeAdminRequest } from "@/lib/auth/supabase-admin";
 import { confirmShipment, batchConfirmShipment } from "@/lib/db/orders";
-import { mapWithConcurrency } from "@/lib/async";
-import { fireAndForget } from "@/lib/notifications/fire-and-forget";
-import { sendShipmentNotifications } from "@/lib/notifications/send";
+import { getRequestId, getRouteFromRequest, logError } from "@/lib/logger";
 import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
 const confirmShipmentSingleSchema = z
@@ -34,9 +32,12 @@ const confirmShipmentSchema = z.union([
 ]);
 
 export async function POST(request: NextRequest) {
+  let authMode: "cookie" | "bearer" | "none" = "none";
+
   try {
-    const isAdmin = await verifyAdminSession(request);
-    if (!isAdmin) {
+    const authorization = await authorizeAdminRequest(request);
+    authMode = authorization.mode;
+    if (!authorization.authorized) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -53,7 +54,6 @@ export async function POST(request: NextRequest) {
           { status: 404 },
         );
       }
-      fireAndForget(() => sendShipmentNotifications(order, order.order_items));
       return NextResponse.json({ order });
     }
 
@@ -62,17 +62,18 @@ export async function POST(request: NextRequest) {
     const changedIds = new Set(shippedOrders.map((order) => order.id));
     const skipped = trimmedIds.filter((id) => !changedIds.has(id));
 
-    fireAndForget(() =>
-      mapWithConcurrency(shippedOrders, 10, (order) =>
-        sendShipmentNotifications(order, order.order_items),
-      ).then(() => undefined),
-    );
-
     return NextResponse.json({
       shipped: shippedOrders.length,
       skipped,
     });
-  } catch {
+  } catch (error) {
+    logError({
+      event: "confirm_shipment_failed",
+      requestId: getRequestId(request),
+      route: getRouteFromRequest(request),
+      authMode,
+      error,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

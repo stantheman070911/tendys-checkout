@@ -1,5 +1,18 @@
 import type { NextConfig } from "next";
 
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+  "connect-src 'self' https: wss:",
+].join("; ");
+
 function normalizeAllowedImageHost(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -50,8 +63,16 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-DNS-Prefetch-Control", value: "on" },
           {
+            key: "Content-Security-Policy",
+            value: CONTENT_SECURITY_POLICY,
+          },
+          {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
           },
         ],
       },
@@ -59,14 +80,28 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      { source: "/bitchassnigga", destination: "/admin" },
-      { source: "/bitchassnigga/:path*", destination: "/admin/:path*" },
+      {
+        source: "/backoffice",
+        destination: "/admin",
+      },
+      {
+        source: "/backoffice/:path*",
+        destination: "/admin/:path*",
+      },
     ];
   },
   async redirects() {
     return [
-      { source: "/admin", destination: "/gtfo", permanent: false },
-      { source: "/admin/:path*", destination: "/gtfo", permanent: false },
+      {
+        source: "/admin",
+        destination: "/gtfo",
+        permanent: false,
+      },
+      {
+        source: "/admin/:path*",
+        destination: "/gtfo",
+        permanent: false,
+      },
     ];
   },
 };

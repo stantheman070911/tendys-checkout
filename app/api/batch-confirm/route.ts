@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/auth/supabase-admin";
+import { authorizeAdminRequest } from "@/lib/auth/supabase-admin";
 import { batchConfirm } from "@/lib/db/orders";
-import { mapWithConcurrency } from "@/lib/async";
-import { fireAndForget } from "@/lib/notifications/fire-and-forget";
-import { sendPaymentConfirmedNotifications } from "@/lib/notifications/send";
+import { getRequestId, getRouteFromRequest, logError } from "@/lib/logger";
 import { parseJsonBody, uuidStringSchema, z } from "@/lib/validation";
 
 const batchConfirmSchema = z.object({
@@ -13,9 +11,12 @@ const batchConfirmSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  let authMode: "cookie" | "bearer" | "none" = "none";
+
   try {
-    const isAdmin = await verifyAdminSession(request);
-    if (!isAdmin) {
+    const authorization = await authorizeAdminRequest(request);
+    authMode = authorization.mode;
+    if (!authorization.authorized) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -29,17 +30,18 @@ export async function POST(request: NextRequest) {
     const changedIds = new Set(confirmedOrders.map((order) => order.id));
     const skipped = trimmedIds.filter((id) => !changedIds.has(id));
 
-    fireAndForget(() =>
-      mapWithConcurrency(confirmedOrders, 10, (order) =>
-        sendPaymentConfirmedNotifications(order, order.order_items),
-      ).then(() => undefined),
-    );
-
     return NextResponse.json({
       confirmed: confirmedOrders.length,
       skipped,
     });
-  } catch {
+  } catch (error) {
+    logError({
+      event: "batch_confirm_failed",
+      requestId: getRequestId(request),
+      route: getRouteFromRequest(request),
+      authMode,
+      error,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

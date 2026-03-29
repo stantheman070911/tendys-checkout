@@ -1,9 +1,11 @@
+import { getLineChannelAccessToken } from "@/lib/server-env";
+
 export type NotifyResult = { success: boolean; error?: string };
 
 const LINE_API_BASE = "https://api.line.me/v2/bot/message";
 
 function getToken(): string | null {
-  return process.env.LINE_CHANNEL_ACCESS_TOKEN ?? null;
+  return getLineChannelAccessToken() ?? null;
 }
 
 async function linePost(

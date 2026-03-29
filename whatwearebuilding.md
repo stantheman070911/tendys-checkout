@@ -1,5 +1,8 @@
 # 生鮮團購訂購系統 — MVP Spec
 
+> Release readiness and production approval status live only in `roadmap.md`.
+> Treat this file as product/architecture intent, not a sign-off document.
+
 小型生鮮團購的訂購 + 金流回報 + 出貨管理 + 供應商管理系統。
 團主在 LINE 群組分享連結 → 用戶下單 + 匯款回報 → 團主確認付款 → 協調供應商到貨 → 確認出貨 + 通知。
 內建類募資進度條，鼓勵揪團達標。
@@ -198,6 +201,7 @@
   - 經過效能清理後的實戰 review，訂單 / 出貨 mutation flow 仍保留 authoritative refresh，避免 total / page / hasMore 漂移；即時 badge 仍由 client chrome state 補強
   - 目前剩餘的是 backlog，不是上線阻塞：`OrdersPageClient` / `ShipmentsPageClient` 的 browser-level integration coverage，以及 admin list query 真正 DB-side 的 preview 聚合瘦身
 - 這輪 UI 重構沒有改動核心流程或 API 契約；如果出現行為問題，先假設是既有邏輯問題，不是這次設計重構刻意改規格。
+- 任何候選版本、staging 驗證、上線簽核狀態，一律以 `roadmap.md` 為準。
 
 ---
 

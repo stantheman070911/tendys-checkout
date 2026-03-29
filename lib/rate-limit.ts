@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { logError } from "@/lib/logger";
 import {
   getRateLimitConfig,
   isEnvironmentConfigurationError,
@@ -28,6 +29,11 @@ export interface CheckRateLimitResult {
   allowed: boolean;
   retryAfterSeconds: number;
   error?: "backend_unavailable";
+}
+
+interface RateLimitErrorContext {
+  route?: string | null;
+  requestId?: string | null;
 }
 
 interface RateLimitCheckArgs {
@@ -159,11 +165,23 @@ export async function checkRateLimit(
   key: string,
   limit: number,
   windowMs: number,
+  context?: RateLimitErrorContext,
 ): Promise<CheckRateLimitResult> {
   try {
     return await getStore().check({ key, limit, windowMs });
   } catch (error) {
     if (isEnvironmentConfigurationError(error)) {
+      logError({
+        event: "rate_limit_backend_unavailable",
+        route: context?.route ?? null,
+        requestId: context?.requestId ?? null,
+        error,
+        details: {
+          key,
+          limit,
+          windowMs,
+        },
+      });
       return {
         allowed: false,
         retryAfterSeconds: 0,

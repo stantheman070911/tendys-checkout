@@ -15,6 +15,11 @@ export type NotificationType =
 
 export type NotificationChannel = "line" | "email";
 export type NotificationLogStatus = "success" | "failed" | "skipped";
+export type NotificationJobStatus =
+  | "pending"
+  | "processing"
+  | "sent"
+  | "failed";
 
 // ─── Entity Interfaces ─────────────────────────────────────
 
@@ -121,6 +126,27 @@ export interface NotificationLog {
   created_at: string;
 }
 
+export interface NotificationJob {
+  id: string;
+  order_id: string | null;
+  round_id: string | null;
+  product_id: string | null;
+  recipient: string;
+  channel: NotificationChannel;
+  type: NotificationType;
+  payload: Record<string, unknown>;
+  dedupe_key: string;
+  status: NotificationJobStatus;
+  attempt_count: number;
+  max_attempts: number;
+  available_at: string;
+  locked_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+}
+
 // ─── Request Types ──────────────────────────────────────────
 
 export interface CartItem {
@@ -222,6 +248,16 @@ export interface AdminDashboardProductRow {
   unit: string;
   qty: number;
   revenue: number;
+}
+
+export interface AdminNotificationFailureRow {
+  id: string;
+  recipient: string;
+  channel: NotificationChannel;
+  type: NotificationType;
+  last_error: string | null;
+  attempt_count: number;
+  created_at: string;
 }
 
 // ─── Phase 6: Shipments Page Types ─────────────────────────

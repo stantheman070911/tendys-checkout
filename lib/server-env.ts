@@ -5,7 +5,23 @@ export class EnvironmentConfigurationError extends Error {
   }
 }
 
+const PRODUCTION_REQUIRED_ENV_NAMES = [
+  "ADMIN_SESSION_SECRET",
+  "PUBLIC_ORDER_ACCESS_SECRET",
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+  "LINE_CHANNEL_ACCESS_TOKEN",
+  "LINE_CHANNEL_SECRET",
+  "NOTIFICATION_WORKER_SECRET",
+  "CRON_SECRET",
+  "SENTRY_DSN",
+  "OPS_ALERT_WEBHOOK_URL",
+] as const;
+
 const warnedFallbacks = new Set<string>();
+let productionRuntimeValidated = false;
 
 function warnInsecureFallback(message: string) {
   if (warnedFallbacks.has(message)) {
@@ -69,6 +85,119 @@ export function getPublicOrderAccessSecret() {
     name: "PUBLIC_ORDER_ACCESS_SECRET",
     developmentFallback: "dev-only-public-order-secret",
   });
+}
+
+export function getNotificationWorkerSecret() {
+  return readSeparatedSigningSecret({
+    name: "NOTIFICATION_WORKER_SECRET",
+    developmentFallback: "dev-only-notification-worker-secret",
+  });
+}
+
+export function getCronSecret() {
+  if (!isProductionEnvironment()) {
+    return readOptionalEnv("CRON_SECRET");
+  }
+
+  return readRequiredProductionEnv("CRON_SECRET");
+}
+
+export function getNotificationWorkerAuthorizationSecret() {
+  return getCronSecret() ?? getNotificationWorkerSecret();
+}
+
+export function allowBearerAdminSessionFallback() {
+  return readOptionalEnv("ALLOW_BEARER_ADMIN_SESSION_FALLBACK") === "true";
+}
+
+export function getResendApiKey() {
+  if (!isProductionEnvironment()) {
+    return readOptionalEnv("RESEND_API_KEY");
+  }
+
+  return readRequiredProductionEnv("RESEND_API_KEY");
+}
+
+export function getResendFromEmail() {
+  if (!isProductionEnvironment()) {
+    return readOptionalEnv("RESEND_FROM_EMAIL");
+  }
+
+  return readRequiredProductionEnv("RESEND_FROM_EMAIL");
+}
+
+export function getLineChannelAccessToken() {
+  if (!isProductionEnvironment()) {
+    return readOptionalEnv("LINE_CHANNEL_ACCESS_TOKEN");
+  }
+
+  return readRequiredProductionEnv("LINE_CHANNEL_ACCESS_TOKEN");
+}
+
+export function getLineChannelSecret() {
+  if (!isProductionEnvironment()) {
+    return readOptionalEnv("LINE_CHANNEL_SECRET");
+  }
+
+  return readRequiredProductionEnv("LINE_CHANNEL_SECRET");
+}
+
+export function getSentryDsn() {
+  if (!isProductionEnvironment()) {
+    return readOptionalEnv("SENTRY_DSN");
+  }
+
+  return readRequiredProductionEnv("SENTRY_DSN");
+}
+
+export function getOpsAlertWebhookUrl() {
+  if (!isProductionEnvironment()) {
+    return readOptionalEnv("OPS_ALERT_WEBHOOK_URL");
+  }
+
+  return readRequiredProductionEnv("OPS_ALERT_WEBHOOK_URL");
+}
+
+export function getProductionRuntimeValidationErrors() {
+  if (!isProductionEnvironment()) {
+    return [];
+  }
+
+  const missing = PRODUCTION_REQUIRED_ENV_NAMES.filter(
+    (name) => !readOptionalEnv(name),
+  );
+  const errors = missing.map(
+    (name) => `Missing required environment variable: ${name}`,
+  );
+
+  if (allowBearerAdminSessionFallback()) {
+    errors.push(
+      "ALLOW_BEARER_ADMIN_SESSION_FALLBACK must be false or unset in production",
+    );
+  }
+
+  return errors;
+}
+
+export function validateProductionRuntimeConfig() {
+  if (!isProductionEnvironment()) {
+    return;
+  }
+
+  if (productionRuntimeValidated) {
+    return;
+  }
+
+  const errors = getProductionRuntimeValidationErrors();
+  if (errors.length > 0) {
+    throw new EnvironmentConfigurationError(errors.join("; "));
+  }
+
+  productionRuntimeValidated = true;
+}
+
+export function resetProductionRuntimeValidationForTests() {
+  productionRuntimeValidated = false;
 }
 
 export function getRateLimitConfig() {

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import type { NotificationChannel, NotificationType } from "@/types";
 
@@ -11,8 +12,11 @@ export interface LogNotificationPayload {
   errorMessage?: string | null;
 }
 
-export async function logNotification(payload: LogNotificationPayload) {
-  return prisma.notificationLog.create({
+async function createNotificationLog(
+  client: Prisma.TransactionClient | typeof prisma,
+  payload: LogNotificationPayload,
+) {
+  return client.notificationLog.create({
     data: {
       order_id: payload.orderId ?? null,
       round_id: payload.roundId ?? null,
@@ -23,6 +27,17 @@ export async function logNotification(payload: LogNotificationPayload) {
       error_message: payload.errorMessage ?? null,
     },
   });
+}
+
+export async function logNotification(payload: LogNotificationPayload) {
+  return createNotificationLog(prisma, payload);
+}
+
+export async function logNotificationTx(
+  tx: Prisma.TransactionClient,
+  payload: LogNotificationPayload,
+) {
+  return createNotificationLog(tx, payload);
 }
 
 export async function getLogsByOrder(orderId: string) {

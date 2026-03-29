@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const execMock = vi.hoisted(() => vi.fn());
 const redisConstructorMock = vi.hoisted(() => vi.fn());
+const loggerMock = vi.hoisted(() => ({
+  logError: vi.fn(),
+}));
 
 vi.mock("@upstash/redis", () => ({
   Redis: redisConstructorMock.mockImplementation(() => ({
@@ -10,6 +13,8 @@ vi.mock("@upstash/redis", () => ({
     }),
   })),
 }));
+
+vi.mock("@/lib/logger", () => loggerMock);
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -25,6 +30,7 @@ describe("checkRateLimit", () => {
     process.env = { ...ORIGINAL_ENV };
     execMock.mockReset();
     redisConstructorMock.mockClear();
+    loggerMock.logError.mockReset();
     const { resetRateLimitStoreForTests } = await importRateLimitModule();
     resetRateLimitStoreForTests();
   });
@@ -79,12 +85,22 @@ describe("checkRateLimit", () => {
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
     const { checkRateLimit } = await importRateLimitModule();
 
-    await expect(checkRateLimit("lookup:1.2.3.4", 5, 60_000)).resolves.toEqual(
-      {
-        allowed: false,
-        retryAfterSeconds: 0,
-        error: "backend_unavailable",
-      },
+    await expect(
+      checkRateLimit("lookup:1.2.3.4", 5, 60_000, {
+        route: "/api/lookup",
+        requestId: "req-123",
+      }),
+    ).resolves.toEqual({
+      allowed: false,
+      retryAfterSeconds: 0,
+      error: "backend_unavailable",
+    });
+    expect(loggerMock.logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "rate_limit_backend_unavailable",
+        route: "/api/lookup",
+        requestId: "req-123",
+      }),
     );
   });
 

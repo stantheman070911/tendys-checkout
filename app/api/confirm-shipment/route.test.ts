@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth/supabase-admin", () => ({
-  verifyAdminSession: authMock,
+  authorizeAdminRequest: authMock,
 }));
 
 const ordersMock = vi.hoisted(() => ({
@@ -12,16 +12,6 @@ const ordersMock = vi.hoisted(() => ({
   batchConfirmShipment: vi.fn(),
 }));
 vi.mock("@/lib/db/orders", () => ordersMock);
-
-const notifyMock = vi.hoisted(() => ({
-  sendShipmentNotifications: vi.fn(),
-}));
-vi.mock("@/lib/notifications/send", () => notifyMock);
-vi.mock("@/lib/notifications/fire-and-forget", () => ({
-  fireAndForget: (task: () => Promise<unknown>) => {
-    void task();
-  },
-}));
 
 import { POST } from "./route";
 
@@ -48,19 +38,18 @@ const fakeOrder = {
 describe("POST /api/confirm-shipment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authMock.mockResolvedValue(true);
-    notifyMock.sendShipmentNotifications.mockResolvedValue({});
+    authMock.mockResolvedValue({
+      authorized: true,
+      mode: "cookie",
+      claims: null,
+    });
   });
 
-  it("single: valid → 200 + notification", async () => {
+  it("single: valid → 200", async () => {
     ordersMock.confirmShipment.mockResolvedValue(fakeOrder);
 
     const res = await POST(makeRequest({ orderId: UUID1 }));
     expect(res.status).toBe(200);
-    expect(notifyMock.sendShipmentNotifications).toHaveBeenCalledWith(
-      fakeOrder,
-      fakeOrder.order_items,
-    );
   });
 
   it("single: not found → 404", async () => {
@@ -80,20 +69,21 @@ describe("POST /api/confirm-shipment", () => {
     expect(data.skipped).toEqual([UUID2]);
   });
 
-  it("batch: notification only for newly shipped", async () => {
+  it("batch: only returns newly shipped orders", async () => {
     ordersMock.batchConfirmShipment.mockResolvedValue([fakeOrder]);
 
-    await POST(makeRequest({ orderIds: [UUID1, UUID2] }));
-    // Only called once for the one that actually shipped
-    expect(notifyMock.sendShipmentNotifications).toHaveBeenCalledTimes(1);
-    expect(notifyMock.sendShipmentNotifications).toHaveBeenCalledWith(
-      fakeOrder,
-      fakeOrder.order_items,
-    );
+    const res = await POST(makeRequest({ orderIds: [UUID1, UUID2] }));
+    const data = await res.json();
+    expect(data.shipped).toBe(1);
+    expect(data.skipped).toEqual([UUID2]);
   });
 
   it("returns 401 when not admin", async () => {
-    authMock.mockResolvedValue(false);
+    authMock.mockResolvedValue({
+      authorized: false,
+      mode: "none",
+      claims: null,
+    });
 
     const res = await POST(makeRequest({ orderId: UUID1 }));
     expect(res.status).toBe(401);

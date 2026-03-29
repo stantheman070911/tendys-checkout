@@ -139,8 +139,7 @@ app/
   page.tsx                      # Storefront
   order/[orderNumber]/page.tsx  # Public order detail (server-renders when the order-scoped access cookie exists; direct access still gated by order_number + purchaser_name + phone_last3)
   lookup/page.tsx               # Order lookup (purchaser_name + phone_last3)
-  gtfo/page.tsx                 # Troll page for /admin snoopers
-  admin/                        # ⚠️ NOT /admin (redirects to /gtfo). Real URL: /bitchassnigga (next.config.ts rewrites)
+  admin/                        # Canonical admin route
     layout.tsx                  # Auth guard, nav tabs, POS button
     page.tsx                    # Login
     dashboard/page.tsx          # Stats + aggregation + notification log

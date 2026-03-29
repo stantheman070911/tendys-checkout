@@ -48,6 +48,7 @@ const roundUpdateSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const all = request.nextUrl.searchParams.get("all");
+    const requestedRoundId = request.nextUrl.searchParams.get("roundId");
 
     // Admin: list recent rounds
     if (all === "true") {
@@ -57,6 +58,18 @@ export async function GET(request: NextRequest) {
       }
       const rounds = await listRecent();
       return NextResponse.json({ rounds });
+    }
+
+    if (requestedRoundId) {
+      const round = await findById(requestedRoundId);
+      return NextResponse.json(
+        { round },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
     }
 
     // Public: get current open round
